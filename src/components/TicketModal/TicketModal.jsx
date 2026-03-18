@@ -3,22 +3,14 @@ import { X, Expand, User, Building2, Database, Mail, Phone, Clock, Calendar } fr
 import { statusBadgeClass, priorityBadgeClass, crmBadgeClass, formatDateTime, getInitials, getAvatarColor } from '../../utils/helpers';
 import './TicketModal.css';
 
-// ── Hover Popup (same pattern as TicketDetails) ──────────────────────────────
+// ── Hover Popup ──────────────────────────────────────────────────────────────
 function HoverPopup({ children, popup }) {
   const [visible, setVisible] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-  const ref = useRef();
   const timerRef = useRef();
 
-  const show = () => {
-    clearTimeout(timerRef.current);
-    const rect = ref.current?.getBoundingClientRect();
-    if (rect) setPos({ top: rect.bottom + 8, left: rect.left });
-    setVisible(true);
-  };
+  const show = () => { clearTimeout(timerRef.current); setVisible(true); };
   const hide = () => { timerRef.current = setTimeout(() => setVisible(false), 120); };
 
-  // close on Escape
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') setVisible(false); };
     window.addEventListener('keydown', handler);
@@ -26,26 +18,34 @@ function HoverPopup({ children, popup }) {
   }, []);
 
   return (
-    <>
-      <span ref={ref} onMouseEnter={show} onMouseLeave={hide} style={{ cursor: 'default' }}>
-        {children}
-      </span>
+    <span
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      style={{ position: 'relative', display: 'inline-block', cursor: 'default' }}
+    >
+      {children}
       {visible && (
         <div
           onMouseEnter={() => clearTimeout(timerRef.current)}
           onMouseLeave={hide}
           style={{
-            position: 'fixed', top: pos.top, left: pos.left,
-            zIndex: 1100, minWidth: 210, maxWidth: 270,
-            background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-lg)',
-            padding: '14px 16px', animation: 'fadeIn 0.15s ease',
+            position: 'absolute',
+            top: 'calc(100% + 8px)',
+            left: 0,
+            zIndex: 1100,
+            width: 260,
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+            padding: '14px 16px',
+            animation: 'fadeIn 0.15s ease',
           }}
         >
           {popup}
         </div>
       )}
-    </>
+    </span>
   );
 }
 
