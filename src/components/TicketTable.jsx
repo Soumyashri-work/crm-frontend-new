@@ -1,17 +1,19 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { statusBadgeClass, priorityBadgeClass, crmBadgeClass, formatDateTime, getInitials, getAvatarColor } from '../utils/helpers';
+import TicketModal from './TicketModal/TicketModal';
 
 const PRIORITY_ORDER = { Urgent: 4, High: 3, Medium: 2, Low: 1 };
 const STATUS_ORDER   = { Open: 4, 'In Progress': 3, Pending: 2, Closed: 1 };
 
 const SAMPLE = [
-  { id: 11, crm_id: 'ESPO-1252', title: 'Server timeout errors',           status: 'Open',        priority: 'Urgent', assignee: 'Alex Brown',   assignee_email: 'alex.brown@company.com', customer: 'David Lee', customer_email: 'david.lee@globalindustries.com', account: 'Global Industries Inc', updated: new Date(Date.now()-3600000).toISOString(), crm: 'EspoCRM' },
-  { id: 1,  crm_id: 'ESPO-1247', title: 'Login page not loading',          status: 'Open',        priority: 'Urgent', assignee: 'Sarah Chen',   assignee_email: 'sarah.chen@company.com',  customer: 'Alex Brown', customer_email: 'alex.brown@digitaldynamics.com', account: 'Digital Dynamics',      updated: new Date(Date.now()-7200000).toISOString(), crm: 'EspoCRM' },
-  { id: 2,  crm_id: 'ZMD-3456',  title: 'Add dark mode support',           status: 'In Progress', priority: 'Medium', assignee: 'Mike Johnson', assignee_email: 'mike.johnson@company.com', customer: 'Sarah Kim',  customer_email: 'sarah.kim@innovationlabs.com',   account: 'Innovation Labs',        updated: new Date(Date.now()-10800000).toISOString(), crm: 'Zammad' },
-  { id: 4,  crm_id: 'ZMD-3457',  title: 'Performance issue on dashboard',  status: 'In Progress', priority: 'High',   assignee: 'Sarah Chen',   assignee_email: 'sarah.chen@company.com',  customer: 'Lisa Anderson', customer_email: 'lisa.a@esg.com',               account: 'Enterprise Solutions',   updated: new Date(Date.now()-14400000).toISOString(), crm: 'Zammad' },
-  { id: 5,  crm_id: 'ESPO-1248', title: 'Email notifications not sending', status: 'Open',        priority: 'High',   assignee: 'Alex Brown',   assignee_email: 'alex.brown@company.com',  customer: 'Tom Wilson',  customer_email: 'tom.w@acmecorp.com',             account: 'Acme Corporation',       updated: new Date(Date.now()-18000000).toISOString(), crm: 'EspoCRM' },
-  { id: 6,  crm_id: 'ZMD-3458',  title: 'Export CSV feature request',      status: 'Closed',      priority: 'Low',    assignee: 'Mike Johnson', assignee_email: 'mike.johnson@company.com', customer: 'Rachel Green', customer_email: 'rachel.green@nexustech.io',    account: 'Nexus Technologies',     updated: new Date(Date.now()-86400000).toISOString(), crm: 'Zammad' },
+  { id: 11, crm_id: 'ESPO-1252', title: 'Server timeout errors',           status: 'Open',        priority: 'Urgent', assignee: 'Alex Brown',   assignee_email: 'alex.brown@company.com',   customer: 'David Lee',    customer_email: 'david.lee@globalindustries.com', account: 'Global Industries Inc',     updated: new Date(Date.now()-3600000).toISOString(),   created: new Date(Date.now()-86400000).toISOString(),   description: 'Users are experiencing server timeout errors when trying to load the dashboard. This started after the latest deployment.', crm: 'EspoCRM' },
+  { id: 1,  crm_id: 'ESPO-1247', title: 'Login page not loading',          status: 'Open',        priority: 'Urgent', assignee: 'Sarah Chen',   assignee_email: 'sarah.chen@company.com',   customer: 'Alex Brown',   customer_email: 'alex.brown@digitaldynamics.com',  account: 'Digital Dynamics',          updated: new Date(Date.now()-7200000).toISOString(),   created: new Date(Date.now()-172800000).toISOString(),  description: 'The login page is not loading for several users in the US region. Shows a blank white screen with no error messages.', crm: 'EspoCRM' },
+  { id: 2,  crm_id: 'ZMD-3456',  title: 'Add dark mode support',           status: 'In Progress', priority: 'Medium', assignee: 'Mike Johnson', assignee_email: 'mike.johnson@company.com', customer: 'Sarah Kim',    customer_email: 'sarah.kim@innovationlabs.com',    account: 'Innovation Labs',           updated: new Date(Date.now()-10800000).toISOString(),  created: new Date(Date.now()-259200000).toISOString(),  description: 'Feature request to add dark mode support. Highly requested by users who work in low-light environments.', crm: 'Zammad' },
+  { id: 4,  crm_id: 'ZMD-3457',  title: 'Performance issue on dashboard',  status: 'In Progress', priority: 'High',   assignee: 'Sarah Chen',   assignee_email: 'sarah.chen@company.com',   customer: 'Lisa Anderson',customer_email: 'lisa.a@esg.com',                  account: 'Enterprise Solutions',      updated: new Date(Date.now()-14400000).toISOString(),  created: new Date(Date.now()-345600000).toISOString(),  description: 'Users are reporting slow load times on the main dashboard page, especially when many tickets are loaded.', crm: 'Zammad' },
+  { id: 5,  crm_id: 'ESPO-1248', title: 'Email notifications not sending', status: 'Open',        priority: 'High',   assignee: 'Alex Brown',   assignee_email: 'alex.brown@company.com',   customer: 'Tom Wilson',   customer_email: 'tom.w@acmecorp.com',              account: 'Acme Corporation',          updated: new Date(Date.now()-18000000).toISOString(),  created: new Date(Date.now()-432000000).toISOString(),  description: 'The system is not sending email notifications when tickets are created or updated. This affects all users.', crm: 'EspoCRM' },
+  { id: 6,  crm_id: 'ZMD-3458',  title: 'Export CSV feature request',      status: 'Closed',      priority: 'Low',    assignee: 'Mike Johnson', assignee_email: 'mike.johnson@company.com', customer: 'Rachel Green', customer_email: 'rachel.green@nexustech.io',        account: 'Nexus Technologies',        updated: new Date(Date.now()-86400000).toISOString(),  created: new Date(Date.now()-604800000).toISOString(),  description: 'Users want the ability to export ticket data to CSV format for reporting purposes.', crm: 'Zammad' },
 ];
 
 function sortData(data, field, dir) {
@@ -44,26 +46,41 @@ export default function TicketTable({ tickets, onSort, sortField, sortDir, isAge
   const navigate = useNavigate();
   const raw = tickets || SAMPLE;
 
-  // Client-side filter + sort when no backend
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   const filtered = filters || search ? filterData(raw, filters || {}, search || '') : raw;
   const data = sortField ? sortData(filtered, sortField, sortDir) : filtered;
 
   const SortIcon = ({ field }) => {
     if (sortField !== field) return <ArrowUpDown size={13} style={{ opacity: 0.35, marginLeft: 4, flexShrink: 0 }} />;
     return sortDir === 'asc'
-      ? <ArrowUp size={13} style={{ marginLeft: 4, color: 'var(--primary)', flexShrink: 0 }} />
+      ? <ArrowUp   size={13} style={{ marginLeft: 4, color: 'var(--primary)', flexShrink: 0 }} />
       : <ArrowDown size={13} style={{ marginLeft: 4, color: 'var(--primary)', flexShrink: 0 }} />;
   };
 
   const thSort = (field) => ({
     style: {
-      cursor: 'pointer',
-      userSelect: 'none',
-      color: sortField === field ? 'var(--primary)' : undefined,
-      background: sortField === field ? '#EFF6FF' : undefined,
+      cursor: 'pointer', userSelect: 'none',
+      color:      sortField === field ? 'var(--primary)' : undefined,
+      background: sortField === field ? '#EFF6FF'        : undefined,
     },
     onClick: () => onSort?.(field),
   });
+
+  const handleRowClick = (ticket) => {
+    setSelectedTicket(ticket);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setTimeout(() => setSelectedTicket(null), 300);
+  };
+
+  const handleExpandTicket = (ticketId) => {
+    navigate(isAgent ? `/agent/tickets/${ticketId}` : `/admin/tickets/${ticketId}`);
+  };
 
   if (data.length === 0) return (
     <div className="card" style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -72,75 +89,74 @@ export default function TicketTable({ tickets, onSort, sortField, sortDir, isAge
   );
 
   return (
-    <div className="card" style={{ overflow: 'hidden' }}>
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>TICKET</th>
-              <th {...thSort('status')}>
-                <span style={{ display: 'flex', alignItems: 'center' }}>STATUS <SortIcon field="status" /></span>
-              </th>
-              <th {...thSort('priority')}>
-                <span style={{ display: 'flex', alignItems: 'center' }}>PRIORITY <SortIcon field="priority" /></span>
-              </th>
-              {!isAgent && <th>ASSIGNEE</th>}
-              <th {...thSort('updated')}>
-                <span style={{ display: 'flex', alignItems: 'center' }}>UPDATED <SortIcon field="updated" /></span>
-              </th>
-              <th>CRM</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((ticket, i) => (
-              <tr
-                key={ticket.id}
-                style={{ cursor: 'pointer', animationDelay: `${i * 0.04}s` }}
-                className="animate-in"
-                onClick={() => navigate(isAgent ? `/agent/tickets/${ticket.id}` : `/admin/tickets/${ticket.id}`)}
-              >
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                    <div style={{
-                      width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-                      background: 'var(--primary-light)', display: 'flex',
-                      alignItems: 'center', justifyContent: 'center',
-                      fontSize: 11, fontWeight: 700, color: 'var(--primary)',
-                    }}>
-                      #{ticket.id}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>{ticket.title}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{ticket.crm_id}</div>
-                    </div>
-                  </div>
-                </td>
-                <td><span className={statusBadgeClass(ticket.status)}>{ticket.status}</span></td>
-                <td><span className={priorityBadgeClass(ticket.priority)}>{ticket.priority}</span></td>
-                {!isAgent && (
+    <>
+      <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>TICKET</th>
+                <th {...thSort('status')}>
+                  <span style={{ display: 'flex', alignItems: 'center' }}>STATUS <SortIcon field="status" /></span>
+                </th>
+                <th {...thSort('priority')}>
+                  <span style={{ display: 'flex', alignItems: 'center' }}>PRIORITY <SortIcon field="priority" /></span>
+                </th>
+                {!isAgent && <th>ASSIGNEE</th>}
+                <th {...thSort('updated')}>
+                  <span style={{ display: 'flex', alignItems: 'center' }}>UPDATED <SortIcon field="updated" /></span>
+                </th>
+                <th>CRM</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((ticket, i) => (
+                <tr
+                  key={ticket.id}
+                  style={{ cursor: 'pointer', animationDelay: `${i * 0.04}s` }}
+                  className="animate-in"
+                  onClick={() => handleRowClick(ticket)}
+                >
                   <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{
-                        width: 28, height: 28, borderRadius: '50%',
-                        background: getAvatarColor(ticket.assignee),
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0,
-                      }}>
-                        {getInitials(ticket.assignee)}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--primary)' }}>
+                        #{ticket.id}
                       </div>
-                      <span style={{ fontSize: 13.5 }}>{ticket.assignee}</span>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{ticket.title}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{ticket.crm_id}</div>
+                      </div>
                     </div>
                   </td>
-                )}
-                <td style={{ color: 'var(--text-secondary)', fontSize: 13, whiteSpace: 'nowrap' }}>
-                  {formatDateTime(ticket.updated)}
-                </td>
-                <td><span className={crmBadgeClass(ticket.crm)}>{ticket.crm}</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  <td><span className={statusBadgeClass(ticket.status)}>{ticket.status}</span></td>
+                  <td><span className={priorityBadgeClass(ticket.priority)}>{ticket.priority}</span></td>
+                  {!isAgent && (
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: getAvatarColor(ticket.assignee), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0 }}>
+                          {getInitials(ticket.assignee)}
+                        </div>
+                        <span style={{ fontSize: 13.5 }}>{ticket.assignee}</span>
+                      </div>
+                    </td>
+                  )}
+                  <td style={{ color: 'var(--text-secondary)', fontSize: 13, whiteSpace: 'nowrap' }}>
+                    {formatDateTime(ticket.updated)}
+                  </td>
+                  <td><span className={crmBadgeClass(ticket.crm)}>{ticket.crm}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+
+      <TicketModal
+        ticket={selectedTicket}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onExpand={handleExpandTicket}
+      />
+    </>
   );
 }

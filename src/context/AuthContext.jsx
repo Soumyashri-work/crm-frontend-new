@@ -16,18 +16,37 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const storedToken = localStorage.getItem('access_token');
-    const storedUser = localStorage.getItem('user');
-    if (storedToken && storedUser && !isTokenExpired(storedToken)) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-    } else {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('user');
-    }
+useEffect(() => {
+    // TEMP: fake login for UI testing — remove before production
+    const fakeToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwicm9sZSI6ImFkbWluIiwiZXhwIjo5OTk5OTk5OTk5fQ.fake";
+    const fakeUser = {
+      name: "John Anderson",
+      email: "john.anderson@company.com",
+      role: "admin",
+      picture: null
+    };
+    localStorage.setItem('access_token', fakeToken);
+    localStorage.setItem('user', JSON.stringify(fakeUser));
+    setToken(fakeToken);
+    setUser(fakeUser);
     setLoading(false);
   }, []);
+
+
+  
+
+// useEffect(() => {
+//     const storedToken = localStorage.getItem('access_token');
+//     const storedUser = localStorage.getItem('user');
+//     if (storedToken && storedUser && !isTokenExpired(storedToken)) {
+//       setToken(storedToken);
+//       setUser(JSON.parse(storedUser));
+//     } else {
+//       localStorage.removeItem('access_token');
+//       localStorage.removeItem('user');
+//     }
+//     setLoading(false);
+//   }, []);
 
   const login = useCallback((tokenVal, userData) => {
     localStorage.setItem('access_token', tokenVal);
