@@ -6,14 +6,16 @@ import TicketTable from '../../components/TicketTable';
 
 export default function AgentDashboard() {
   const { user } = useAuth();
-  const [myTickets, setMyTickets] = useState(null);
-  const [sort, setSort] = useState({ field: 'updated', dir: 'desc' });
+  const [myTickets, setMyTickets] = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [sort, setSort]           = useState({ field: 'updated', dir: 'desc' });
 
   useEffect(() => {
     ticketService.getAll({ assignee: user?.name, limit: 5 })
-      .then(r => setMyTickets(r.data?.items || r.data))
-      .catch(() => {});
-  }, []);
+      .then(r => setMyTickets(r.data?.items || []))
+      .catch(() => setMyTickets([]))
+      .finally(() => setLoading(false));
+  }, [user?.name]);
 
   const handleSort = (field) => {
     setSort(s => ({ field, dir: s.field === field && s.dir === 'asc' ? 'desc' : 'asc' }));
@@ -27,11 +29,14 @@ export default function AgentDashboard() {
           Hi {user?.name?.split(' ')[0] || 'there'}! Here are your assigned tickets.
         </p>
       </div>
+
       <DashboardWidgets />
+
       <div>
         <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>My Recent Tickets</h3>
         <TicketTable
           tickets={myTickets}
+          loading={loading}
           isAgent
           onSort={handleSort}
           sortField={sort.field}

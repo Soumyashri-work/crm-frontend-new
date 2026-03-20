@@ -5,12 +5,21 @@ import TicketTable from '../../components/TicketTable';
 import { ticketService } from '../../services/ticketService';
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState(null);
-  const [recentTickets, setRecentTickets] = useState(null);
+  const [stats, setStats]               = useState(null);
+  const [recentTickets, setRecentTickets] = useState([]);
+  const [loading, setLoading]           = useState(true);
 
   useEffect(() => {
-    ticketService.getStats().then(r => setStats(r.data)).catch(() => {});
-    ticketService.getAll({ limit: 5, sort: '-updated' }).then(r => setRecentTickets(r.data?.items || r.data)).catch(() => {});
+    // Stats (best-effort — widget falls back to placeholders if it fails)
+    ticketService.getStats()
+      .then(r => setStats(r.data))
+      .catch(() => {});
+
+    // Recent tickets — last 5 by updated timestamp
+    ticketService.getAll({ limit: 5, sort: '-updated' })
+      .then(r => setRecentTickets(r.data?.items || []))
+      .catch(() => setRecentTickets([]))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -28,9 +37,11 @@ export default function AdminDashboard() {
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h3 style={{ fontSize: 16, fontWeight: 600 }}>Recent Tickets</h3>
-          <a href="/admin/tickets" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 500 }}>View all →</a>
+          <a href="/admin/tickets" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 500 }}>
+            View all →
+          </a>
         </div>
-        <TicketTable tickets={recentTickets} />
+        <TicketTable tickets={recentTickets} loading={loading} />
       </div>
     </div>
   );
