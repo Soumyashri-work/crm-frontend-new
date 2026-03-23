@@ -38,22 +38,23 @@ function FilterSelect({ label, options, value, onChange }) {
 }
 
 export default function Filters({ filters, onChange, extraFilters = [] }) {
-  const statusOpts = [
-    { value: 'Open', label: 'Open' },
-    { value: 'Closed', label: 'Closed' },
-    { value: 'Pending', label: 'Pending' },
-    { value: 'In Progress', label: 'In Progress' },
-  ];
-  const priorityOpts = [
-    { value: 'Urgent', label: 'Urgent' },
-    { value: 'High', label: 'High' },
-    { value: 'Medium', label: 'Medium' },
-    { value: 'Low', label: 'Low' },
-  ];
-  const crmOpts = [
-    { value: 'EspoCRM', label: 'EspoCRM' },
-    { value: 'Zammad', label: 'Zammad' },
-  ];
+const statusOpts = [
+  { value: 'open',    label: 'Open'        },
+  { value: 'closed',  label: 'Closed'      },
+  { value: 'pending', label: 'Pending'     },
+];
+
+const priorityOpts = [
+  { value: 'urgent', label: 'Urgent' },
+  { value: 'high',   label: 'High'   },
+  { value: 'normal', label: 'Normal' },
+  { value: 'low',    label: 'Low'    },
+];
+
+const crmOpts = [
+  { value: 'espocrm', label: 'EspoCRM' },
+  { value: 'zammad',  label: 'Zammad'  },
+];
 
   const hasActiveFilters = filters.status || filters.priority || filters.crm ||
     extraFilters.some(f => filters[f.key]);

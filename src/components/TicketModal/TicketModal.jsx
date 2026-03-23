@@ -169,22 +169,24 @@ export default function TicketModal({ ticket, isOpen, onClose, onExpand }) {
       onClose();
     }, 200);
   };
+// Agent
+const assigneeName  = ticket.assignee?.name || '—';
+const assigneeEmail = ticket.assignee?.email || null;
+const assigneeRole  = ticket.assignee?.role  || 'Agent';
 
-  // Resolve nested objects (from SAMPLE flat data or rich SAMPLES from TicketDetails)
-  const assigneeName  = ticket.assignee?.name  || ticket.assignee  || '—';
-  const assigneeEmail = ticket.assignee?.email || ticket.assignee_email || null;
-  const assigneeRole  = ticket.assignee?.role  || 'Agent';
+// Customer  
+const customerName  = ticket.customer?.name
+  || `${ticket.customer?.first_name ?? ''} ${ticket.customer?.last_name ?? ''}`.trim()
+  || '—';
+const customerEmail = ticket.customer?.email || null;
+const customerPhone = ticket.customer?.phone || null;
+const customerAcct  = ticket.account?.name   || ticket.account?.company_name || null;
 
-  const customerName  = ticket.customer?.name  || ticket.customer  || '—';
-  const customerEmail = ticket.customer?.email || ticket.customer_email || null;
-  const customerPhone = ticket.customer?.phone || null;
-  const customerAcct  = ticket.customer?.account || ticket.account || null;
-
-  const accountName   = ticket.account?.name  || ticket.account   || '—';
-  const accountEmail  = ticket.account?.email || null;
-  const accountPhone  = ticket.account?.phone || null;
-  const accountCrm    = ticket.account?.crm   || ticket.crm       || null;
-
+// Account/Company
+const accountName  = ticket.account?.name || ticket.account?.company_name || '—';
+const accountEmail = ticket.account?.email || null;
+const accountPhone = ticket.account?.phone || null;
+const accountCrm   = ticket.crm || null;
   return (
     <>
       {/* Backdrop */}
@@ -197,15 +199,15 @@ export default function TicketModal({ ticket, isOpen, onClose, onExpand }) {
         <div className="ticket-modal-header">
           <div className="ticket-modal-title-section">
             <div style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--primary)' }}>
-              #{ticket.id}
+     {getInitials(ticket.title)}
             </div>
             <div style={{ minWidth: 0 }}>
               <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {ticket.title}
               </h2>
-              <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
-                {ticket.crm_id}
-              </p>
+<p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+  {ticket.crm_id ? `CRM ID: ${ticket.crm_id}` : ''}
+</p>
             </div>
           </div>
 

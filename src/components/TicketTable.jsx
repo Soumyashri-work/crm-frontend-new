@@ -6,19 +6,20 @@ import {
   formatDateTime, getInitials, getAvatarColor,
 } from '../utils/helpers';
 import TicketModal from './TicketModal/TicketModal';
+import { ticketService } from '../services/ticketService';
 
-const PRIORITY_ORDER = { Urgent: 4, High: 3, Medium: 2, Low: 1 };
-const STATUS_ORDER   = { Open: 4, 'In Progress': 3, Pending: 2, Closed: 1 };
+const PRIORITY_ORDER = { urgent: 4, high: 3, normal: 2, low: 1 };
+const STATUS_ORDER   = { open: 4, pending: 3, closed: 1 };
 
 function sortData(data, field, dir) {
   if (!field) return data;
   return [...data].sort((a, b) => {
     let av = a[field], bv = b[field];
-    if (field === 'priority') { av = PRIORITY_ORDER[a.priority] || 0; bv = PRIORITY_ORDER[b.priority] || 0; }
-    if (field === 'status')   { av = STATUS_ORDER[a.status]   || 0; bv = STATUS_ORDER[b.status]   || 0; }
+    if (field === 'priority') { av = PRIORITY_ORDER[a.priority?.toLowerCase()] || 0; bv = PRIORITY_ORDER[b.priority?.toLowerCase()] || 0; }
+    if (field === 'status')   { av = STATUS_ORDER[a.status?.toLowerCase()]     || 0; bv = STATUS_ORDER[b.status?.toLowerCase()]     || 0; }
     if (field === 'updated')  { av = new Date(a.updated); bv = new Date(b.updated); }
     if (av < bv) return dir === 'asc' ? -1 : 1;
-    if (av > bv) return dir === 'asc' ? 1  : -1;
+    if (av > bv) return dir === 'asc' ?  1 : -1;
     return 0;
   });
 }
@@ -29,21 +30,16 @@ function filterData(data, filters, search) {
     if (filters.priority && t.priority !== filters.priority) return false;
     if (filters.crm      && t.crm      !== filters.crm)      return false;
     if (search) {
-      const q = search.toLowerCase();
-      const title  = (t.title  || '').toLowerCase();
-      const crmId  = (t.crm_id || '').toLowerCase();
+      const q     = search.toLowerCase();
+      const title = (t.title  || '').toLowerCase();
+      const crmId = (t.crm_id || '').toLowerCase();
       if (!title.includes(q) && !crmId.includes(q)) return false;
     }
     return true;
   });
 }
 
-// Resolve nested assignee name whether it's a string or object
-function assigneeName(t) {
-  if (!t.assignee) return '—';
-  if (typeof t.assignee === 'string') return t.assignee;
-  return t.assignee.name || '—';
-}
+
 
 export default function TicketTable({
   tickets,
@@ -54,7 +50,8 @@ export default function TicketTable({
 }) {
   const navigate = useNavigate();
   const [selectedTicket, setSelectedTicket] = useState(null);
-  const [isModalOpen, setIsModalOpen]       = useState(false);
+  const [isModalOpen,    setIsModalOpen]    = useState(false);
+  const [modalLoading,   setModalLoading]   = useState(false);
 
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (loading) {
@@ -85,6 +82,7 @@ export default function TicketTable({
   const filtered = (filters || search) ? filterData(raw, filters || {}, search || '') : raw;
   const data     = sortField ? sortData(filtered, sortField, sortDir) : filtered;
 
+  // ── Sort icon ─────────────────────────────────────────────────────────────
   const SortIcon = ({ field }) => {
     if (sortField !== field)
       return <ArrowUpDown size={13} style={{ opacity: 0.35, marginLeft: 4, flexShrink: 0 }} />;
@@ -102,9 +100,20 @@ export default function TicketTable({
     onClick: () => onSort?.(field),
   });
 
-  const handleRowClick = (ticket) => {
-    setSelectedTicket(ticket);
+  // ── Row click → fetch full detail, then open modal ────────────────────────
+  const handleRowClick = async (ticket) => {
     setIsModalOpen(true);
+    setModalLoading(true);
+    setSelectedTicket(null);
+    try {
+      const full = await ticketService.getById(ticket.id);
+      setSelectedTicket(full);
+    } catch (err) {
+      console.error('Failed to load ticket detail:', err);
+      setSelectedTicket(ticket); // fallback to brief data
+    } finally {
+      setModalLoading(false);
+    }
   };
 
   const handleCloseModal = () => {
@@ -142,7 +151,6 @@ export default function TicketTable({
                 <th {...thSort('priority')}>
                   <span style={{ display: 'flex', alignItems: 'center' }}>PRIORITY <SortIcon field="priority" /></span>
                 </th>
-                {!isAgent && <th>ASSIGNEE</th>}
                 <th {...thSort('updated')}>
                   <span style={{ display: 'flex', alignItems: 'center' }}>UPDATED <SortIcon field="updated" /></span>
                 </th>
@@ -151,7 +159,6 @@ export default function TicketTable({
             </thead>
             <tbody>
               {data.map((ticket, i) => {
-                const name = assigneeName(ticket);
                 return (
                   <tr
                     key={ticket.id}
@@ -159,53 +166,44 @@ export default function TicketTable({
                     className="animate-in"
                     onClick={() => handleRowClick(ticket)}
                   >
+                    {/* Ticket title + CRM ID */}
                     <td>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                         <div style={{
-                          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                          width: 32, height: 32, borderRadius: 8, flexShrink: 0,
                           background: 'var(--primary-light)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: 11, fontWeight: 700, color: 'var(--primary)',
                         }}>
-                          #{ticket.id}
+                          {getInitials(ticket.title)}
                         </div>
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 14 }}>{ticket.title}</div>
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{ticket.crm_id}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                            {ticket.crm_id || '—'}
+                          </div>
                         </div>
                       </div>
                     </td>
 
+                    {/* Status */}
                     <td>
                       <span className={statusBadgeClass(ticket.status)}>{ticket.status}</span>
                     </td>
 
+                    {/* Priority */}
                     <td>
                       <span className={priorityBadgeClass(ticket.priority)}>{ticket.priority}</span>
                     </td>
 
-                    {!isAgent && (
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{
-                            width: 28, height: 28, borderRadius: '50%',
-                            background: getAvatarColor(name),
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0,
-                          }}>
-                            {getInitials(name)}
-                          </div>
-                          <span style={{ fontSize: 13.5 }}>{name}</span>
-                        </div>
-                      </td>
-                    )}
-
+                    {/* Updated */}
                     <td style={{ color: 'var(--text-secondary)', fontSize: 13, whiteSpace: 'nowrap' }}>
-                      {formatDateTime(ticket.updated)}
+                      {formatDateTime(ticket.updated) || '—'}
                     </td>
 
+                    {/* CRM */}
                     <td>
-                      <span className={crmBadgeClass(ticket.crm)}>{ticket.crm}</span>
+                      <span className={crmBadgeClass(ticket.crm)}>{ticket.crm || '—'}</span>
                     </td>
                   </tr>
                 );
@@ -220,6 +218,7 @@ export default function TicketTable({
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onExpand={handleExpandTicket}
+        loading={modalLoading}
       />
     </>
   );
