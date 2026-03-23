@@ -185,17 +185,17 @@ export default function TicketDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
 
-  const fetchTicket = () => {
-    setLoading(true);
-    setError(null);
-    ticketService.getById(id)
-      .then(r => setTicket(r.data))
-      .catch(err => {
-        console.error('Failed to load ticket:', err);
-        setError('Could not load ticket. It may not exist or the server is unavailable.');
-      })
-      .finally(() => setLoading(false));
-  };
+const fetchTicket = () => {
+  setLoading(true);
+  setError(null);
+  ticketService.getById(id)
+    .then(data => setTicket(data))   // ← was r.data, but getById already unwraps
+    .catch(err => {
+      console.error('Failed to load ticket:', err);
+      setError('Could not load ticket. It may not exist or the server is unavailable.');
+    })
+    .finally(() => setLoading(false));
+};
 
   useEffect(() => { fetchTicket(); }, [id]);
 
@@ -233,15 +233,21 @@ export default function TicketDetails() {
 
   // ── Ticket not returned (shouldn't happen, but guard) ────────────────────
   if (!ticket) return null;
+  
+  // Agent from backend is { id, name, email }
+const assignee     = ticket.assignee ?? {};
+const assigneeName = assignee.name || '—';
 
-  // Resolve nested relations (normalizeTicket already ran, so these are objects)
-  const assignee = typeof ticket.assignee === 'object' ? ticket.assignee : { name: ticket.assignee };
-  const customer = typeof ticket.customer === 'object' ? ticket.customer : { name: ticket.customer };
-  const account  = typeof ticket.account  === 'object' ? ticket.account  : { name: ticket.account  };
+// Customer from backend is { id, first_name, last_name, email }
+const customer     = ticket.customer ?? {};
+const customerName = customer.name
+  || `${customer.first_name ?? ''} ${customer.last_name ?? ''}`.trim()
+  || '—';
 
-  const assigneeName = assignee.name || '—';
-  const customerName = customer.name || '—';
-  const accountName  = account.name  || customer.account || '—';
+// Company/account from backend is { id, company_name }
+const account     = ticket.account ?? {};
+const accountName = account.name || account.company_name || '—';
+
 
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -260,7 +266,7 @@ export default function TicketDetails() {
           >
             Tickets
           </span>
-          {' › '}#{ticket.id}
+      {' › '}{ticket.crm_id || ticket.crm_ticket_id || `#${ticket.id}`}
         </span>
       </div>
 
