@@ -181,23 +181,33 @@ export default function TicketDetails() {
   const isAgent    = location.pathname.startsWith('/agent');
   const base       = isAgent ? '/agent' : '/admin';
 
-  const [ticket, setTicket] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // FIX: Seed state from router location if TicketTable already fetched this
+  // ticket for the modal. If the user navigates directly to the URL (bookmark,
+  // refresh, shared link) location.state will be null and we fall back to
+  // fetching normally, so direct-URL access is fully preserved.
+  const preloaded = location.state?.ticket ?? null;
+
+  const [ticket, setTicket]   = useState(preloaded);
+  const [loading, setLoading] = useState(!preloaded); // skip loading state if pre-seeded
   const [error, setError]     = useState(null);
 
-const fetchTicket = () => {
-  setLoading(true);
-  setError(null);
-  ticketService.getById(id)
-    .then(data => setTicket(data))   // ← was r.data, but getById already unwraps
-    .catch(err => {
-      console.error('Failed to load ticket:', err);
-      setError('Could not load ticket. It may not exist or the server is unavailable.');
-    })
-    .finally(() => setLoading(false));
-};
+  const fetchTicket = () => {
+    setLoading(true);
+    setError(null);
+    ticketService.getById(id)
+      .then(data => setTicket(data))
+      .catch(err => {
+        console.error('Failed to load ticket:', err);
+        setError('Could not load ticket. It may not exist or the server is unavailable.');
+      })
+      .finally(() => setLoading(false));
+  };
 
-  useEffect(() => { fetchTicket(); }, [id]);
+  useEffect(() => {
+    // Skip the network call if we already have the full ticket from navigation state.
+    if (preloaded) return;
+    fetchTicket();
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Loading spinner ──────────────────────────────────────────────────────
   if (loading) return (
@@ -233,21 +243,20 @@ const fetchTicket = () => {
 
   // ── Ticket not returned (shouldn't happen, but guard) ────────────────────
   if (!ticket) return null;
-  
+
   // Agent from backend is { id, name, email }
-const assignee     = ticket.assignee ?? {};
-const assigneeName = assignee.name || '—';
+  const assignee     = ticket.assignee ?? {};
+  const assigneeName = assignee.name || '—';
 
-// Customer from backend is { id, first_name, last_name, email }
-const customer     = ticket.customer ?? {};
-const customerName = customer.name
-  || `${customer.first_name ?? ''} ${customer.last_name ?? ''}`.trim()
-  || '—';
+  // Customer from backend is { id, first_name, last_name, email }
+  const customer     = ticket.customer ?? {};
+  const customerName = customer.name
+    || `${customer.first_name ?? ''} ${customer.last_name ?? ''}`.trim()
+    || '—';
 
-// Company/account from backend is { id, company_name }
-const account     = ticket.account ?? {};
-const accountName = account.name || account.company_name || '—';
-
+  // Company/account from backend is { id, company_name }
+  const account     = ticket.account ?? {};
+  const accountName = account.name || account.company_name || '—';
 
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>

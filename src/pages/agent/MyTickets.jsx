@@ -18,17 +18,33 @@ export default function MyTickets() {
   const [sort, setSort]             = useState({ field: 'updated', dir: 'desc' });
   const [page, setPage]             = useState(1);
 
-  const fetchTickets = useCallback(async (currentPage = 1) => {
-    if (!user?.agent_id) return;
+  // FIX: fetchTickets previously captured filters.status and filters.priority
+  // from the closure, so those values had to live in useCallback's deps array.
+  // Every filter change → new fetchTickets reference → useEffect([fetchTickets])
+  // fired → fetch. But React also re-renders the component on filter state
+  // change, which caused useCallback to rebuild the function reference a second
+  // time in the same cycle, triggering a second effect run and a second fetch.
+  //
+  // Fix: accept agentId, status, and priority as explicit parameters so the
+  // function never reads from the closure. useCallback deps are now empty —
+  // the reference is permanently stable and the effect only fires when we
+  // explicitly call it with new values.
+  const fetchTickets = useCallback(async (
+    currentPage = 1,
+    agentId     = null,
+    status      = undefined,
+    priority    = undefined,
+  ) => {
+    if (!agentId) return;
 
     setLoading(true);
     setError(null);
     try {
-      const data = await ticketService.getByAgent(user.agent_id, {
+      const data = await ticketService.getByAgent(agentId, {
         page:            currentPage,
         page_size:       DEFAULT_PAGE_SIZE,
-        status:          filters.status   || undefined,
-        priority:        filters.priority || undefined,
+        status:          status   || undefined,
+        priority:        priority || undefined,
         include_deleted: false,
       });
       setTickets(data.items ?? []);
@@ -44,12 +60,15 @@ export default function MyTickets() {
     } finally {
       setLoading(false);
     }
-  }, [user?.agent_id, filters.status, filters.priority]);
+  }, []); // stable reference — no closure deps
 
+  // Single effect: fires on mount and whenever agent or filters change.
+  // All values are passed explicitly so fetchTickets stays stable and the
+  // effect is the sole driver of fetches.
   useEffect(() => {
     setPage(1);
-    fetchTickets(1);
-  }, [fetchTickets]);
+    fetchTickets(1, user?.agent_id, filters.status, filters.priority);
+  }, [user?.agent_id, filters.status, filters.priority]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSort = (field) => {
     setSort(s => ({ field, dir: s.field === field && s.dir === 'asc' ? 'desc' : 'asc' }));
@@ -57,10 +76,11 @@ export default function MyTickets() {
 
   const handlePageChange = (newPage) => {
     setPage(newPage);
-    fetchTickets(newPage);
+    fetchTickets(newPage, user?.agent_id, filters.status, filters.priority);
   };
 
-  // Client-side search filter on top of fetched data
+  // Client-side search on top of the current fetched page.
+  // Status/priority are already filtered server-side in fetchTickets.
   const filtered = tickets.filter(ticket => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -109,7 +129,10 @@ export default function MyTickets() {
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <span>{error}</span>
-          <button onClick={() => fetchTickets(page)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', fontWeight: 600, fontFamily: 'inherit' }}>
+          <button
+            onClick={() => fetchTickets(page, user?.agent_id, filters.status, filters.priority)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', fontWeight: 600, fontFamily: 'inherit' }}
+          >
             Retry
           </button>
         </div>
@@ -122,7 +145,9 @@ export default function MyTickets() {
         </div>
       )}
 
-      {/* Table */}
+      {/* Table — passes isAgent so TicketTable routes expansion to /agent/tickets/:id.
+          search and filters are handled above (client-side search, server-side
+          status/priority), so we pass empty values here to avoid double-filtering. */}
       <TicketTable
         tickets={filtered}
         loading={loading}
