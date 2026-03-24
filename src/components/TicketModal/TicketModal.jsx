@@ -205,9 +205,6 @@ const accountCrm   = ticket.crm || null;
               <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {ticket.title}
               </h2>
-<p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
-  {ticket.crm_id ? `CRM ID: ${ticket.crm_id}` : ''}
-</p>
             </div>
           </div>
 

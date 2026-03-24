@@ -165,7 +165,6 @@ export default function Customers() {
                       </div>
                       <div>
                         <div style={{ fontWeight: 600, fontSize: 14 }}>{c.name}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{c.crm_id}</div>
                       </div>
                     </div>
                   </td>

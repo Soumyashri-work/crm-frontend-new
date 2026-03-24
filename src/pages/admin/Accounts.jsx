@@ -164,7 +164,6 @@ export default function Accounts() {
                       </div>
                       <div>
                         <div style={{ fontWeight: 600, fontSize: 14 }}>{a.name}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{a.crm_id}</div>
                       </div>
                     </div>
                   </td>
