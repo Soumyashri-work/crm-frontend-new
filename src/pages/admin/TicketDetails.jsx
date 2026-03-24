@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, User, Building2, Database, Clock,
   Calendar, Mail, Phone, ExternalLink, AlertTriangle,
+  MessageCircle, Send,
 } from 'lucide-react';
 import { ticketService } from '../../services/ticketService';
 import {
@@ -190,6 +191,8 @@ export default function TicketDetails() {
   const [ticket, setTicket]   = useState(preloaded);
   const [loading, setLoading] = useState(!preloaded); // skip loading state if pre-seeded
   const [error, setError]     = useState(null);
+  const [comment, setComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const fetchTicket = () => {
     setLoading(true);
@@ -208,6 +211,27 @@ export default function TicketDetails() {
     if (preloaded) return;
     fetchTicket();
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Handle comment submission ────────────────────────────────────────────
+  const handleComment = async () => {
+    if (!comment.trim()) return;
+    setSubmitting(true);
+    try {
+      await ticketService.addComment(id, { text: comment });
+      setComment('');
+      fetchTicket();
+    } catch (err) {
+      console.error('Failed to add comment:', err);
+      // Optimistically add comment locally
+      setTicket(t => ({
+        ...t,
+        comments: [...(t.comments || []), { id: Date.now(), author: 'You', text: comment, created: new Date().toISOString() }],
+      }));
+      setComment('');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   // ── Loading spinner ──────────────────────────────────────────────────────
   if (loading) return (
@@ -280,8 +304,9 @@ export default function TicketDetails() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 290px', gap: 16, alignItems: 'start' }}>
 
-        {/* ── Left: main content ── */}
+        {/* ── Left: main content + comments ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Ticket header card */}
           <div className="card animate-in" style={{ padding: 24 }}>
             <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
               <span className={statusBadgeClass(ticket.status)}>{ticket.status}</span>
@@ -303,6 +328,57 @@ export default function TicketDetails() {
                 No description provided.
               </p>
             )}
+          </div>
+
+          {/* Comments Section */}
+          <div className="card animate-in" style={{ padding: 24, animationDelay: '0.05s' }}>
+            <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 18, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <MessageCircle size={17} /> Comments ({ticket.comments?.length || 0})
+            </h3>
+
+            {ticket.comments?.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: 13.5 }}>
+                No comments yet. Be the first to add one.
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
+              {(ticket.comments || []).map(c => (
+                <div key={c.id} style={{ display: 'flex', gap: 12 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0, background: getAvatarColor(c.author), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'white' }}>
+                    {getInitials(c.author)}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
+                      <span style={{ fontWeight: 600, fontSize: 13.5 }}>{c.author}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{formatDateTime(c.created)}</span>
+                    </div>
+                    <div style={{ background: 'var(--surface-2)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: 13.5, lineHeight: 1.65 }}>
+                      {c.text}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Comment input */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <textarea
+                className="form-input"
+                style={{ flex: 1, resize: 'vertical', minHeight: 80 }}
+                placeholder="Add a comment..."
+                value={comment}
+                onChange={e => setComment(e.target.value)}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={handleComment}
+                disabled={submitting || !comment.trim()}
+                style={{ alignSelf: 'flex-end', padding: '10px 14px' }}
+              >
+                <Send size={16} />
+              </button>
+            </div>
           </div>
         </div>
 
