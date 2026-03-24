@@ -23,7 +23,7 @@ useEffect(() => {
       name: "Rajnandini Patil",
       email: "rajnandini.patil@betsol.com",
       role: "agent",
-      agent_id:"b0b49141-2eeb-426e-be9f-091f82373792",
+      agent_id: import.meta.env.VITE_AGENT_ID, 
       picture: null
     };
     localStorage.setItem('access_token', fakeToken);
