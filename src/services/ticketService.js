@@ -166,4 +166,19 @@ export const ticketService = {
   /** Add a comment to a ticket */
   addComment: (id, data) => api.post(`/tickets/${id}/comments`, data),
 
+
+getByAgent: async (agentId, params = {}) => {
+  const res  = await api.get(`/tickets/by-agent/${agentId}`, { params });
+  const data = unwrap(res);
+  return {
+    ...data,
+    items: (data.items ?? []).map(normalizeTicket),
+  };
+},
+
+getAgentStats: async (agentId) => {
+  const res = await api.get(`/tickets/stats/agent/${agentId}`);
+  return unwrap(res);
+},
+
 };

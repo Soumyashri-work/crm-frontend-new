@@ -20,9 +20,10 @@ useEffect(() => {
     // TEMP: fake login for UI testing — remove before production
     const fakeToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwicm9sZSI6ImFkbWluIiwiZXhwIjo5OTk5OTk5OTk5fQ.fake";
     const fakeUser = {
-      name: "John Anderson",
-      email: "john.anderson@company.com",
-      role: "admin",
+      name: "Rajnandini Patil",
+      email: "rajnandini.patil@betsol.com",
+      role: "agent",
+      agent_id:"b0b49141-2eeb-426e-be9f-091f82373792",
       picture: null
     };
     localStorage.setItem('access_token', fakeToken);
@@ -31,6 +32,23 @@ useEffect(() => {
     setUser(fakeUser);
     setLoading(false);
   }, []);
+
+  // useEffect(() => {
+  //   // TEMP: fake login for UI testing — remove before production
+  //   const fakeToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwicm9sZSI6ImFkbWluIiwiZXhwIjo5OTk5OTk5OTk5fQ.fake";
+  //   const fakeUser = {
+  //     name: "John Doe",
+  //     email: "johndoe@gmail.com",
+  //     role: "admin",
+  //     picture: null
+  //   };
+  //   localStorage.setItem('access_token', fakeToken);
+  //   localStorage.setItem('user', JSON.stringify(fakeUser));
+  //   setToken(fakeToken);
+  //   setUser(fakeUser);
+  //   setLoading(false);
+  // }, []);
+
 
 
   

@@ -1,37 +1,79 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search } from 'lucide-react';
 import TicketTable from '../../components/TicketTable';
 import Filters from '../../components/Filters';
 import { ticketService } from '../../services/ticketService';
 import { useAuth } from '../../context/AuthContext';
 
+const DEFAULT_PAGE_SIZE = 20;
+
 export default function MyTickets() {
   const { user } = useAuth();
-  const [tickets, setTickets] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState(null);
-  const [filters, setFilters] = useState({});
-  const [search, setSearch]   = useState('');
-  const [sort, setSort]       = useState({ field: 'updated', dir: 'desc' });
+  const [tickets, setTickets]       = useState([]);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, total_pages: 1 });
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState(null);
+  const [filters, setFilters]       = useState({});
+  const [search, setSearch]         = useState('');
+  const [sort, setSort]             = useState({ field: 'updated', dir: 'desc' });
+  const [page, setPage]             = useState(1);
 
-  useEffect(() => {
+  const fetchTickets = useCallback(async (currentPage = 1) => {
+    if (!user?.agent_id) return;
+
     setLoading(true);
     setError(null);
-    ticketService.getAll({ assignee: user?.name })
-      .then(r => setTickets(r.data?.items || []))
-      .catch(err => {
-        console.error('Failed to load tickets:', err);
-        setError('Failed to load your tickets. Please try again.');
-      })
-      .finally(() => setLoading(false));
-  }, [user?.name]);
+    try {
+      const data = await ticketService.getByAgent(user.agent_id, {
+        page:            currentPage,
+        page_size:       DEFAULT_PAGE_SIZE,
+        status:          filters.status   || undefined,
+        priority:        filters.priority || undefined,
+        include_deleted: false,
+      });
+      setTickets(data.items ?? []);
+      setPagination({
+        total:       data.total       ?? 0,
+        page:        data.page        ?? currentPage,
+        total_pages: data.total_pages ?? 1,
+      });
+    } catch (err) {
+      console.error('Failed to load tickets:', err);
+      setError('Failed to load your tickets. Please try again.');
+      setTickets([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.agent_id, filters.status, filters.priority]);
+
+  useEffect(() => {
+    setPage(1);
+    fetchTickets(1);
+  }, [fetchTickets]);
 
   const handleSort = (field) => {
     setSort(s => ({ field, dir: s.field === field && s.dir === 'asc' ? 'desc' : 'asc' }));
   };
 
+  const handlePageChange = (newPage) => {
+    setPage(newPage);
+    fetchTickets(newPage);
+  };
+
+  // Client-side search filter on top of fetched data
+  const filtered = tickets.filter(ticket => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      ticket.title?.toLowerCase().includes(q) ||
+      ticket.crm_id?.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* Breadcrumb */}
       <div>
         <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>
           Dashboard › <span style={{ color: 'var(--text-primary)' }}>My Tickets</span>
@@ -39,9 +81,14 @@ export default function MyTickets() {
         <h2 style={{ fontSize: 20, fontWeight: 700 }}>My Tickets</h2>
       </div>
 
+      {/* Search + Filters */}
       <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ position: 'relative' }}>
-          <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <Search size={16} style={{
+            position: 'absolute', left: 12, top: '50%',
+            transform: 'translateY(-50%)', color: 'var(--text-muted)',
+            pointerEvents: 'none',
+          }} />
           <input
             className="form-input"
             style={{ width: '100%', paddingLeft: 36 }}
@@ -53,26 +100,69 @@ export default function MyTickets() {
         <Filters filters={filters} onChange={setFilters} />
       </div>
 
+      {/* Error */}
       {error && (
         <div style={{
           padding: '12px 16px', borderRadius: 'var(--radius-sm)',
           background: '#FEF2F2', border: '1px solid #FCA5A5',
           color: '#DC2626', fontSize: 13.5,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
-          {error}
+          <span>{error}</span>
+          <button onClick={() => fetchTickets(page)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', fontWeight: 600, fontFamily: 'inherit' }}>
+            Retry
+          </button>
         </div>
       )}
 
+      {/* No agent_id guard */}
+      {!user?.agent_id && !loading && (
+        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13.5 }}>
+          No agent profile linked to your account.
+        </div>
+      )}
+
+      {/* Table */}
       <TicketTable
-        tickets={tickets}
+        tickets={filtered}
         loading={loading}
         isAgent
         onSort={handleSort}
         sortField={sort.field}
         sortDir={sort.dir}
-        filters={filters}
-        search={search}
+        filters={{}}
+        search=""
       />
+
+      {/* Pagination */}
+      {!loading && !error && pagination.total_pages > 1 && (
+        <div style={{
+          display: 'flex', justifyContent: 'space-between',
+          alignItems: 'center', fontSize: 13, color: 'var(--text-muted)',
+        }}>
+          <span>
+            {pagination.total} ticket{pagination.total !== 1 ? 's' : ''} total
+            {search ? ` — ${filtered.length} shown` : ''}
+          </span>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              onClick={() => handlePageChange(page - 1)}
+              disabled={page <= 1}
+              style={{ padding: '4px 10px', cursor: page <= 1 ? 'not-allowed' : 'pointer' }}
+            >
+              ‹ Prev
+            </button>
+            <span>Page {pagination.page} of {pagination.total_pages}</span>
+            <button
+              onClick={() => handlePageChange(page + 1)}
+              disabled={page >= pagination.total_pages}
+              style={{ padding: '4px 10px', cursor: page >= pagination.total_pages ? 'not-allowed' : 'pointer' }}
+            >
+              Next ›
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
