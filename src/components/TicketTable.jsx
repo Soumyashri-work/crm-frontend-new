@@ -121,8 +121,13 @@ export default function TicketTable({
     setTimeout(() => setSelectedTicket(null), 300);
   };
 
+  // FIX: Pass the already-fetched full ticket through router state so
+  // TicketDetails can use it immediately and skip its own getById call.
   const handleExpandTicket = (ticketId) => {
-    navigate(isAgent ? `/agent/tickets/${ticketId}` : `/admin/tickets/${ticketId}`);
+    navigate(
+      isAgent ? `/agent/tickets/${ticketId}` : `/admin/tickets/${ticketId}`,
+      { state: { ticket: selectedTicket } },
+    );
   };
 
   // ── Empty state ───────────────────────────────────────────────────────────

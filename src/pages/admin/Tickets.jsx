@@ -34,7 +34,15 @@ export default function AdminTickets() {
   // -------------------------------------------------------------------------
   // Fetch
   // -------------------------------------------------------------------------
-  const fetchTickets = useCallback(async (currentPage = 1, showDeleted = includeDeleted) => {
+  // FIX: Empty deps array — fetchTickets never reads from the closure.
+  // Both currentPage and showDeleted are passed as explicit arguments, so
+  // there is nothing to capture. Previously [includeDeleted] was listed here,
+  // which caused useCallback to produce a new function reference every time
+  // the toggle changed. That new reference then triggered the useEffect on
+  // the same render that [includeDeleted] already triggered it, causing two
+  // GET /tickets/ calls on every toggle — and two on the initial mount
+  // (false → false is still a new function identity on first render).
+  const fetchTickets = useCallback(async (currentPage = 1, showDeleted = false) => {
     setLoading(true);
     setError(null);
     try {
@@ -58,14 +66,12 @@ export default function AdminTickets() {
     } finally {
       setLoading(false);
     }
-  }, [includeDeleted]);
+  }, []); // stable reference — all inputs arrive as parameters
 
-  // Initial load
-  useEffect(() => {
-    fetchTickets(1);
-  }, [fetchTickets]);
-
-  // Refetch when include_deleted toggle changes
+  // Single effect: handles initial load and every subsequent toggle change.
+  // fetchTickets is intentionally omitted from deps — it is guaranteed stable.
+  // includeDeleted is passed explicitly as an argument so the function always
+  // receives the current value rather than a stale closure.
   useEffect(() => {
     setPage(1);
     fetchTickets(1, includeDeleted);
@@ -83,11 +89,11 @@ export default function AdminTickets() {
 
   const handlePageChange = (newPage) => {
     setPage(newPage);
-    fetchTickets(newPage);
+    fetchTickets(newPage, includeDeleted);
   };
 
   const handleRetry = () => {
-    fetchTickets(page);
+    fetchTickets(page, includeDeleted);
   };
 
   // -------------------------------------------------------------------------
