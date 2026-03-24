@@ -100,12 +100,7 @@ export default function AccountDetail() {
             Details
           </div>
 
-          {/* CRM ID */}
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>CRM ID</div>
-            <div style={{ fontSize: 13, fontWeight: 500, fontFamily: 'monospace' }}>{account.crm_id || '—'}</div>
-          </div>
-
+        
           {/* CRM Source */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>

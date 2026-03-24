@@ -107,13 +107,6 @@ export default function CustomerDetail() {
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 18 }}>
             Details
           </div>
-
-          {/* CRM ID */}
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>CRM ID</div>
-            <div style={{ fontSize: 13.5, fontWeight: 500, fontFamily: 'monospace' }}>{customer.crm_id || '—'}</div>
-          </div>
-
           {/* CRM Source */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>

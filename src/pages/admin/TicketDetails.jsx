@@ -266,7 +266,6 @@ const accountName = account.name || account.company_name || '—';
           >
             Tickets
           </span>
-      {' › '}{ticket.crm_id || ticket.crm_ticket_id || `#${ticket.id}`}
         </span>
       </div>
 
@@ -283,7 +282,6 @@ const accountName = account.name || account.company_name || '—';
 
             <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{ticket.title}</h1>
             <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 16 }}>
-              {ticket.crm_id}
               {ticket.created ? ` · Created ${formatDateTime(ticket.created)}` : ''}
             </div>
 
