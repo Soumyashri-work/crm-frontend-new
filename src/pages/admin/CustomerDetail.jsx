@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, Database, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Database, AlertTriangle } from 'lucide-react';
 import { customerService } from '../../services/customerService';
 import { crmBadgeClass, getInitials, getAvatarColor } from '../../utils/helpers';
 
@@ -57,9 +57,12 @@ export default function CustomerDetail() {
           <ArrowLeft size={16} /> Back
         </button>
         <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-          <span onClick={() => navigate('/admin/customers')} style={{ cursor: 'pointer', color: 'var(--text-muted)' }}
+          <span
+            onClick={() => navigate('/admin/customers')}
+            style={{ cursor: 'pointer', color: 'var(--text-muted)' }}
             onMouseEnter={e => e.currentTarget.style.color = 'var(--primary)'}
-            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+          >
             Customers
           </span>
           {' › '}{customer.name}
@@ -91,14 +94,7 @@ export default function CustomerDetail() {
                 <Phone size={15} /> {customer.phone}
               </div>
             )}
-            {customer.company_id && (
-              <div
-                style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: 'var(--primary)', cursor: 'pointer', fontWeight: 500 }}
-                onClick={() => navigate(`/admin/accounts/${customer.company_id}`)}
-              >
-                <Building2 size={15} /> View Account
-              </div>
-            )}
+            {/* Account link removed — accounts page disabled under multi-tenancy */}
           </div>
         </div>
 
@@ -107,6 +103,7 @@ export default function CustomerDetail() {
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 18 }}>
             Details
           </div>
+
           {/* CRM Source */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
@@ -115,11 +112,13 @@ export default function CustomerDetail() {
             <span className={crmBadgeClass(customer.crm)}>{customer.crm}</span>
           </div>
 
-          {/* First / Last name */}
+          {/* First name */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>First Name</div>
             <div style={{ fontSize: 13.5 }}>{customer.first_name || '—'}</div>
           </div>
+
+          {/* Last name */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Last Name</div>
             <div style={{ fontSize: 13.5 }}>{customer.last_name || '—'}</div>

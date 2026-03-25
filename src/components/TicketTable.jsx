@@ -183,7 +183,6 @@ const handleExpandTicket = (ticketId) => {
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 14 }}>{ticket.title}</div>
                           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                            {ticket.crm_id || '—'}
                           </div>
                         </div>
                       </div>

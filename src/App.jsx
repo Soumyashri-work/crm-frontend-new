@@ -15,8 +15,8 @@ import AgentLayout from './layouts/AgentLayout';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminTickets from './pages/admin/Tickets';
 import TicketDetails from './pages/admin/TicketDetails';
-import Accounts from './pages/admin/Accounts';
-import AccountDetail from './pages/admin/AccountDetail';
+// import Accounts from './pages/admin/Accounts';        // disabled — multi-tenancy: admin sees own tenant only
+// import AccountDetail from './pages/admin/AccountDetail'; // disabled — same reason
 import Customers from './pages/admin/Customers';
 import CustomerDetail from './pages/admin/CustomerDetail';
 import Users from './pages/admin/Users';
@@ -31,9 +31,9 @@ import AgentProfile from './pages/agent/Profile';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime:          30_000, // 30 s before background refetch
-      retry:              1,      // one retry on failure
-      refetchOnWindowFocus: false, // avoids surprise refetches on tab switch
+      staleTime:            30_000,
+      retry:                1,
+      refetchOnWindowFocus: false,
     },
   },
 });
@@ -45,7 +45,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             {/* Public */}
-            <Route path="/login" element={<Login />} />
+            <Route path="/login"         element={<Login />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
 
             {/* Admin routes */}
@@ -55,16 +55,17 @@ export default function App() {
               </ProtectedRoute>
             }>
               <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard"        element={<AdminDashboard />} />
-              <Route path="tickets"          element={<AdminTickets />} />
-              <Route path="tickets/:id"      element={<TicketDetails />} />
-              <Route path="accounts"         element={<Accounts />} />
-              <Route path="accounts/:id"     element={<AccountDetail />} />
-              <Route path="customers"        element={<Customers />} />
-              <Route path="customers/:id"    element={<CustomerDetail />} />
-              <Route path="users"            element={<Users />} />
-              <Route path="users/:id"        element={<UserDetail />} />
-              <Route path="settings"         element={<Settings />} />
+              <Route path="dashboard"     element={<AdminDashboard />} />
+              <Route path="tickets"       element={<AdminTickets />} />
+              <Route path="tickets/:id"   element={<TicketDetails />} />
+              {/* Accounts routes disabled — admin belongs to one tenant, no cross-org accounts view */}
+              {/* <Route path="accounts"      element={<Accounts />} /> */}
+              {/* <Route path="accounts/:id"  element={<AccountDetail />} /> */}
+              <Route path="customers"     element={<Customers />} />
+              <Route path="customers/:id" element={<CustomerDetail />} />
+              <Route path="users"         element={<Users />} />
+              <Route path="users/:id"     element={<UserDetail />} />
+              <Route path="settings"      element={<Settings />} />
             </Route>
 
             {/* Agent routes */}
@@ -74,15 +75,15 @@ export default function App() {
               </ProtectedRoute>
             }>
               <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard"        element={<AgentDashboard />} />
-              <Route path="my-tickets"       element={<MyTickets />} />
-              <Route path="tickets/:id"      element={<TicketDetails />} />
-              <Route path="profile"          element={<AgentProfile />} />
+              <Route path="dashboard"  element={<AgentDashboard />} />
+              <Route path="my-tickets" element={<MyTickets />} />
+              <Route path="tickets/:id" element={<TicketDetails />} />
+              <Route path="profile"    element={<AgentProfile />} />
             </Route>
 
-            {/* Root redirect */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            {/* Fallbacks */}
+            <Route path="/"  element={<Navigate to="/login" replace />} />
+            <Route path="*"  element={<Navigate to="/login" replace />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

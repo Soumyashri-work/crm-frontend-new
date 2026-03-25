@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Expand, User, Building2, Database, Mail, Phone, Clock, Calendar } from 'lucide-react';
+import { X, Expand, User, Database, Mail, Phone, Clock, Calendar } from 'lucide-react';
+// Building2 removed — Account chip disabled under multi-tenancy
 import { statusBadgeClass, priorityBadgeClass, crmBadgeClass, formatDateTime, getInitials, getAvatarColor } from '../../utils/helpers';
 import './TicketModal.css';
 
@@ -76,29 +77,7 @@ function PersonPopup({ name, email, role, phone, extra }) {
   );
 }
 
-function AccountPopup({ name, email, phone, crm }) {
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
-        <div style={{ width: 34, height: 34, borderRadius: 8, background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--primary)', flexShrink: 0 }}>
-          {getInitials(name)}
-        </div>
-        <div style={{ fontWeight: 600, fontSize: 13.5 }}>{name}</div>
-      </div>
-      {email && (
-        <a href={`mailto:${email}`} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: 'var(--primary)', marginBottom: 6, textDecoration: 'none' }}>
-          <Mail size={13} /> {email}
-        </a>
-      )}
-      {phone && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 6 }}>
-          <Phone size={13} /> {phone}
-        </div>
-      )}
-      {crm && <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--text-muted)' }}><Database size={12} /> {crm}</div>}
-    </div>
-  );
-}
+// AccountPopup removed — accounts disabled under multi-tenancy
 
 function CrmPopup({ crm }) {
   const info = {
@@ -180,13 +159,7 @@ const customerName  = ticket.customer?.name
   || '—';
 const customerEmail = ticket.customer?.email || null;
 const customerPhone = ticket.customer?.phone || null;
-const customerAcct  = ticket.account?.name   || ticket.account?.company_name || null;
-
-// Account/Company
-const accountName  = ticket.account?.name || ticket.account?.company_name || '—';
-const accountEmail = ticket.account?.email || null;
-const accountPhone = ticket.account?.phone || null;
-const accountCrm   = ticket.crm || null;
+// accountName/accountEmail/accountPhone removed — accounts disabled under multi-tenancy
   return (
     <>
       {/* Backdrop */}
@@ -273,18 +246,11 @@ const accountCrm   = ticket.crm || null;
                     </div>
                   }
                   label={customerName}
-                  popup={<PersonPopup name={customerName} email={customerEmail} phone={customerPhone} extra={customerAcct ? `Account: ${customerAcct}` : null} />}
+                  popup={<PersonPopup name={customerName} email={customerEmail} phone={customerPhone} />}
                 />
               </div>
 
-              <div className="detail-item">
-                <label className="modal-label">Account</label>
-                <HoverChip
-                  icon={<Building2 size={14} color="var(--primary)" />}
-                  label={accountName}
-                  popup={<AccountPopup name={accountName} email={accountEmail} phone={accountPhone} crm={accountCrm} />}
-                />
-              </div>
+              {/* Account chip removed — accounts disabled under multi-tenancy */}
 
               <div className="detail-item">
                 <label className="modal-label">Assignee</label>
