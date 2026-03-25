@@ -1,20 +1,39 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+/**
+ * pages/TicketDetails.jsx
+ *
+ * React Query powers both the ticket fetch and comments.
+ *
+ * Cache reuse strategy
+ * ─────────────────────
+ * When the user navigates here from TicketTable the router state contains the
+ * already-fetched full ticket (`location.state.ticket`). We pass that as
+ * `initialData` to useQuery so the page renders immediately with no network
+ * call. React Query will still background-refresh if the data is stale.
+ *
+ * Comments use useMutation with optimistic updates so the new comment appears
+ * instantly while the POST is in flight.
+ */
+
+import { useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, User, Building2, Database, Clock,
   Calendar, Mail, Phone, ExternalLink, AlertTriangle,
   MessageCircle, Send,
 } from 'lucide-react';
-import { ticketService } from '../../services/ticketService';
+import { ticketService, ticketKeys } from '../../services/ticketService';
 import {
   statusBadgeClass, priorityBadgeClass, crmBadgeClass,
   formatDateTime, getInitials, getAvatarColor,
 } from '../../utils/helpers';
 
 // ── Hover Popup ──────────────────────────────────────────────────────────────
+import { useRef } from 'react';
+
 function HoverPopup({ children, popup }) {
   const [visible, setVisible] = useState(false);
-  const [pos, setPos]         = useState({ top: 0, left: 0 });
+  const [pos,     setPos]     = useState({ top: 0, left: 0 });
   const ref      = useRef();
   const timerRef = useRef();
 
@@ -50,7 +69,7 @@ function HoverPopup({ children, popup }) {
   );
 }
 
-// ── Popup contents ────────────────────────────────────────────────────────────
+// ── Popup contents ─────────────────────────────────────────────────────────
 function PersonPopup({ name, email, role, phone, extra }) {
   return (
     <div>
@@ -128,7 +147,7 @@ function CrmPopup({ crm }) {
   );
 }
 
-// ── Detail Row ────────────────────────────────────────────────────────────────
+// ── Detail Row ─────────────────────────────────────────────────────────────
 function DetailRow({ icon: Icon, label, children }) {
   return (
     <div style={{ marginBottom: 16 }}>
@@ -140,7 +159,7 @@ function DetailRow({ icon: Icon, label, children }) {
   );
 }
 
-// ── Clickable chip ────────────────────────────────────────────────────────────
+// ── Chip ───────────────────────────────────────────────────────────────────
 function Chip({ onClick, avatarName, label, icon, linkable }) {
   return (
     <div
@@ -174,93 +193,124 @@ function Chip({ onClick, avatarName, label, icon, linkable }) {
   );
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
+// ── Comment skeleton ───────────────────────────────────────────────────────
+function CommentSkeleton() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
+      {[...Array(3)].map((_, i) => (
+        <div key={i} style={{ display: 'flex', gap: 12 }}>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--border)', flexShrink: 0, animation: 'pulse 1.4s ease-in-out infinite' }} />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ height: 12, width: '30%', borderRadius: 4, background: 'var(--border)', animation: 'pulse 1.4s ease-in-out infinite' }} />
+            <div style={{ height: 48, borderRadius: 6, background: 'var(--border)', animation: 'pulse 1.4s ease-in-out infinite' }} />
+          </div>
+        </div>
+      ))}
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.45}}`}</style>
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────
 export default function TicketDetails() {
-  const { id }   = useParams();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { id }     = useParams();
+  const navigate   = useNavigate();
+  const location   = useLocation();
+  const queryClient = useQueryClient();
 
   const isAgent  = location.pathname.startsWith('/agent');
   const base     = isAgent ? '/agent' : '/admin';
   const backPath = isAgent ? `${base}/my-tickets` : `${base}/tickets`;
 
-  // Preloaded from TicketTable navigation state (skips redundant fetch)
-  const preloaded = location.state?.ticket ?? null;
+  // The full ticket object passed through router state by TicketTable.
+  // Used as initialData so the page is immediately populated —
+  // React Query will background-refresh when stale.
+  const preloaded = location.state?.ticket ?? undefined;
 
-  const [ticket, setTicket]   = useState(preloaded);
-  const [loading, setLoading] = useState(!preloaded);
-  const [error, setError]     = useState(null);
+  const [comment,    setComment]    = useState('');
 
-  // ── Comments state ────────────────────────────────────────────────────────
-  const [comments, setComments]               = useState([]);
-  const [commentsLoading, setCommentsLoading] = useState(true);
-  const [commentsError, setCommentsError]     = useState(null);
-  const [commentTotal, setCommentTotal]       = useState(0);
-  const [comment, setComment]                 = useState('');
-  const [submitting, setSubmitting]           = useState(false);
+  // ── Ticket query ──────────────────────────────────────────────────────────
+  const {
+    data: ticket,
+    isLoading: ticketLoading,
+    isError:   ticketError,
+    error:     ticketErr,
+    refetch:   refetchTicket,
+  } = useQuery({
+    queryKey:    ticketKeys.detail(id),
+    queryFn:     () => ticketService.getById(id),
+    initialData: preloaded,
+    // Don't treat the preloaded data as stale immediately —
+    // give it 30 s before triggering a background refresh.
+    initialDataUpdatedAt: preloaded ? Date.now() : undefined,
+    staleTime: 30_000,
+  });
 
-  // ── Fetch ticket ──────────────────────────────────────────────────────────
-  const fetchTicket = useCallback(() => {
-    setLoading(true);
-    setError(null);
-    ticketService.getById(id)
-      .then(data => setTicket(data))
-      .catch(err => {
-        console.error('Failed to load ticket:', err);
-        setError('Could not load ticket. It may not exist or the server is unavailable.');
-      })
-      .finally(() => setLoading(false));
-  }, [id]);
+  // ── Comments query ────────────────────────────────────────────────────────
+  const commentsParams = { page: 1, page_size: 50 };
+  const {
+    data:      commentsData,
+    isLoading: commentsLoading,
+    isError:   commentsError,
+    refetch:   refetchComments,
+  } = useQuery({
+    queryKey: ticketKeys.comments(id, commentsParams),
+    queryFn:  () => ticketService.getComments(id, commentsParams),
+    staleTime: 20_000,
+  });
 
-  // ── Fetch comments ────────────────────────────────────────────────────────
-  const fetchComments = useCallback(async () => {
-    setCommentsLoading(true);
-    setCommentsError(null);
-    try {
-      const data = await ticketService.getComments(id, { page: 1, page_size: 50 });
-      setComments(data.items ?? []);
-      setCommentTotal(data.total ?? 0);
-    } catch (err) {
-      console.error('Failed to load comments:', err);
-      setCommentsError('Could not load comments.');
-    } finally {
-      setCommentsLoading(false);
-    }
-  }, [id]);
+  const comments     = commentsData?.items ?? [];
+  const commentTotal = commentsData?.total ?? 0;
 
-  useEffect(() => {
-    if (!preloaded) fetchTicket();
-    fetchComments();
-  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ── Add comment mutation (optimistic) ─────────────────────────────────────
+  const addCommentMutation = useMutation({
+    mutationFn: (text) => ticketService.addComment(id, { text }),
 
-  // ── Submit comment ────────────────────────────────────────────────────────
-  const handleComment = async () => {
-    if (!comment.trim()) return;
-    setSubmitting(true);
-    try {
-      await ticketService.addComment(id, { text: comment });
-      setComment('');
-      fetchComments();
-    } catch (err) {
-      console.error('Failed to add comment:', err);
-      // Optimistic fallback
-      setComments(prev => [...prev, {
-        id:             Date.now(),
-        author_name:    'You',
-        body:           comment,
-        crm_created_at: new Date().toISOString(),
-        is_internal:    false,
-        comment_type:   'note',
-      }]);
-      setCommentTotal(t => t + 1);
-      setComment('');
-    } finally {
-      setSubmitting(false);
-    }
+    // Optimistically insert the new comment before the request completes
+    onMutate: async (text) => {
+      await queryClient.cancelQueries({ queryKey: ticketKeys.comments(id, commentsParams) });
+
+      const previous = queryClient.getQueryData(ticketKeys.comments(id, commentsParams));
+
+      queryClient.setQueryData(ticketKeys.comments(id, commentsParams), (old) => {
+        const optimistic = {
+          id:             `optimistic-${Date.now()}`,
+          author_name:    'You',
+          body:           text,
+          crm_created_at: new Date().toISOString(),
+          is_internal:    false,
+          comment_type:   'note',
+        };
+        return old
+          ? { ...old, items: [...(old.items ?? []), optimistic], total: (old.total ?? 0) + 1 }
+          : { items: [optimistic], total: 1 };
+      });
+
+      return { previous }; // snapshot for rollback
+    },
+
+    // On success, replace optimistic data with real server data
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ticketKeys.comments(id, commentsParams) });
+    },
+
+    // Roll back on failure
+    onError: (_err, _text, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(ticketKeys.comments(id, commentsParams), context.previous);
+      }
+    },
+  });
+
+  const handleComment = () => {
+    const text = comment.trim();
+    if (!text) return;
+    setComment('');
+    addCommentMutation.mutate(text);
   };
 
   // ── Loading ───────────────────────────────────────────────────────────────
-  if (loading) return (
+  if (ticketLoading) return (
     <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
       <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid var(--border)', borderTopColor: 'var(--primary)', animation: 'spin 0.8s linear infinite' }} />
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -268,16 +318,18 @@ export default function TicketDetails() {
   );
 
   // ── Error ─────────────────────────────────────────────────────────────────
-  if (error) return (
+  if (ticketError && !ticket) return (
     <div style={{ maxWidth: 560, margin: '40px auto' }}>
       <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 'var(--radius)', padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center' }}>
         <AlertTriangle size={32} color="#DC2626" />
-        <div style={{ fontWeight: 600, fontSize: 15, color: '#DC2626' }}>{error}</div>
+        <div style={{ fontWeight: 600, fontSize: 15, color: '#DC2626' }}>
+          {ticketErr?.message ?? 'Could not load ticket.'}
+        </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn btn-outline" onClick={() => navigate(backPath)}>
             <ArrowLeft size={15} /> Back to tickets
           </button>
-          <button className="btn btn-primary" onClick={fetchTicket}>Retry</button>
+          <button className="btn btn-primary" onClick={() => refetchTicket()}>Retry</button>
         </div>
       </div>
     </div>
@@ -287,12 +339,10 @@ export default function TicketDetails() {
 
   const assignee     = ticket.assignee ?? {};
   const assigneeName = assignee.name || '—';
-
   const customer     = ticket.customer ?? {};
   const customerName = customer.name
     || `${customer.first_name ?? ''} ${customer.last_name ?? ''}`.trim()
     || '—';
-
   const account     = ticket.account ?? {};
   const accountName = account.name || account.company_name || '—';
 
@@ -354,46 +404,27 @@ export default function TicketDetails() {
               Comments ({commentTotal})
             </h3>
 
-            {/* Comments loading skeleton */}
-            {commentsLoading && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 12 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--border)', flexShrink: 0, animation: 'pulse 1.4s ease-in-out infinite' }} />
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <div style={{ height: 12, width: '30%', borderRadius: 4, background: 'var(--border)', animation: 'pulse 1.4s ease-in-out infinite' }} />
-                      <div style={{ height: 48, borderRadius: 6, background: 'var(--border)', animation: 'pulse 1.4s ease-in-out infinite' }} />
-                    </div>
-                  </div>
-                ))}
-                <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.45}}`}</style>
-              </div>
-            )}
+            {commentsLoading && <CommentSkeleton />}
 
-            {/* Comments error */}
             {commentsError && !commentsLoading && (
               <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#DC2626', fontSize: 13, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>{commentsError}</span>
-                <button onClick={fetchComments} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', fontWeight: 600, fontFamily: 'inherit', fontSize: 13 }}>
+                <span>Could not load comments.</span>
+                <button onClick={() => refetchComments()} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', fontWeight: 600, fontFamily: 'inherit', fontSize: 13 }}>
                   Retry
                 </button>
               </div>
             )}
 
-            {/* Empty state */}
             {!commentsLoading && !commentsError && comments.length === 0 && (
               <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: 13.5 }}>
                 No comments yet. Be the first to add one.
               </div>
             )}
 
-            {/* Comments list */}
             {!commentsLoading && comments.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
                 {comments.map(c => (
                   <div key={c.id} style={{ display: 'flex', gap: 12 }}>
-
-                    {/* Avatar */}
                     <div style={{
                       width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
                       background: getAvatarColor(c.author_name),
@@ -404,24 +435,22 @@ export default function TicketDetails() {
                     </div>
 
                     <div style={{ flex: 1 }}>
-                      {/* Author + timestamp + badges */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
                         <span style={{ fontWeight: 600, fontSize: 13.5 }}>{c.author_name}</span>
                         <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                           {formatDateTime(c.crm_created_at)}
-                        </span>   
+                        </span>
                       </div>
 
-                      {/* Body — rendered as HTML since backend sends <br>, <div> tags */}
                       <div
                         style={{
-                          background:    c.is_internal ? '#FDFDF0' : 'var(--surface-2)',
-                          border:        c.is_internal ? '1px dashed #C8B900' : '1px solid transparent',
-                          padding:       '10px 14px',
-                          borderRadius:  'var(--radius-sm)',
-                          fontSize:      13.5,
-                          lineHeight:    1.65,
-                          color:         'var(--text-secondary)',
+                          background:   c.is_internal ? '#FDFDF0' : 'var(--surface-2)',
+                          border:       c.is_internal ? '1px dashed #C8B900' : '1px solid transparent',
+                          padding:      '10px 14px',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize:     13.5,
+                          lineHeight:   1.65,
+                          color:        'var(--text-secondary)',
                         }}
                         dangerouslySetInnerHTML={{ __html: c.body }}
                       />
@@ -450,11 +479,11 @@ export default function TicketDetails() {
               <button
                 className="btn btn-primary"
                 onClick={handleComment}
-                disabled={submitting || !comment.trim()}
+                disabled={addCommentMutation.isPending || !comment.trim()}
                 style={{ alignSelf: 'flex-end', padding: '10px 14px' }}
                 title="Send (Ctrl+Enter)"
               >
-                {submitting
+                {addCommentMutation.isPending
                   ? <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid white', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
                   : <Send size={16} />
                 }

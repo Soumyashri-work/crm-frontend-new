@@ -1,54 +1,50 @@
 /**
  * services/ticketService.js
  *
- * All ticket API calls.
+ * All ticket API calls + React Query key factories.
  *
- * Backend response shapes:
- *   List:   { success, message, data: { items, total, page, page_size, total_pages } }
- *   Single: { success, message, data: { id, title, status, priority, agent, customer, ... } }
- *   Error:  { success: false, message: "...", data: null }
- *
- * Every method returns the parsed data directly — callers never
- * need to unwrap the envelope manually.
+ * Key shape (follow the hierarchy so partial invalidation works):
+ *   ['tickets']                              – all tickets namespace
+ *   ['tickets', 'list', params]              – paginated admin list
+ *   ['tickets', 'byAgent', agentId, params]  – agent-scoped list
+ *   ['tickets', 'detail', id]                – single ticket
+ *   ['tickets', 'comments', ticketId, params]– comments for a ticket
+ *   ['tickets', 'stats']                     – global stats
+ *   ['tickets', 'agentStats', agentId]       – per-agent stats
  */
 
 import api from './api';
 
 // ---------------------------------------------------------------------------
+// Query key factory
+// ---------------------------------------------------------------------------
+export const ticketKeys = {
+  all:         ()                         => ['tickets'],
+  lists:       ()                         => ['tickets', 'list'],
+  list:        (params = {})              => ['tickets', 'list', params],
+  byAgent:     (agentId, params = {})     => ['tickets', 'byAgent', agentId, params],
+  details:     ()                         => ['tickets', 'detail'],
+  detail:      (id)                       => ['tickets', 'detail', id],
+  comments:    (ticketId, params = {})    => ['tickets', 'comments', ticketId, params],
+  stats:       ()                         => ['tickets', 'stats'],
+  agentStats:  (agentId)                  => ['tickets', 'agentStats', agentId],
+};
+
+// ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Unwrap the standard { success, message, data } envelope.
- * Throws an error with the backend message if success=false.
- */
 function unwrap(response) {
   const body = response.data;
-
   if (!body.success) {
-    const err = new Error(body.message || 'An unexpected error occurred');
-    err.status = response.status;
-    err.data   = body.data;
+    const err    = new Error(body.message || 'An unexpected error occurred');
+    err.status   = response.status;
+    err.data     = body.data;
     throw err;
   }
-
   return body.data;
 }
 
-/**
- * Normalize a raw ticket object from the backend into the shape
- * the frontend components expect.
- *
- * Backend field  →  Frontend field
- * ─────────────────────────────────
- * source_system  →  crm
- * crm_ticket_id  →  crm_id
- * created_at     →  created
- * updated_at     →  updated
- * agent          →  assignee  (with .name resolved)
- * customer       →  customer  (with .name resolved from first+last)
- * company        →  account
- */
 function normalizeTicket(t) {
   if (!t) return t;
 
@@ -58,11 +54,10 @@ function normalizeTicket(t) {
 
   return {
     ...t,
-
-    crm:     (t.source_system ?? t.crm)    ?? '—',
-    crm_id:  (t.crm_ticket_id ?? t.crm_id) ?? '—',
-    created: (t.created_at    ?? t.created) ?? null,
-    updated: (t.updated_at    ?? t.updated) ?? null,
+    crm:    (t.source_system ?? t.crm)    ?? '—',
+    crm_id: (t.crm_ticket_id ?? t.crm_id) ?? '—',
+    created:(t.created_at    ?? t.created) ?? null,
+    updated:(t.updated_at    ?? t.updated) ?? null,
 
     assignee: agent
       ? {
@@ -88,104 +83,66 @@ function normalizeTicket(t) {
       : null,
   };
 }
+
 // ---------------------------------------------------------------------------
 // Ticket service
 // ---------------------------------------------------------------------------
-
 export const ticketService = {
 
-  /**
-   * Fetch paginated ticket list.
-   *
-   * @param {Object} params - Query params: page, page_size, include_deleted
-   * @returns {{ items, total, page, page_size, total_pages }}
-   *
-   * Backend: GET /api/v1/tickets/
-   */
+  /** GET /api/v1/tickets/ */
   getAll: async (params = {}) => {
     const res  = await api.get('/tickets/', { params });
     const data = unwrap(res);
-    return {
-      ...data,
-      items: (data.items ?? []).map(normalizeTicket),
-    };
+    return { ...data, items: (data.items ?? []).map(normalizeTicket) };
   },
 
-  /**
-   * Fetch tickets filtered by CRM source system.
-   *
-   * @param {'zammad'|'espocrm'} source
-   * @param {Object} params - page, page_size, include_deleted
-   * @returns {{ items, total, page, page_size, total_pages }}
-   *
-   * Backend: GET /api/v1/tickets/source/{source}
-   */
+  /** GET /api/v1/tickets/source/{source} */
   getBySource: async (source, params = {}) => {
     const res  = await api.get(`/tickets/source/${source}`, { params });
     const data = unwrap(res);
-    return {
-      ...data,
-      items: (data.items ?? []).map(normalizeTicket),
-    };
+    return { ...data, items: (data.items ?? []).map(normalizeTicket) };
   },
 
-  /**
-   * Fetch a single ticket by internal UUID.
-   *
-   * @param {string} id - Internal ticket UUID
-   * @returns {Object} Full ticket detail with nested agent, customer, company
-   *
-   * Backend: GET /api/v1/tickets/{id}
-   */
+  /** GET /api/v1/tickets/{id} */
   getById: async (id) => {
     const res = await api.get(`/tickets/${id}`);
     return normalizeTicket(unwrap(res));
   },
 
-  /**
-   * Fetch ticket stats for the dashboard.
-   * Returns total, active, deleted counts and a breakdown by status.
-   *
-   * Backend: GET /api/v1/tickets/stats
-   */
+  /** GET /api/v1/tickets/stats */
   getStats: async () => {
     const res = await api.get('/tickets/stats');
     return unwrap(res);
-    // returns: { total, active, deleted, by_status: { open: N, pending: N, closed: N } }
   },
 
-  /** Create a ticket */
-  create: (data) => api.post('/tickets/', data),
+  /** GET /api/v1/tickets/by-agent/{agentId} */
+  getByAgent: async (agentId, params = {}) => {
+    const res  = await api.get(`/tickets/by-agent/${agentId}`, { params });
+    const data = unwrap(res);
+    return { ...data, items: (data.items ?? []).map(normalizeTicket) };
+  },
 
-  /** Update a ticket */
-  update: (id, data) => api.put(`/tickets/${id}`, data),
+  /** GET /api/v1/tickets/stats/agent/{agentId} */
+  getAgentStats: async (agentId) => {
+    const res = await api.get(`/tickets/stats/agent/${agentId}`);
+    return unwrap(res);
+  },
 
-  /** Soft delete a ticket */
-  delete: (id, data) => api.delete(`/tickets/${id}`, { data }),
+  /** GET /api/v1/tickets/{ticketId}/comments */
+  getComments: async (ticketId, params = {}) => {
+    const res  = await api.get(`/tickets/${ticketId}/comments`, { params });
+    return unwrap(res); // { items, total, page, page_size, total_pages }
+  },
 
-  /** Add a comment to a ticket */
+  /** POST /api/v1/tickets/ */
+  create: (data)        => api.post('/tickets/', data),
+
+  /** PUT /api/v1/tickets/{id} */
+  update: (id, data)    => api.put(`/tickets/${id}`, data),
+
+  /** DELETE /api/v1/tickets/{id} */
+  delete: (id, data)    => api.delete(`/tickets/${id}`, { data }),
+
+  /** POST /api/v1/tickets/{id}/comments */
   addComment: (id, data) => api.post(`/tickets/${id}/comments`, data),
-
-
-getByAgent: async (agentId, params = {}) => {
-  const res  = await api.get(`/tickets/by-agent/${agentId}`, { params });
-  const data = unwrap(res);
-  return {
-    ...data,
-    items: (data.items ?? []).map(normalizeTicket),
-  };
-},
-
-getAgentStats: async (agentId) => {
-  const res = await api.get(`/tickets/stats/agent/${agentId}`);
-  return unwrap(res);
-},
-
-
-getComments: async (ticketId, params = {}) => {
-  const res  = await api.get(`/tickets/${ticketId}/comments`, { params });
-  const data = unwrap(res);
-  return data; // { items, total, page, page_size, total_pages }
-},
-
 };
