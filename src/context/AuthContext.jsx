@@ -23,11 +23,7 @@ export function AuthProvider({ children }) {
 //       name: "Rajnandini Patil",
 //       email: "rajnandini.patil@betsol.com",
 //       role: "agent",
-<<<<<<< Updated upstream
 //       agent_id: import.meta.env.VITE_AGENT_ID, 
-=======
-//       agent_id: import.meta.env.VITE_AGENT_ID,
->>>>>>> Stashed changes
 //       picture: null
 //     };
 //     localStorage.setItem('access_token', fakeToken);

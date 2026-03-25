@@ -123,12 +123,10 @@ export default function TicketTable({
 
   // FIX: Pass the already-fetched full ticket through router state so
   // TicketDetails can use it immediately and skip its own getById call.
-  const handleExpandTicket = (ticketId) => {
-    navigate(
-      isAgent ? `/agent/tickets/${ticketId}` : `/admin/tickets/${ticketId}`,
-      { state: { ticket: selectedTicket } },
-    );
-  };
+const handleExpandTicket = (ticketId) => {
+  const path = isAgent ? `/agent/tickets/${ticketId}` : `/admin/tickets/${ticketId}`;
+  navigate(path, { state: { ticket: selectedTicket } }); // ← pass preloaded ticket
+};
 
   // ── Empty state ───────────────────────────────────────────────────────────
   if (data.length === 0) {
