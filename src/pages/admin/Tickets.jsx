@@ -1,112 +1,78 @@
 /**
  * pages/admin/AdminTickets.jsx
  *
- * Admin ticket list page.
- *
- * - Fetches from GET /api/v1/tickets/ with pagination
- * - Supports search, filters, sort — all client-side for now
- * - Shows full detail on row click via GET /api/v1/tickets/{id}
- * - Admins see all tickets including soft-deleted (toggle)
+ * Uses React Query so the GET /tickets/ result is shared with the dashboard.
+ * When the user navigates here from the dashboard, the cached data is served
+ * instantly — no extra network call is made unless the data is stale
+ * (default staleTime: 30 s, see QueryClient setup).
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { Search } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import TicketTable from '../../components/TicketTable';
 import Filters from '../../components/Filters';
-import { ticketService } from '../../services/ticketService';
+import { ticketService, ticketKeys } from '../../services/ticketService';
 
 const DEFAULT_PAGE_SIZE = 20;
 
 export default function AdminTickets() {
-  // -------------------------------------------------------------------------
-  // State
-  // -------------------------------------------------------------------------
-  const [tickets, setTickets]           = useState([]);
-  const [pagination, setPagination]     = useState({ total: 0, page: 1, total_pages: 1 });
-  const [loading, setLoading]           = useState(true);
-  const [error, setError]               = useState(null);
-  const [filters, setFilters]           = useState({});
-  const [search, setSearch]             = useState('');
-  const [sort, setSort]                 = useState({ field: 'updated_at', dir: 'desc' });
-  const [page, setPage]                 = useState(1);
+  const [filters,        setFilters]        = useState({});
+  const [search,         setSearch]         = useState('');
+  const [sort,           setSort]           = useState({ field: 'updated_at', dir: 'desc' });
+  const [page,           setPage]           = useState(1);
   const [includeDeleted, setIncludeDeleted] = useState(false);
 
-  // -------------------------------------------------------------------------
-  // Fetch
-  // -------------------------------------------------------------------------
-  // FIX: Empty deps array — fetchTickets never reads from the closure.
-  // Both currentPage and showDeleted are passed as explicit arguments, so
-  // there is nothing to capture. Previously [includeDeleted] was listed here,
-  // which caused useCallback to produce a new function reference every time
-  // the toggle changed. That new reference then triggered the useEffect on
-  // the same render that [includeDeleted] already triggered it, causing two
-  // GET /tickets/ calls on every toggle — and two on the initial mount
-  // (false → false is still a new function identity on first render).
-  const fetchTickets = useCallback(async (currentPage = 1, showDeleted = false) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await ticketService.getAll({
-        page:            currentPage,
-        page_size:       DEFAULT_PAGE_SIZE,
-        include_deleted: showDeleted,
-      });
-
-      // Backend returns: { items, total, page, page_size, total_pages }
-      setTickets(data.items ?? []);
-      setPagination({
-        total:       data.total       ?? 0,
-        page:        data.page        ?? currentPage,
-        total_pages: data.total_pages ?? 1,
-      });
-    } catch (err) {
-      console.error('AdminTickets: failed to load tickets', err);
-      setError(err.message || 'Failed to load tickets. Please try again.');
-      setTickets([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []); // stable reference — all inputs arrive as parameters
-
-  // Single effect: handles initial load and every subsequent toggle change.
-  // fetchTickets is intentionally omitted from deps — it is guaranteed stable.
-  // includeDeleted is passed explicitly as an argument so the function always
-  // receives the current value rather than a stale closure.
-  useEffect(() => {
-    setPage(1);
-    fetchTickets(1, includeDeleted);
-  }, [includeDeleted]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // -------------------------------------------------------------------------
-  // Handlers
-  // -------------------------------------------------------------------------
-  const handleSort = (field) => {
-    setSort(s => ({
-      field,
-      dir: s.field === field && s.dir === 'asc' ? 'desc' : 'asc',
-    }));
+  // ── Query params object – drives the cache key ──────────────────────────
+  // When these values match what the dashboard already fetched (e.g. page 1,
+  // no deleted), React Query returns the cached result immediately.
+  const queryParams = {
+    page,
+    page_size:       DEFAULT_PAGE_SIZE,
+    include_deleted: includeDeleted,
   };
 
-  const handlePageChange = (newPage) => {
-    setPage(newPage);
-    fetchTickets(newPage, includeDeleted);
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    isFetching,
+    refetch,
+  } = useQuery({
+    queryKey: ticketKeys.list(queryParams),
+    queryFn:  () => ticketService.getAll(queryParams),
+    // Keep previous page data visible while new page loads (no flash of empty)
+    placeholderData: (prev) => prev,
+    staleTime: 30_000, // treat cached data as fresh for 30 s
+  });
+
+  const tickets    = data?.items        ?? [];
+  const pagination = {
+    total:       data?.total       ?? 0,
+    page:        data?.page        ?? page,
+    total_pages: data?.total_pages ?? 1,
   };
 
-  const handleRetry = () => {
-    fetchTickets(page, includeDeleted);
+  // ── Handlers ─────────────────────────────────────────────────────────────
+  const handleSort = (field) =>
+    setSort(s => ({ field, dir: s.field === field && s.dir === 'asc' ? 'desc' : 'asc' }));
+
+  const handlePageChange = (newPage) => setPage(newPage);
+
+  const handleDeletedToggle = (e) => {
+    setIncludeDeleted(e.target.checked);
+    setPage(1); // reset to page 1 whenever the scope changes
   };
 
-  // -------------------------------------------------------------------------
-  // Client-side derived data
-  // Apply search + filters + sort on top of fetched page
-  // -------------------------------------------------------------------------
+  // ── Client-side search + filter + sort on top of the fetched page ─────────
   const filtered = tickets
     .filter(ticket => {
       const q = search.toLowerCase();
       if (!q) return true;
       return (
         ticket.title?.toLowerCase().includes(q) ||
-        ticket.crm_ticket_id?.toLowerCase().includes(q)
+        ticket.crm_id?.toLowerCase().includes(q)
       );
     })
     .filter(ticket => {
@@ -122,9 +88,7 @@ export default function AdminTickets() {
         : String(val(b)).localeCompare(String(val(a)));
     });
 
-  // -------------------------------------------------------------------------
-  // Render
-  // -------------------------------------------------------------------------
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
@@ -138,7 +102,6 @@ export default function AdminTickets() {
       {/* Search + Filters */}
       <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          {/* Search input */}
           <div style={{ position: 'relative', flex: 1 }}>
             <Search size={16} style={{
               position: 'absolute', left: 12, top: '50%',
@@ -154,12 +117,20 @@ export default function AdminTickets() {
             />
           </div>
 
-          {/* Admin-only: show deleted toggle */}
+          {/* Subtle "refetching" indicator */}
+          {isFetching && !isLoading && (
+            <div style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: 'var(--primary)', opacity: 0.6,
+              animation: 'pulse 1s ease-in-out infinite',
+            }} />
+          )}
+
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
             <input
               type="checkbox"
               checked={includeDeleted}
-              onChange={e => setIncludeDeleted(e.target.checked)}
+              onChange={handleDeletedToggle}
             />
             Show deleted
           </label>
@@ -169,26 +140,17 @@ export default function AdminTickets() {
       </div>
 
       {/* Error banner */}
-      {error && (
+      {isError && (
         <div style={{
-          padding: '12px 16px',
-          borderRadius: 'var(--radius-sm)',
-          background: '#FEF2F2',
-          border: '1px solid #FCA5A5',
-          color: '#DC2626',
-          fontSize: 13.5,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          padding: '12px 16px', borderRadius: 'var(--radius-sm)',
+          background: '#FEF2F2', border: '1px solid #FCA5A5',
+          color: '#DC2626', fontSize: 13.5,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
-          <span>{error}</span>
+          <span>{error?.message ?? 'Failed to load tickets.'}</span>
           <button
-            onClick={handleRetry}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: '#DC2626', fontWeight: 600, fontSize: 13,
-              fontFamily: 'inherit', padding: '0 4px',
-            }}
+            onClick={() => refetch()}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', fontWeight: 600, fontSize: 13, fontFamily: 'inherit', padding: '0 4px' }}
           >
             Retry
           </button>
@@ -198,7 +160,7 @@ export default function AdminTickets() {
       {/* Ticket table */}
       <TicketTable
         tickets={filtered}
-        loading={loading}
+        loading={isLoading}
         onSort={handleSort}
         sortField={sort.field}
         sortDir={sort.dir}
@@ -207,7 +169,7 @@ export default function AdminTickets() {
       />
 
       {/* Pagination + row count */}
-      {!loading && !error && (
+      {!isLoading && !isError && (
         <div style={{
           display: 'flex', justifyContent: 'space-between',
           alignItems: 'center', fontSize: 13, color: 'var(--text-muted)',
@@ -223,7 +185,7 @@ export default function AdminTickets() {
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <button
                 onClick={() => handlePageChange(page - 1)}
-                disabled={page <= 1}
+                disabled={page <= 1 || isFetching}
                 style={{ padding: '4px 10px', cursor: page <= 1 ? 'not-allowed' : 'pointer' }}
               >
                 ‹ Prev
@@ -231,7 +193,7 @@ export default function AdminTickets() {
               <span>Page {pagination.page} of {pagination.total_pages}</span>
               <button
                 onClick={() => handlePageChange(page + 1)}
-                disabled={page >= pagination.total_pages}
+                disabled={page >= pagination.total_pages || isFetching}
                 style={{ padding: '4px 10px', cursor: page >= pagination.total_pages ? 'not-allowed' : 'pointer' }}
               >
                 Next ›

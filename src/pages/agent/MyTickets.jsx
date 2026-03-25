@@ -1,86 +1,75 @@
-import { useState, useEffect, useCallback } from 'react';
+/**
+ * pages/agent/MyTickets.jsx
+ *
+ * Agent ticket list. React Query handles fetching, caching, and deduplication.
+ * Server-side filtering on status/priority; client-side search on the fetched page.
+ */
+
+import { useState } from 'react';
 import { Search } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import TicketTable from '../../components/TicketTable';
 import Filters from '../../components/Filters';
-import { ticketService } from '../../services/ticketService';
+import { ticketService, ticketKeys } from '../../services/ticketService';
 import { useAuth } from '../../context/AuthContext';
 
 const DEFAULT_PAGE_SIZE = 20;
 
 export default function MyTickets() {
   const { user } = useAuth();
-  const [tickets, setTickets]       = useState([]);
-  const [pagination, setPagination] = useState({ total: 0, page: 1, total_pages: 1 });
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState(null);
-  const [filters, setFilters]       = useState({});
-  const [search, setSearch]         = useState('');
-  const [sort, setSort]             = useState({ field: 'updated', dir: 'desc' });
-  const [page, setPage]             = useState(1);
 
-  // FIX: fetchTickets previously captured filters.status and filters.priority
-  // from the closure, so those values had to live in useCallback's deps array.
-  // Every filter change → new fetchTickets reference → useEffect([fetchTickets])
-  // fired → fetch. But React also re-renders the component on filter state
-  // change, which caused useCallback to rebuild the function reference a second
-  // time in the same cycle, triggering a second effect run and a second fetch.
-  //
-  // Fix: accept agentId, status, and priority as explicit parameters so the
-  // function never reads from the closure. useCallback deps are now empty —
-  // the reference is permanently stable and the effect only fires when we
-  // explicitly call it with new values.
-  const fetchTickets = useCallback(async (
-    currentPage = 1,
-    agentId     = null,
-    status      = undefined,
-    priority    = undefined,
-  ) => {
-    if (!agentId) return;
+  const [filters, setFilters] = useState({});
+  const [search,  setSearch]  = useState('');
+  const [sort,    setSort]    = useState({ field: 'updated', dir: 'desc' });
+  const [page,    setPage]    = useState(1);
 
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await ticketService.getByAgent(agentId, {
-        page:            currentPage,
-        page_size:       DEFAULT_PAGE_SIZE,
-        status:          status   || undefined,
-        priority:        priority || undefined,
-        include_deleted: false,
-      });
-      setTickets(data.items ?? []);
-      setPagination({
-        total:       data.total       ?? 0,
-        page:        data.page        ?? currentPage,
-        total_pages: data.total_pages ?? 1,
-      });
-    } catch (err) {
-      console.error('Failed to load tickets:', err);
-      setError('Failed to load your tickets. Please try again.');
-      setTickets([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []); // stable reference — no closure deps
+  const agentId = user?.agent_id;
 
-  // Single effect: fires on mount and whenever agent or filters change.
-  // All values are passed explicitly so fetchTickets stays stable and the
-  // effect is the sole driver of fetches.
-  useEffect(() => {
-    setPage(1);
-    fetchTickets(1, user?.agent_id, filters.status, filters.priority);
-  }, [user?.agent_id, filters.status, filters.priority]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Server-side filter params included in the cache key —
+  // a new key = new fetch, same key = cache hit.
+  const queryParams = {
+    page,
+    page_size:       DEFAULT_PAGE_SIZE,
+    status:          filters.status   || undefined,
+    priority:        filters.priority || undefined,
+    include_deleted: false,
+  };
 
-  const handleSort = (field) => {
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    isFetching,
+    refetch,
+  } = useQuery({
+    queryKey: ticketKeys.byAgent(agentId, queryParams),
+    queryFn:  () => ticketService.getByAgent(agentId, queryParams),
+    enabled:  !!agentId, // don't fire until we have an agentId
+    placeholderData: (prev) => prev,
+    staleTime: 30_000,
+  });
+
+  const tickets    = data?.items        ?? [];
+  const pagination = {
+    total:       data?.total       ?? 0,
+    page:        data?.page        ?? page,
+    total_pages: data?.total_pages ?? 1,
+  };
+
+  // ── Handlers ─────────────────────────────────────────────────────────────
+  const handleSort = (field) =>
     setSort(s => ({ field, dir: s.field === field && s.dir === 'asc' ? 'desc' : 'asc' }));
+
+  const handlePageChange = (newPage) => setPage(newPage);
+
+  // Reset to page 1 when server-side filters change
+  const handleFiltersChange = (newFilters) => {
+    setFilters(newFilters);
+    setPage(1);
   };
 
-  const handlePageChange = (newPage) => {
-    setPage(newPage);
-    fetchTickets(newPage, user?.agent_id, filters.status, filters.priority);
-  };
-
-  // Client-side search on top of the current fetched page.
-  // Status/priority are already filtered server-side in fetchTickets.
+  // Client-side search only (status/priority are server-side)
   const filtered = tickets.filter(ticket => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -90,10 +79,11 @@ export default function MyTickets() {
     );
   });
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* Breadcrumb */}
+      {/* Breadcrumb + heading */}
       <div>
         <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>
           Dashboard › <span style={{ color: 'var(--text-primary)' }}>My Tickets</span>
@@ -103,34 +93,47 @@ export default function MyTickets() {
 
       {/* Search + Filters */}
       <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ position: 'relative' }}>
-          <Search size={16} style={{
-            position: 'absolute', left: 12, top: '50%',
-            transform: 'translateY(-50%)', color: 'var(--text-muted)',
-            pointerEvents: 'none',
-          }} />
-          <input
-            className="form-input"
-            style={{ width: '100%', paddingLeft: 36 }}
-            placeholder="Search tickets…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <Search size={16} style={{
+              position: 'absolute', left: 12, top: '50%',
+              transform: 'translateY(-50%)', color: 'var(--text-muted)',
+              pointerEvents: 'none',
+            }} />
+            <input
+              className="form-input"
+              style={{ width: '100%', paddingLeft: 36 }}
+              placeholder="Search tickets…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Subtle background-refetch indicator */}
+          {isFetching && !isLoading && (
+            <div style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: 'var(--primary)', opacity: 0.6,
+              animation: 'pulse 1s ease-in-out infinite',
+            }} />
+          )}
         </div>
-        <Filters filters={filters} onChange={setFilters} />
+
+        {/* Filters drive server-side params via handleFiltersChange */}
+        <Filters filters={filters} onChange={handleFiltersChange} />
       </div>
 
       {/* Error */}
-      {error && (
+      {isError && (
         <div style={{
           padding: '12px 16px', borderRadius: 'var(--radius-sm)',
           background: '#FEF2F2', border: '1px solid #FCA5A5',
           color: '#DC2626', fontSize: 13.5,
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
-          <span>{error}</span>
+          <span>{error?.message ?? 'Failed to load your tickets.'}</span>
           <button
-            onClick={() => fetchTickets(page, user?.agent_id, filters.status, filters.priority)}
+            onClick={() => refetch()}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', fontWeight: 600, fontFamily: 'inherit' }}
           >
             Retry
@@ -138,19 +141,17 @@ export default function MyTickets() {
         </div>
       )}
 
-      {/* No agent_id guard */}
-      {!user?.agent_id && !loading && (
-        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13.5 }}>
+      {/* No agent guard */}
+      {!agentId && !isLoading && (
+        <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13.5 }}>
           No agent profile linked to your account.
         </div>
       )}
 
-      {/* Table — passes isAgent so TicketTable routes expansion to /agent/tickets/:id.
-          search and filters are handled above (client-side search, server-side
-          status/priority), so we pass empty values here to avoid double-filtering. */}
+      {/* Table – status/priority already filtered server-side, pass empty to avoid double-filter */}
       <TicketTable
         tickets={filtered}
-        loading={loading}
+        loading={isLoading}
         isAgent
         onSort={handleSort}
         sortField={sort.field}
@@ -160,7 +161,7 @@ export default function MyTickets() {
       />
 
       {/* Pagination */}
-      {!loading && !error && pagination.total_pages > 1 && (
+      {!isLoading && !isError && pagination.total_pages > 1 && (
         <div style={{
           display: 'flex', justifyContent: 'space-between',
           alignItems: 'center', fontSize: 13, color: 'var(--text-muted)',
@@ -172,7 +173,7 @@ export default function MyTickets() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
               onClick={() => handlePageChange(page - 1)}
-              disabled={page <= 1}
+              disabled={page <= 1 || isFetching}
               style={{ padding: '4px 10px', cursor: page <= 1 ? 'not-allowed' : 'pointer' }}
             >
               ‹ Prev
@@ -180,7 +181,7 @@ export default function MyTickets() {
             <span>Page {pagination.page} of {pagination.total_pages}</span>
             <button
               onClick={() => handlePageChange(page + 1)}
-              disabled={page >= pagination.total_pages}
+              disabled={page >= pagination.total_pages || isFetching}
               style={{ padding: '4px 10px', cursor: page >= pagination.total_pages ? 'not-allowed' : 'pointer' }}
             >
               Next ›
