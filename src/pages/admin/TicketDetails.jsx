@@ -18,10 +18,11 @@ import { useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeft, User, Building2, Database, Clock,
+  ArrowLeft, User, Database, Clock,
   Calendar, Mail, Phone, ExternalLink, AlertTriangle,
   MessageCircle, Send,
 } from 'lucide-react';
+// Building2 removed — Account row disabled under multi-tenancy
 import { ticketService, ticketKeys } from '../../services/ticketService';
 import {
   statusBadgeClass, priorityBadgeClass, crmBadgeClass,
@@ -97,33 +98,7 @@ function PersonPopup({ name, email, role, phone, extra }) {
   );
 }
 
-function AccountPopup({ name, email, phone, crm, tickets }) {
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
-        <div style={{ width: 36, height: 36, borderRadius: 8, background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: 'var(--primary)', flexShrink: 0 }}>
-          {getInitials(name)}
-        </div>
-        <div style={{ fontWeight: 600, fontSize: 13.5 }}>{name}</div>
-      </div>
-      {email && (
-        <a href={`mailto:${email}`} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: 'var(--primary)', marginBottom: 6, textDecoration: 'none' }}>
-          <Mail size={13} /> {email}
-        </a>
-      )}
-      {phone && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 6 }}>
-          <Phone size={13} /> {phone}
-        </div>
-      )}
-      {crm && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--text-muted)' }}>
-          <Database size={12} /> {crm}{tickets != null ? ` · ${tickets} tickets` : ''}
-        </div>
-      )}
-    </div>
-  );
-}
+// AccountPopup removed — accounts page disabled under multi-tenancy
 
 function CrmPopup({ crm }) {
   const info = {
@@ -343,8 +318,7 @@ export default function TicketDetails() {
   const customerName = customer.name
     || `${customer.first_name ?? ''} ${customer.last_name ?? ''}`.trim()
     || '—';
-  const account     = ticket.account ?? {};
-  const accountName = account.name || account.company_name || '—';
+  // account removed — accounts disabled under multi-tenancy
 
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -516,24 +490,7 @@ export default function TicketDetails() {
             </HoverPopup>
           </DetailRow>
 
-          <DetailRow icon={Building2} label="Account">
-            <HoverPopup popup={
-              <AccountPopup
-                name={accountName}
-                email={account.email}
-                phone={account.phone}
-                crm={account.crm}
-                tickets={account.tickets}
-              />
-            }>
-              <Chip
-                onClick={() => account.id && navigate(`${base}/accounts/${account.id}`)}
-                icon={<Building2 size={14} color="var(--primary)" />}
-                label={accountName}
-                linkable={!!account.id}
-              />
-            </HoverPopup>
-          </DetailRow>
+          {/* Account row removed — admin is scoped to their own tenant */}
 
           <DetailRow icon={User} label="Assignee">
             <HoverPopup popup={

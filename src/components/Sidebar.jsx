@@ -2,35 +2,33 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
-  LayoutDashboard, Ticket, Building2, Users, UserCircle,
+  LayoutDashboard, Ticket, Users, UserCircle,
   Settings, ChevronLeft, ChevronRight, LogOut, ClipboardList
 } from 'lucide-react';
 
 const adminNav = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/admin/tickets',   icon: Ticket,          label: 'Tickets'   },
-  { to: '/admin/accounts',  icon: Building2,        label: 'Accounts'  },
-  { to: '/admin/customers', icon: UserCircle,       label: 'Customers' },
-  { to: '/admin/users',     icon: Users,            label: 'Users'     },
-  { to: '/admin/settings',  icon: Settings,         label: 'Settings'  },
+  // Accounts removed — admin is scoped to their own tenant
+  { to: '/admin/customers', icon: UserCircle,      label: 'Customers' },
+  { to: '/admin/users',     icon: Users,           label: 'Users'     },
+  { to: '/admin/settings',  icon: Settings,        label: 'Settings'  },
 ];
 
 const agentNav = [
-  { to: '/agent/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/agent/my-tickets',icon: ClipboardList,   label: 'My Tickets'},
-  { to: '/agent/profile',   icon: UserCircle,      label: 'Profile'   },
+  { to: '/agent/dashboard',  icon: LayoutDashboard, label: 'Dashboard'  },
+  { to: '/agent/my-tickets', icon: ClipboardList,   label: 'My Tickets' },
+  { to: '/agent/profile',    icon: UserCircle,      label: 'Profile'    },
 ];
 
 export default function Sidebar({ isAdmin }) {
   const [collapsed, setCollapsed] = useState(false);
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const nav = isAdmin ? adminNav : agentNav;
+  const { user, logout }          = useAuth();
+  const navigate                  = useNavigate();
+  const nav                       = isAdmin ? adminNav : agentNav;
 
   const handleLogout = async () => {
-    try {
-      await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/logout`);
-    } catch (_) {}
+    try { await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/logout`); } catch (_) {}
     logout();
     navigate('/login');
   };
@@ -59,8 +57,7 @@ export default function Sidebar({ isAdmin }) {
         <div style={{
           width: 36, height: 36, borderRadius: 10,
           background: 'var(--primary)', display: 'flex',
-          alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0,
+          alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         }}>
           <Ticket size={18} color="white" />
         </div>
@@ -108,8 +105,7 @@ export default function Sidebar({ isAdmin }) {
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
             padding: '8px 12px', marginBottom: 8,
-            borderRadius: 'var(--radius-sm)',
-            background: 'var(--surface-2)',
+            borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)',
           }}>
             <div style={{
               width: 32, height: 32, borderRadius: '50%',
@@ -117,7 +113,7 @@ export default function Sidebar({ isAdmin }) {
               alignItems: 'center', justifyContent: 'center',
               fontSize: 12, fontWeight: 700, color: 'white', flexShrink: 0,
             }}>
-              {(user.name || user.email || 'U').slice(0,2).toUpperCase()}
+              {(user.name || user.email || 'U').slice(0, 2).toUpperCase()}
             </div>
             <div style={{ overflow: 'hidden' }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -149,7 +145,7 @@ export default function Sidebar({ isAdmin }) {
         </button>
       </div>
 
-      {/* Toggle button */}
+      {/* Toggle */}
       <button
         onClick={() => setCollapsed(c => !c)}
         style={{
