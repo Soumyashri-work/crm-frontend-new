@@ -181,4 +181,11 @@ getAgentStats: async (agentId) => {
   return unwrap(res);
 },
 
+
+getComments: async (ticketId, params = {}) => {
+  const res  = await api.get(`/tickets/${ticketId}/comments`, { params });
+  const data = unwrap(res);
+  return data; // { items, total, page, page_size, total_pages }
+},
+
 };
