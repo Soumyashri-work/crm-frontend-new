@@ -16,34 +16,14 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
-// useEffect(() => {
-//     // TEMP: fake login for UI testing — remove before production
-//     const fakeToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwicm9sZSI6ImFkbWluIiwiZXhwIjo5OTk5OTk5OTk5fQ.fake";
-//     const fakeUser = {
-//       name: "Rajnandini Patil",
-//       email: "rajnandini.patil@betsol.com",
-//       role: "agent",
-<<<<<<< Updated upstream
-//       agent_id: import.meta.env.VITE_AGENT_ID, 
-=======
-//       agent_id: import.meta.env.VITE_AGENT_ID,
->>>>>>> Stashed changes
-//       picture: null
-//     };
-//     localStorage.setItem('access_token', fakeToken);
-//     localStorage.setItem('user', JSON.stringify(fakeUser));
-//     setToken(fakeToken);
-//     setUser(fakeUser);
-//     setLoading(false);
-//   }, []);
-
-  useEffect(() => {
+useEffect(() => {
     // TEMP: fake login for UI testing — remove before production
     const fakeToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwicm9sZSI6ImFkbWluIiwiZXhwIjo5OTk5OTk5OTk5fQ.fake";
     const fakeUser = {
-      name: "John Doe",
-      email: "johndoe@gmail.com",
-      role: "admin",
+      name: "Rajnandini Patil",
+      email: "rajnandini.patil@betsol.com",
+      role: "agent",
+      agent_id: import.meta.env.VITE_AGENT_ID, 
       picture: null
     };
     localStorage.setItem('access_token', fakeToken);
@@ -52,6 +32,22 @@ export function AuthProvider({ children }) {
     setUser(fakeUser);
     setLoading(false);
   }, []);
+
+  // useEffect(() => {
+  //   // TEMP: fake login for UI testing — remove before production
+  //   const fakeToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwicm9sZSI6ImFkbWluIiwiZXhwIjo5OTk5OTk5OTk5fQ.fake";
+  //   const fakeUser = {
+  //     name: "John Doe",
+  //     email: "johndoe@gmail.com",
+  //     role: "admin",
+  //     picture: null
+  //   };
+  //   localStorage.setItem('access_token', fakeToken);
+  //   localStorage.setItem('user', JSON.stringify(fakeUser));
+  //   setToken(fakeToken);
+  //   setUser(fakeUser);
+  //   setLoading(false);
+  // }, []);
 
 
 
