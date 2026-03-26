@@ -1,28 +1,35 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import DashboardWidgets from '../../components/DashboardWidgets';
 import Charts from '../../components/Charts';
 import TicketTable from '../../components/TicketTable';
-import { ticketService } from '../../services/ticketService';
+import { ticketService, ticketKeys } from '../../services/ticketService';
+
+const RECENT_PARAMS = { page: 1, page_size: 5 };
 
 export default function AdminDashboard() {
-  const [stats, setStats]                 = useState(null);
-  const [recentTickets, setRecentTickets] = useState([]);
-  const [loading, setLoading]             = useState(true);
 
-  useEffect(() => {
-    // Stats
-    ticketService.getStats()
-      .then(data => setStats(data))  
-      .catch(() => {});
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  const { data: stats } = useQuery({
+    queryKey: ticketKeys.stats(),
+    queryFn:  ticketService.getStats,
+    staleTime: 60_000,   // stats change slowly — cache for 1 min
+  });
 
-    // Recent tickets
-    ticketService.getAll({ page: 1, page_size: 5 })
-      .then(data => setRecentTickets(data.items ?? []))
-      .catch(() => setRecentTickets([]))
-      .finally(() => setLoading(false));
-  }, []);
+  // ── Recent tickets ────────────────────────────────────────────────────────
+  // queryKey matches what Tickets.jsx uses for page 1 — cache is shared,
+  // so navigating Dashboard → Tickets shows data instantly with no refetch.
+  const {
+    data: recentData,
+    isLoading: ticketsLoading,
+  } = useQuery({
+    queryKey: ticketKeys.list(RECENT_PARAMS),
+    queryFn:  () => ticketService.getAll(RECENT_PARAMS),
+    staleTime: 30_000,
+  });
 
-  // Build chart-ready arrays from stats
+  const recentTickets = recentData?.items ?? [];
+
+  // ── Chart data derived from stats ─────────────────────────────────────────
   const statusData = stats ? [
     { name: 'Open',    value: stats.by_status?.open    || 0, color: '#2563EB' },
     { name: 'Closed',  value: stats.by_status?.closed  || 0, color: '#10B981' },
@@ -51,9 +58,11 @@ export default function AdminDashboard() {
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h3 style={{ fontSize: 16, fontWeight: 600 }}>Recent Tickets</h3>
-          <a href="/admin/tickets" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 500 }}>View all →</a>
+          <a href="/admin/tickets" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 500 }}>
+            View all →
+          </a>
         </div>
-        <TicketTable tickets={recentTickets} loading={loading} />
+        <TicketTable tickets={recentTickets} loading={ticketsLoading} />
       </div>
     </div>
   );

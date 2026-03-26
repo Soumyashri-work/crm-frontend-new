@@ -1,46 +1,53 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Mail, Phone, Database, AlertTriangle } from 'lucide-react';
-import { customerService } from '../../services/customerService';
+import { customerService, customerKeys } from '../../services/customerService';
 import { crmBadgeClass, getInitials, getAvatarColor } from '../../utils/helpers';
 
 export default function CustomerDetail() {
-  const { id }   = useParams();
-  const navigate = useNavigate();
-  const [customer, setCustomer] = useState(null);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState(null);
+  const { id }     = useParams();
+  const navigate   = useNavigate();
+  const location   = useLocation();
 
-  const fetchCustomer = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await customerService.getById(id);
-      setCustomer(data);
-    } catch (err) {
-      setError('Could not load customer.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // If the user navigated from the Customers list the row object is in
+  // router state — use it as initialData so the page renders immediately.
+  const preloaded = location.state?.customer ?? undefined;
 
-  useEffect(() => { fetchCustomer(); }, [id]);
+  const {
+    data:     customer,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey:    customerKeys.detail(id),
+    queryFn:     () => customerService.getById(id),
+    initialData: preloaded,
+    initialDataUpdatedAt: preloaded ? Date.now() : undefined,
+    staleTime:   30_000,
+  });
 
-  if (loading) return (
+  // ── Loading ───────────────────────────────────────────────────────────────
+  if (isLoading) return (
     <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
       <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid var(--border)', borderTopColor: 'var(--primary)', animation: 'spin 0.8s linear infinite' }} />
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 
-  if (error) return (
+  // ── Error ─────────────────────────────────────────────────────────────────
+  if (isError && !customer) return (
     <div style={{ maxWidth: 520, margin: '40px auto' }}>
       <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 'var(--radius)', padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center' }}>
         <AlertTriangle size={32} color="#DC2626" />
-        <div style={{ fontWeight: 600, color: '#DC2626' }}>{error}</div>
+        <div style={{ fontWeight: 600, color: '#DC2626' }}>
+          {error?.message ?? 'Could not load customer.'}
+        </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn btn-outline" onClick={() => navigate('/admin/customers')}><ArrowLeft size={15} /> Back</button>
-          <button className="btn btn-primary" onClick={fetchCustomer}>Retry</button>
+          <button className="btn btn-outline" onClick={() => navigate('/admin/customers')}>
+            <ArrowLeft size={15} /> Back
+          </button>
+          <button className="btn btn-primary" onClick={() => refetch()}>Retry</button>
         </div>
       </div>
     </div>
@@ -51,7 +58,7 @@ export default function CustomerDetail() {
   return (
     <div style={{ maxWidth: 860, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* Back */}
+      {/* Back / breadcrumb */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <button onClick={() => navigate('/admin/customers')} className="btn btn-ghost" style={{ padding: '6px 10px' }}>
           <ArrowLeft size={16} /> Back
@@ -114,13 +121,17 @@ export default function CustomerDetail() {
 
           {/* First name */}
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>First Name</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
+              First Name
+            </div>
             <div style={{ fontSize: 13.5 }}>{customer.first_name || '—'}</div>
           </div>
 
           {/* Last name */}
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Last Name</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
+              Last Name
+            </div>
             <div style={{ fontSize: 13.5 }}>{customer.last_name || '—'}</div>
           </div>
         </div>
