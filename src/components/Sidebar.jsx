@@ -99,65 +99,33 @@ export default function Sidebar({ isAdmin }) {
         ))}
       </nav>
 
-      {/* User + Logout */}
-      <div style={{ borderTop: '1px solid var(--border)', padding: '12px 10px' }}>
-        {!collapsed && user && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '8px 12px', marginBottom: 8,
-            borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)',
-          }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: '50%',
-              background: 'var(--primary)', display: 'flex',
-              alignItems: 'center', justifyContent: 'center',
-              fontSize: 12, fontWeight: 700, color: 'white', flexShrink: 0,
-            }}>
-              {(user.name || user.email || 'U').slice(0, 2).toUpperCase()}
-            </div>
-            <div style={{ overflow: 'hidden' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {user.name || 'User'}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {user.email}
-              </div>
-            </div>
-          </div>
-        )}
+      {/* Toggle */}
+      <div style={{ borderTop: '1px solid var(--border)', padding: '12px' }}>
         <button
-          onClick={handleLogout}
-          title={collapsed ? 'Logout' : undefined}
+          onClick={() => setCollapsed(c => !c)}
+          title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
           style={{
-            width: '100%', display: 'flex', alignItems: 'center',
-            gap: 10, padding: collapsed ? '10px 0' : '10px 12px',
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            borderRadius: 'var(--radius-sm)', border: 'none',
-            background: 'transparent', cursor: 'pointer',
-            color: 'var(--text-secondary)', fontSize: 14, fontFamily: 'inherit',
+            width: '100%', padding: '10px 12px',
+            borderRadius: 'var(--radius-sm)',
+            background: 'var(--surface-2)', border: '1px solid var(--border)',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: 8, fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)',
             transition: 'all var(--transition)',
+            fontFamily: 'inherit',
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = 'var(--danger)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'var(--primary-light)';
+            e.currentTarget.style.color = 'var(--primary)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'var(--surface-2)';
+            e.currentTarget.style.color = 'var(--text-secondary)';
+          }}
         >
-          <LogOut size={18} />
-          {!collapsed && <span>Logout</span>}
+          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          {!collapsed && <span>{collapsed ? 'Expand' : 'Collapse'}</span>}
         </button>
       </div>
-
-      {/* Toggle */}
-      <button
-        onClick={() => setCollapsed(c => !c)}
-        style={{
-          position: 'absolute', bottom: 80, right: -12,
-          width: 24, height: 24, borderRadius: '50%',
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: 'var(--shadow)', zIndex: 10,
-        }}
-      >
-        {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-      </button>
     </aside>
   );
 }

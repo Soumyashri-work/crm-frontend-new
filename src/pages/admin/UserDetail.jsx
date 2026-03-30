@@ -58,7 +58,7 @@ export default function UserDetail() {
   const isAdmin = (user.role || '').toLowerCase() === 'admin';
 
   return (
-    <div style={{ maxWidth: 860, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ margin: '0 auto', padding: '0 40px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* Breadcrumb */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -78,7 +78,7 @@ export default function UserDetail() {
         </span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 260px', gap: 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16, alignItems: 'start' }}>
 
         {/* Left — profile */}
         <div className="card animate-in" style={{ padding: 24 }}>
