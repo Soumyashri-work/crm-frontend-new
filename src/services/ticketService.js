@@ -134,6 +134,9 @@ export const ticketService = {
     return unwrap(res); // { items, total, page, page_size, total_pages }
   },
 
+  syncComments: (ticketId) =>
+  api.post(`/sync/${ticketId}/comments/sync`).then(r => r.data),
+
   /** POST /api/v1/tickets/ */
   create: (data)        => api.post('/tickets/', data),
 
