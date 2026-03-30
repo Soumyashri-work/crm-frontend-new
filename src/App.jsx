@@ -15,13 +15,13 @@ import AgentLayout from './layouts/AgentLayout';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminTickets from './pages/admin/Tickets';
 import TicketDetails from './pages/admin/TicketDetails';
-// import Accounts from './pages/admin/Accounts';        // disabled — multi-tenancy: admin sees own tenant only
+// import Accounts from './pages/admin/Accounts';           // disabled — multi-tenancy: admin sees own tenant only
 // import AccountDetail from './pages/admin/AccountDetail'; // disabled — same reason
 import Customers from './pages/admin/Customers';
 import CustomerDetail from './pages/admin/CustomerDetail';
-import Users from './pages/admin/Users';
-import UserDetail from './pages/admin/UserDetail';
 import Settings from './pages/admin/Settings';
+import Agents from './pages/admin/Agents';
+import AgentDetail from './pages/admin/AgentDetail';
 
 // Agent pages
 import AgentDashboard from './pages/agent/Dashboard';
@@ -55,17 +55,17 @@ export default function App() {
               </ProtectedRoute>
             }>
               <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard"     element={<AdminDashboard />} />
-              <Route path="tickets"       element={<AdminTickets />} />
-              <Route path="tickets/:id"   element={<TicketDetails />} />
+              <Route path="dashboard"      element={<AdminDashboard />} />
+              <Route path="tickets"        element={<AdminTickets />} />
+              <Route path="tickets/:id"    element={<TicketDetails />} />
               {/* Accounts routes disabled — admin belongs to one tenant, no cross-org accounts view */}
-              {/* <Route path="accounts"      element={<Accounts />} /> */}
-              {/* <Route path="accounts/:id"  element={<AccountDetail />} /> */}
-              <Route path="customers"     element={<Customers />} />
-              <Route path="customers/:id" element={<CustomerDetail />} />
-              <Route path="users"         element={<Users />} />
-              <Route path="users/:id"     element={<UserDetail />} />
-              <Route path="settings"      element={<Settings />} />
+              {/* <Route path="accounts"     element={<Accounts />} /> */}
+              {/* <Route path="accounts/:id" element={<AccountDetail />} /> */}
+              <Route path="customers"      element={<Customers />} />
+              <Route path="customers/:id"  element={<CustomerDetail />} />
+              <Route path="agents"         element={<Agents />} />
+              <Route path="agents/:id"     element={<AgentDetail />} />
+              <Route path="settings"       element={<Settings />} />
             </Route>
 
             {/* Agent routes */}
@@ -75,10 +75,10 @@ export default function App() {
               </ProtectedRoute>
             }>
               <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard"  element={<AgentDashboard />} />
-              <Route path="my-tickets" element={<MyTickets />} />
+              <Route path="dashboard"   element={<AgentDashboard />} />
+              <Route path="my-tickets"  element={<MyTickets />} />
               <Route path="tickets/:id" element={<TicketDetails />} />
-              <Route path="profile"    element={<AgentProfile />} />
+              <Route path="profile"     element={<AgentProfile />} />
             </Route>
 
             {/* Fallbacks */}

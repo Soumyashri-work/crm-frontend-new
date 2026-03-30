@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Ticket, Users, UserCircle,
-  Settings, ChevronLeft, ChevronRight, LogOut, ClipboardList
+  Settings, ChevronLeft, ChevronRight, ClipboardList
 } from 'lucide-react';
 
 const adminNav = [
@@ -11,7 +11,7 @@ const adminNav = [
   { to: '/admin/tickets',   icon: Ticket,          label: 'Tickets'   },
   // Accounts removed — admin is scoped to their own tenant
   { to: '/admin/customers', icon: UserCircle,      label: 'Customers' },
-  { to: '/admin/users',     icon: Users,           label: 'Users'     },
+  { to: '/admin/agents',    icon: Users,           label: 'Agents'    },
   { to: '/admin/settings',  icon: Settings,        label: 'Settings'  },
 ];
 
@@ -23,7 +23,7 @@ const agentNav = [
 
 export default function Sidebar({ isAdmin }) {
   const [collapsed, setCollapsed] = useState(false);
-  const { user, logout }          = useAuth();
+  const { logout }                = useAuth();
   const navigate                  = useNavigate();
   const nav                       = isAdmin ? adminNav : agentNav;
 
@@ -99,7 +99,7 @@ export default function Sidebar({ isAdmin }) {
         ))}
       </nav>
 
-      {/* Toggle */}
+      {/* Collapse toggle */}
       <div style={{ borderTop: '1px solid var(--border)', padding: '12px' }}>
         <button
           onClick={() => setCollapsed(c => !c)}
@@ -123,7 +123,7 @@ export default function Sidebar({ isAdmin }) {
           }}
         >
           {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          {!collapsed && <span>{collapsed ? 'Expand' : 'Collapse'}</span>}
+          {!collapsed && <span>Collapse</span>}
         </button>
       </div>
     </aside>
