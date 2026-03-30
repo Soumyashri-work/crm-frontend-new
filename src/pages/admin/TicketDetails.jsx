@@ -202,14 +202,12 @@ export default function TicketDetails() {
   // React Query will background-refresh when stale.
   const preloaded = location.state?.ticket ?? undefined;
 
-  const [comment,    setComment]    = useState('');
-  const [commentSyncDone, setCommentSyncDone] = useState(false);
+  const [comment, setComment] = useState('');
 
-useEffect(() => {
-  ticketService.syncComments(id)
-    .catch(() => {})
-    .finally(() => setCommentSyncDone(true));
-}, [id]);
+  // Sync comments in the background without blocking the query
+  useEffect(() => {
+    ticketService.syncComments(id).catch(() => {});
+  }, [id]);
 
   // ── Ticket query ──────────────────────────────────────────────────────────
   const {
@@ -239,7 +237,6 @@ useEffect(() => {
     queryKey: ticketKeys.comments(id, commentsParams),
     queryFn:  () => ticketService.getComments(id, commentsParams),
     staleTime: 20_000,
-    enabled: commentSyncDone
   });
 
   const comments     = commentsData?.items ?? [];
@@ -329,7 +326,7 @@ useEffect(() => {
   // account removed — accounts disabled under multi-tenancy
 
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ margin: '0 auto', padding: '0 40px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* Back / breadcrumb */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -349,7 +346,7 @@ useEffect(() => {
         </span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 290px', gap: 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 340px', gap: 16, alignItems: 'start' }}>
 
         {/* ── Left: main content + comments ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -425,8 +422,7 @@ useEffect(() => {
 
                       <div
                         style={{
-                          background:   c.is_internal ? '#FDFDF0' : 'var(--surface-2)',
-                          border:       c.is_internal ? '1px dashed #C8B900' : '1px solid transparent',
+                          background:   'var(--surface-2)',
                           padding:      '10px 14px',
                           borderRadius: 'var(--radius-sm)',
                           fontSize:     13.5,
