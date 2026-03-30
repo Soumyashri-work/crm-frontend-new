@@ -14,7 +14,7 @@
  * instantly while the POST is in flight.
  */
 
-import { useState } from 'react';
+import { useState,useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -203,6 +203,13 @@ export default function TicketDetails() {
   const preloaded = location.state?.ticket ?? undefined;
 
   const [comment,    setComment]    = useState('');
+  const [commentSyncDone, setCommentSyncDone] = useState(false);
+
+useEffect(() => {
+  ticketService.syncComments(id)
+    .catch(() => {})
+    .finally(() => setCommentSyncDone(true));
+}, [id]);
 
   // ── Ticket query ──────────────────────────────────────────────────────────
   const {
@@ -232,6 +239,7 @@ export default function TicketDetails() {
     queryKey: ticketKeys.comments(id, commentsParams),
     queryFn:  () => ticketService.getComments(id, commentsParams),
     staleTime: 20_000,
+    enabled: commentSyncDone
   });
 
   const comments     = commentsData?.items ?? [];
