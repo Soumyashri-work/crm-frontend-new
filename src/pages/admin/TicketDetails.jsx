@@ -14,7 +14,7 @@
  * instantly while the POST is in flight.
  */
 
-import { useState,useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -22,7 +22,6 @@ import {
   Calendar, Mail, Phone, ExternalLink, AlertTriangle,
   MessageCircle, Send,
 } from 'lucide-react';
-// Building2 removed — Account row disabled under multi-tenancy
 import { ticketService, ticketKeys } from '../../services/ticketService';
 import {
   statusBadgeClass, priorityBadgeClass, crmBadgeClass,
@@ -30,8 +29,6 @@ import {
 } from '../../utils/helpers';
 
 // ── Hover Popup ──────────────────────────────────────────────────────────────
-import { useRef } from 'react';
-
 function HoverPopup({ children, popup }) {
   const [visible, setVisible] = useState(false);
   const [pos,     setPos]     = useState({ top: 0, left: 0 });
@@ -97,8 +94,6 @@ function PersonPopup({ name, email, role, phone, extra }) {
     </div>
   );
 }
-
-// AccountPopup removed — accounts page disabled under multi-tenancy
 
 function CrmPopup({ crm }) {
   const info = {
@@ -171,40 +166,51 @@ function Chip({ onClick, avatarName, label, icon, linkable }) {
 // ── Comment skeleton ───────────────────────────────────────────────────────
 function CommentSkeleton() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20, minHeight: 160 }}>
       {[...Array(3)].map((_, i) => (
-        <div key={i} style={{ display: 'flex', gap: 12 }}>
-          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--border)', flexShrink: 0, animation: 'pulse 1.4s ease-in-out infinite' }} />
+        <div key={i} style={{ display: 'flex', gap: 12, opacity: 1 - i * 0.25 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: '50%',
+            background: 'var(--border)', flexShrink: 0,
+            animation: 'pulse 1.4s ease-in-out infinite',
+            animationDelay: `${i * 0.15}s`,
+          }} />
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{ height: 12, width: '30%', borderRadius: 4, background: 'var(--border)', animation: 'pulse 1.4s ease-in-out infinite' }} />
-            <div style={{ height: 48, borderRadius: 6, background: 'var(--border)', animation: 'pulse 1.4s ease-in-out infinite' }} />
+            <div style={{
+              height: 12, width: `${28 + i * 6}%`, borderRadius: 4,
+              background: 'var(--border)',
+              animation: 'pulse 1.4s ease-in-out infinite',
+              animationDelay: `${i * 0.15}s`,
+            }} />
+            <div style={{
+              height: 48, borderRadius: 6,
+              background: 'var(--border)',
+              animation: 'pulse 1.4s ease-in-out infinite',
+              animationDelay: `${i * 0.15}s`,
+            }} />
           </div>
         </div>
       ))}
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.45}}`}</style>
+      <style>{`@keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.45 } }`}</style>
     </div>
   );
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function TicketDetails() {
-  const { id }     = useParams();
-  const navigate   = useNavigate();
-  const location   = useLocation();
+  const { id }      = useParams();
+  const navigate    = useNavigate();
+  const location    = useLocation();
   const queryClient = useQueryClient();
 
   const isAgent  = location.pathname.startsWith('/agent');
   const base     = isAgent ? '/agent' : '/admin';
   const backPath = isAgent ? `${base}/my-tickets` : `${base}/tickets`;
 
-  // The full ticket object passed through router state by TicketTable.
-  // Used as initialData so the page is immediately populated —
-  // React Query will background-refresh when stale.
   const preloaded = location.state?.ticket ?? undefined;
 
   const [comment, setComment] = useState('');
 
-  // Sync comments in the background without blocking the query
   useEffect(() => {
     ticketService.syncComments(id).catch(() => {});
   }, [id]);
@@ -220,8 +226,6 @@ export default function TicketDetails() {
     queryKey:    ticketKeys.detail(id),
     queryFn:     () => ticketService.getById(id),
     initialData: preloaded,
-    // Don't treat the preloaded data as stale immediately —
-    // give it 30 s before triggering a background refresh.
     initialDataUpdatedAt: preloaded ? Date.now() : undefined,
     staleTime: 30_000,
   });
@@ -246,10 +250,8 @@ export default function TicketDetails() {
   const addCommentMutation = useMutation({
     mutationFn: (text) => ticketService.addComment(id, { text }),
 
-    // Optimistically insert the new comment before the request completes
     onMutate: async (text) => {
       await queryClient.cancelQueries({ queryKey: ticketKeys.comments(id, commentsParams) });
-
       const previous = queryClient.getQueryData(ticketKeys.comments(id, commentsParams));
 
       queryClient.setQueryData(ticketKeys.comments(id, commentsParams), (old) => {
@@ -266,15 +268,13 @@ export default function TicketDetails() {
           : { items: [optimistic], total: 1 };
       });
 
-      return { previous }; // snapshot for rollback
+      return { previous };
     },
 
-    // On success, replace optimistic data with real server data
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ticketKeys.comments(id, commentsParams) });
     },
 
-    // Roll back on failure
     onError: (_err, _text, context) => {
       if (context?.previous) {
         queryClient.setQueryData(ticketKeys.comments(id, commentsParams), context.previous);
@@ -323,10 +323,22 @@ export default function TicketDetails() {
   const customerName = customer.name
     || `${customer.first_name ?? ''} ${customer.last_name ?? ''}`.trim()
     || '—';
-  // account removed — accounts disabled under multi-tenancy
+
+  // Derive whether comments are truly ready to display
+  const commentsReady = !commentsLoading && !!commentsData;
 
   return (
     <div style={{ margin: '0 auto', padding: '0 40px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* Global keyframes */}
+      <style>{`
+        @keyframes spin          { to { transform: rotate(360deg); } }
+        @keyframes pulse         { 0%, 100% { opacity: 1 } 50% { opacity: 0.45 } }
+        @keyframes commentsFadeIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0);   }
+        }
+      `}</style>
 
       {/* Back / breadcrumb */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -361,7 +373,7 @@ export default function TicketDetails() {
 
             <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{ticket.title}</h1>
             <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 16 }}>
-              {ticket.created ? ` · Created ${formatDateTime(ticket.created)}` : ''}
+              {ticket.created ? `· Created ${formatDateTime(ticket.created)}` : ''}
             </div>
 
             {ticket.description ? (
@@ -375,73 +387,98 @@ export default function TicketDetails() {
             )}
           </div>
 
-          {/* ── Comments ── */}
+          {/* ── Comments card ── */}
           <div className="card animate-in" style={{ padding: 24, animationDelay: '0.05s' }}>
             <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 18, display: 'flex', alignItems: 'center', gap: 8 }}>
               <MessageCircle size={17} />
-              Comments ({commentTotal})
+              Comments
+              {/* Show total only once we have real data, so the number doesn't flash 0 → N */}
+              {commentsReady && <span>({commentTotal})</span>}
             </h3>
 
-            {commentsLoading && <CommentSkeleton />}
+            {/* ── Comments list area — fixed min-height prevents layout jump ── */}
+            <div style={{
+              minHeight: commentsReady ? 0 : 160,
+              transition: 'min-height 0.3s ease',
+            }}>
 
-            {commentsError && !commentsLoading && (
-              <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#DC2626', fontSize: 13, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Could not load comments.</span>
-                <button onClick={() => refetchComments()} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', fontWeight: 600, fontFamily: 'inherit', fontSize: 13 }}>
-                  Retry
-                </button>
-              </div>
-            )}
+              {/* Skeleton — visible while loading OR before data has settled */}
+              {!commentsReady && !commentsError && <CommentSkeleton />}
 
-            {!commentsLoading && !commentsError && comments.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: 13.5 }}>
-                No comments yet. Be the first to add one.
-              </div>
-            )}
+              {/* Error state */}
+              {commentsError && !commentsLoading && (
+                <div style={{
+                  padding: '12px 14px', borderRadius: 'var(--radius-sm)',
+                  background: '#FEF2F2', border: '1px solid #FCA5A5',
+                  color: '#DC2626', fontSize: 13, marginBottom: 16,
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}>
+                  <span>Could not load comments.</span>
+                  <button
+                    onClick={() => refetchComments()}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', fontWeight: 600, fontFamily: 'inherit', fontSize: 13 }}
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
 
-            {!commentsLoading && comments.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
-                {comments.map(c => (
-                  <div key={c.id} style={{ display: 'flex', gap: 12 }}>
-                    <div style={{
-                      width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-                      background: getAvatarColor(c.author_name),
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 12, fontWeight: 700, color: 'white',
-                    }}>
-                      {getInitials(c.author_name)}
-                    </div>
+              {/* Empty state */}
+              {commentsReady && comments.length === 0 && (
+                <div style={{
+                  textAlign: 'center', padding: '24px 0',
+                  color: 'var(--text-muted)', fontSize: 13.5,
+                  animation: 'commentsFadeIn 0.25s ease',
+                }}>
+                  No comments yet. Be the first to add one.
+                </div>
+              )}
 
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 600, fontSize: 13.5 }}>{c.author_name}</span>
-                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                          {formatDateTime(c.crm_created_at)}
-                        </span>
+              {/* Comments list */}
+              {commentsReady && comments.length > 0 && (
+                <div style={{
+                  display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20,
+                  animation: 'commentsFadeIn 0.3s ease',
+                }}>
+                  {comments.map(c => (
+                    <div key={c.id} style={{ display: 'flex', gap: 12 }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                        background: getAvatarColor(c.author_name),
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 12, fontWeight: 700, color: 'white',
+                      }}>
+                        {getInitials(c.author_name)}
                       </div>
 
-                      <div
-                        style={{
-                          background:   'var(--surface-2)',
-                          padding:      '10px 14px',
-                          borderRadius: 'var(--radius-sm)',
-                          fontSize:     13.5,
-                          lineHeight:   1.65,
-                          color:        'var(--text-secondary)',
-                        }}
-                        dangerouslySetInnerHTML={{ __html: c.body }}
-                      />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 600, fontSize: 13.5 }}>{c.author_name}</span>
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                            {formatDateTime(c.crm_created_at)}
+                          </span>
+                        </div>
+
+                        <div
+                          style={{
+                            background: 'var(--surface-2)', padding: '10px 14px',
+                            borderRadius: 'var(--radius-sm)', fontSize: 13.5,
+                            lineHeight: 1.65, color: 'var(--text-secondary)',
+                          }}
+                          dangerouslySetInnerHTML={{ __html: c.body }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Comment input */}
             <div style={{
               display: 'flex', gap: 10,
-              borderTop: comments.length > 0 ? '1px solid var(--border-light)' : 'none',
-              paddingTop: comments.length > 0 ? 16 : 0,
+              borderTop: commentsReady && comments.length > 0 ? '1px solid var(--border-light)' : 'none',
+              paddingTop: commentsReady && comments.length > 0 ? 16 : 0,
             }}>
               <textarea
                 className="form-input"
@@ -492,8 +529,6 @@ export default function TicketDetails() {
               />
             </HoverPopup>
           </DetailRow>
-
-          {/* Account row removed — admin is scoped to their own tenant */}
 
           <DetailRow icon={User} label="Assignee">
             <HoverPopup popup={
