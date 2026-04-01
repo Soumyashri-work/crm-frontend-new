@@ -64,7 +64,7 @@ export default function App() {
               <Route path="customers"      element={<Customers />} />
               <Route path="customers/:id"  element={<CustomerDetail />} />
               <Route path="agents"         element={<Agents />} />
-              <Route path="agents/:id"     element={<AgentDetail />} />
+              <Route path="agents/detail/:slug" element={<AgentDetail />} />
               <Route path="settings"       element={<Settings />} />
             </Route>
 

@@ -1,18 +1,45 @@
-import { useState, useRef, useEffect } from 'react';
-import { Eye, Edit2, UserX, Search, ArrowUp, ArrowDown, ArrowUpDown, MoreVertical, Send, X } from 'lucide-react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import {
+  Eye,
+  Edit2,
+  UserX,
+  Search,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  MoreVertical,
+  Send,
+  X,
+  XCircle,
+  Clock3,
+  AlertTriangle,
+  CheckCircle2,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { agentService, agentKeys } from '../../services/agentService';
-import { getInitials, getAvatarColor, crmBadgeClass } from '../../utils/helpers';
+import {
+  getInitials,
+  getAvatarColor,
+  crmBadgeClass,
+  getAgentStatusMeta,
+  getAgentRouteSlug,
+  getAgentCrmSources,
+  getAgentTicketsCount,
+  getAgentActiveStatus,
+  getAgentIsActive,
+} from '../../utils/helpers';
+import EditAgentModal from '../../components/EditAgentModal';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
+import CrmBadgesDisplay from '../../components/CrmBadgesDisplay';
 
 const PAGE_SIZE = 20;
 
 // ---------------------------------------------------------------------------
 // Row action menu
 // ---------------------------------------------------------------------------
-function RowActionMenu({ agent, onClose, isOpen }) {
+function RowActionMenu({ onClose, isOpen, onView, onEdit, onDelete }) {
   const menuRef = useRef();
-  const navigate = useNavigate();
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -43,19 +70,28 @@ function RowActionMenu({ agent, onClose, isOpen }) {
       {[
         {
           label: 'View', icon: <Eye size={14} />,
-          onClick: () => { navigate(`/admin/agents/${agent.id}`, { state: { agent } }); onClose(); },
+          onClick: () => {
+            onView();
+            onClose();
+          },
           danger: false,
           border: false,
         },
         {
           label: 'Edit', icon: <Edit2 size={14} />,
-          onClick: onClose,
+          onClick: () => {
+            onEdit();
+            onClose();
+          },
           danger: false,
           border: true,
         },
         {
           label: 'Delete', icon: <UserX size={14} />,
-          onClick: onClose,
+          onClick: () => {
+            onDelete();
+            onClose();
+          },
           danger: true,
           border: true,
         },
@@ -95,6 +131,7 @@ function RowActionMenu({ agent, onClose, isOpen }) {
 // ---------------------------------------------------------------------------
 export default function Agents() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [search,       setSearch]       = useState('');
   const [sortField,    setSortField]    = useState('');
@@ -104,12 +141,15 @@ export default function Agents() {
   const [page,         setPage]         = useState(1);
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [openMenuId,   setOpenMenuId]   = useState(null);
+  const [banner,       setBanner]       = useState(null);
+  const [editingAgent, setEditingAgent] = useState(null);
+  const [deletingAgent, setDeletingAgent] = useState(null);
 
   // ── Query ────────────────────────────────────────────────────────────────
   const queryParams = {
     page,
     page_size: PAGE_SIZE,
-    include_inactive: statusFilter === 'inactive' ? true : undefined,
+    include_inactive: true,
     ...(sourceFilter ? { source: sourceFilter } : {}),
   };
 
@@ -142,9 +182,12 @@ export default function Agents() {
 
   // ── Client-side filter + sort ────────────────────────────────────────────
   const filtered = agents.filter(a => {
-    if (statusFilter && statusFilter !== 'inactive') {
-      if ((a.status || '').toLowerCase() !== statusFilter.toLowerCase()) return false;
+    const statusMeta = getAgentStatusMeta(a.status);
+
+    if (statusFilter && statusMeta.key !== statusFilter) {
+      return false;
     }
+
     if (search) {
       const q = search.toLowerCase();
       if (
@@ -157,8 +200,12 @@ export default function Agents() {
 
   const sorted = sortField
     ? [...filtered].sort((a, b) => {
-        const av = String(a[sortField] ?? '').toLowerCase();
-        const bv = String(b[sortField] ?? '').toLowerCase();
+        const av = sortField === 'tickets'
+          ? Number(getAgentTicketsCount(a))
+          : String(a[sortField] ?? '').toLowerCase();
+        const bv = sortField === 'tickets'
+          ? Number(getAgentTicketsCount(b))
+          : String(b[sortField] ?? '').toLowerCase();
         if (av < bv) return sortDir === 'asc' ? -1 :  1;
         if (av > bv) return sortDir === 'asc' ?  1 : -1;
         return 0;
@@ -177,6 +224,8 @@ export default function Agents() {
   };
 
   const toggleAllRows = () => {
+    if (!isNotInvitedFilter) return;
+
     setSelectedRows(
       selectedRows.size === sorted.length
         ? new Set()
@@ -185,6 +234,26 @@ export default function Agents() {
   };
 
   const hasActiveFilters = statusFilter || search || sourceFilter;
+  const isNotInvitedFilter = statusFilter === 'not_invited';
+
+  const selectedInviteCandidates = useMemo(
+    () => sorted.filter(a => selectedRows.has(a.id)),
+    [sorted, selectedRows],
+  );
+
+  useEffect(() => {
+    if (!isNotInvitedFilter) {
+      setSelectedRows(new Set());
+    }
+  }, [isNotInvitedFilter]);
+
+  useEffect(() => {
+    setSelectedRows((prev) => {
+      const visibleIds = new Set(sorted.map(a => a.id));
+      const next = new Set([...prev].filter(id => visibleIds.has(id)));
+      return next;
+    });
+  }, [sorted]);
 
   const clearFilters = () => {
     setStatusFilter('');
@@ -193,25 +262,159 @@ export default function Agents() {
     setPage(1);
   };
 
+  const invalidateAgents = async () => {
+    await queryClient.invalidateQueries({ queryKey: agentKeys.all() });
+  };
+
+  const inviteMutation = useMutation({
+    mutationFn: (id) => agentService.invite(id),
+    onSuccess: async () => {
+      setBanner({ type: 'success', message: 'Invitation sent successfully.' });
+      await invalidateAgents();
+    },
+    onError: (err) => {
+      setBanner({ type: 'error', message: err?.message || 'Failed to send invitation.' });
+    },
+  });
+
+  const resendMutation = useMutation({
+    mutationFn: (id) => agentService.resendInvite(id),
+    onSuccess: async () => {
+      setBanner({ type: 'success', message: 'Invitation resent successfully.' });
+      await invalidateAgents();
+    },
+    onError: (err) => {
+      setBanner({ type: 'error', message: err?.message || 'Failed to resend invitation.' });
+    },
+  });
+
+  const bulkInviteMutation = useMutation({
+    mutationFn: (ids) => agentService.bulkInvite(ids),
+    onSuccess: async (_data, ids) => {
+      setBanner({
+        type: 'success',
+        message: `Invitation sent successfully to ${ids.length} user${ids.length === 1 ? '' : 's'}.`,
+      });
+      setSelectedRows(new Set());
+      await invalidateAgents();
+    },
+    onError: (err) => {
+      setBanner({ type: 'error', message: err?.message || 'Failed to send bulk invitations.' });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => agentService.update(id, data),
+    onSuccess: async () => {
+      setBanner({ type: 'success', message: 'Agent updated successfully.' });
+      await invalidateAgents();
+    },
+    onError: (err) => {
+      setBanner({ type: 'error', message: err?.message || 'Failed to update agent.' });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => agentService.delete(id),
+    onSuccess: async () => {
+      setBanner({ type: 'success', message: 'Agent deleted successfully.' });
+      await invalidateAgents();
+    },
+    onError: (err) => {
+      setBanner({ type: 'error', message: err?.message || 'Failed to delete agent.' });
+    },
+  });
+
+  const goToDetail = (agent) => {
+    navigate(`/admin/agents/detail/${getAgentRouteSlug(agent)}`, { state: { agent } });
+  };
+
+  const handleEditOpen = (agent) => {
+    setEditingAgent(agent);
+  };
+
+  const handleEditSave = (formData) => {
+    if (!editingAgent) return;
+    updateMutation.mutate(
+      { id: editingAgent.id, data: { name: formData.name } },
+      {
+        onSuccess: () => {
+          setEditingAgent(null);
+        },
+      },
+    );
+  };
+
+  const handleDeleteOpen = (agent) => {
+    setDeletingAgent(agent);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!deletingAgent) return;
+    deleteMutation.mutate(deletingAgent.id, {
+      onSuccess: () => {
+        setDeletingAgent(null);
+      },
+    });
+  };
+
+  const handleInvite = (agent) => inviteMutation.mutate(agent.id);
+  const handleResend = (agent) => resendMutation.mutate(agent.id);
+
+  const handleBulkInvite = () => {
+    if (selectedInviteCandidates.length === 0) return;
+    bulkInviteMutation.mutate(selectedInviteCandidates.map(a => a.id));
+  };
+
   // ── Action button per status ──────────────────────────────────────────────
   const getActionButton = (agent) => {
-    const status = (agent.status || '').toLowerCase();
-    if (status === 'active') return null;
+    const status = getAgentStatusMeta(agent.status).key;
+
     if (status === 'not_invited') return (
-      <button className="btn" style={{ padding: '6px 12px', fontSize: 12, fontWeight: 600, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+      <button
+        className="btn"
+        onClick={() => handleInvite(agent)}
+        disabled={inviteMutation.isPending}
+        style={{
+          padding: '6px 12px',
+          fontSize: 12,
+          fontWeight: 600,
+          background: 'var(--primary)',
+          color: 'white',
+          border: 'none',
+          borderRadius: 'var(--radius-sm)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          opacity: inviteMutation.isPending ? 0.7 : 1,
+        }}
+      >
         <Send size={13} /> Invite
       </button>
     );
+
     if (status === 'expired') return (
-      <button className="btn" style={{ padding: '6px 12px', fontSize: 12, fontWeight: 600, background: '#FF9500', color: 'white', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}>
-        Reissue
+      <button
+        className="btn"
+        onClick={() => handleResend(agent)}
+        disabled={resendMutation.isPending}
+        style={{
+          padding: '6px 12px',
+          fontSize: 12,
+          fontWeight: 600,
+          background: '#FF9500',
+          color: 'white',
+          border: 'none',
+          borderRadius: 'var(--radius-sm)',
+          cursor: 'pointer',
+          opacity: resendMutation.isPending ? 0.7 : 1,
+        }}
+      >
+        Resend
       </button>
     );
-    if (status === 'pending') return (
-      <button className="btn" style={{ padding: '6px 12px', fontSize: 12, fontWeight: 600, background: '#FF6B6B', color: 'white', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}>
-        Report
-      </button>
-    );
+
     return null;
   };
 
@@ -292,6 +495,29 @@ export default function Agents() {
         </div>
       )}
 
+      {banner && (
+        <div style={{
+          padding: '12px 16px',
+          borderRadius: 'var(--radius-sm)',
+          background: banner.type === 'success' ? '#F0FDF4' : '#FEF2F2',
+          border: `1px solid ${banner.type === 'success' ? '#86EFAC' : '#FCA5A5'}`,
+          color: banner.type === 'success' ? '#166534' : '#DC2626',
+          fontSize: 13.5,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <span>{banner.message}</span>
+          <button
+            onClick={() => setBanner(null)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit' }}
+            aria-label="Close banner"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Search + filters */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div className="card" style={{ padding: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -323,7 +549,6 @@ export default function Agents() {
           >
             <option value="">Status: All</option>
             <option value="active">Status: Active</option>
-            <option value="inactive">Status: Inactive</option>
             <option value="not_invited">Status: Not Invited</option>
             <option value="pending">Status: Pending</option>
             <option value="expired">Status: Expired</option>
@@ -397,61 +622,43 @@ export default function Agents() {
         )}
       </div>
 
-      {/* Bulk action bar */}
-      {selectedRows.size > 0 && (
-        <div style={{
-          padding: '12px 16px',
-          background: 'var(--primary-light)',
-          border: '1px solid var(--primary)',
-          borderRadius: 'var(--radius-sm)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <span style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 500 }}>
-            {selectedRows.size} agent{selectedRows.size !== 1 ? 's' : ''} selected
-          </span>
-          <button className="btn" style={{
-            padding: '6px 14px', fontSize: 13, fontWeight: 600,
-            background: 'var(--primary)', color: 'white', border: 'none',
-            borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            <Send size={14} /> Invite Agents ({selectedRows.size})
-          </button>
-        </div>
-      )}
-
       {/* Table */}
       <div className="card" style={{ overflow: 'hidden' }}>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th style={{ width: 40, textAlign: 'center', cursor: 'pointer' }} onClick={toggleAllRows}>
-                  <input
-                    type="checkbox"
-                    checked={selectedRows.size === sorted.length && sorted.length > 0}
-                    onChange={toggleAllRows}
-                    style={{ cursor: 'pointer' }}
-                  />
-                </th>
+                {isNotInvitedFilter && (
+                  <th style={{ width: 40, textAlign: 'center', cursor: 'pointer' }} onClick={toggleAllRows}>
+                    <input
+                      type="checkbox"
+                      checked={selectedRows.size === sorted.length && sorted.length > 0}
+                      onChange={toggleAllRows}
+                      style={{ cursor: 'pointer' }}
+                    />
+                  </th>
+                )}
                 <th {...thSort('name')}>
-                  <span style={{ display: 'flex', alignItems: 'center' }}>AGENT NAME <SortIcon field="name" /></span>
+                  <span style={{ display: 'flex', alignItems: 'center' }}>USER NAME <SortIcon field="name" /></span>
                 </th>
                 <th>EMAIL</th>
                 <th {...thSort('status')}>
                   <span style={{ display: 'flex', alignItems: 'center' }}>STATUS <SortIcon field="status" /></span>
                 </th>
-                <th {...thSort('source')}>
-                  <span style={{ display: 'flex', alignItems: 'center' }}>SOURCE <SortIcon field="source" /></span>
+                <th>
+                  <span style={{ display: 'flex', alignItems: 'center' }}>ACTIVE</span>
                 </th>
-                <th>CRM ID</th>
+                <th {...thSort('tickets')}>
+                  <span style={{ display: 'flex', alignItems: 'center' }}>TICKETS <SortIcon field="tickets" /></span>
+                </th>
+                <th>CRM</th>
                 <th>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+                  <td colSpan={isNotInvitedFilter ? 8 : 7} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
                     {agents.length === 0 ? 'No agents found.' : 'No agents match your filters.'}
                   </td>
                 </tr>
@@ -462,20 +669,22 @@ export default function Agents() {
                   style={{
                     cursor: 'pointer',
                     animationDelay: `${i * 0.04}s`,
-                    background: selectedRows.has(a.id) ? 'var(--primary-light)' : 'transparent',
+                    background: isNotInvitedFilter && selectedRows.has(a.id) ? 'var(--primary-light)' : 'transparent',
                   }}
                 >
-                  <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selectedRows.has(a.id)}
-                      onChange={() => toggleRow(a.id)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                  </td>
+                  {isNotInvitedFilter && (
+                    <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.has(a.id)}
+                        onChange={() => toggleRow(a.id)}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </td>
+                  )}
 
                   {/* Name */}
-                  <td onClick={() => navigate(`/admin/agents/${a.id}`, { state: { agent: a } })}>
+                  <td onClick={() => goToDetail(a)}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div style={{
                         width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
@@ -492,56 +701,71 @@ export default function Agents() {
                   {/* Email */}
                   <td
                     style={{ color: 'var(--text-secondary)', fontSize: 13.5 }}
-                    onClick={() => navigate(`/admin/agents/${a.id}`, { state: { agent: a } })}
+                    onClick={() => goToDetail(a)}
                   >
                     {a.email || '—'}
                   </td>
 
                   {/* Status */}
-                  <td onClick={() => navigate(`/admin/agents/${a.id}`, { state: { agent: a } })}>
-                    <span className={`badge ${
-                      (a.status || '').toLowerCase() === 'active'
-                        ? 'badge-active'
-                        : (a.status || '').toLowerCase() === 'not_invited'
-                          ? 'badge-inactive'
-                          : 'badge-pending'
-                    }`}>
-                      {a.status || 'Active'}
+                  <td onClick={() => goToDetail(a)}>
+                    {(() => {
+                      const meta = getAgentStatusMeta(a.status);
+                      const Icon = meta.key === 'not_invited'
+                        ? XCircle
+                        : meta.key === 'pending'
+                          ? Clock3
+                          : meta.key === 'expired'
+                            ? AlertTriangle
+                            : CheckCircle2;
+
+                      return (
+                        <span className={`badge ${meta.badgeClass}`} style={{ gap: 6 }}>
+                          <Icon size={12} /> {meta.label}
+                        </span>
+                      );
+                    })()}
+                  </td>
+
+                  {/* Active Status */}
+                  <td onClick={() => goToDetail(a)}>
+                    <span style={{ fontSize: 13.5, fontWeight: 600, color: getAgentIsActive(a) ? '#16A34A' : '#DC2626' }}>
+                      {getAgentActiveStatus(a)}
                     </span>
                   </td>
 
-                  {/* Source system */}
                   <td
-                    onClick={() => navigate(`/admin/agents/${a.id}`, { state: { agent: a } })}
-                    style={{ color: 'var(--text-secondary)', fontSize: 13.5 }}
+                    onClick={() => goToDetail(a)}
+                    style={{ color: 'var(--text-secondary)', fontSize: 13.5, fontWeight: 600 }}
                   >
-                    {a.source || '—'}
+                    {getAgentTicketsCount(a)}
                   </td>
 
-                  {/* CRM agent ID */}
-                  <td
-                    onClick={() => navigate(`/admin/agents/${a.id}`, { state: { agent: a } })}
-                    style={{ color: 'var(--text-muted)', fontSize: 12, fontFamily: 'monospace' }}
-                  >
-                    {a.crm_agent_id || '—'}
+                  <td onClick={() => goToDetail(a)}>
+                    <CrmBadgesDisplay crms={getAgentCrmSources(a)} maxDisplay={2} />
                   </td>
 
                   {/* Actions */}
                   <td onClick={e => e.stopPropagation()} style={{ position: 'relative' }}>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       {getActionButton(a)}
-                      <button
-                        className="btn btn-ghost"
-                        style={{ padding: '5px 8px', position: 'relative' }}
-                        onClick={() => setOpenMenuId(openMenuId === a.id ? null : a.id)}
-                      >
-                        <MoreVertical size={16} />
-                      </button>
-                      <RowActionMenu
-                        agent={a}
-                        isOpen={openMenuId === a.id}
-                        onClose={() => setOpenMenuId(null)}
-                      />
+                      {getAgentStatusMeta(a.status).key === 'active' && (
+                        <>
+                          <button
+                            className="btn btn-ghost"
+                            style={{ padding: '5px 8px', position: 'relative' }}
+                            onClick={() => setOpenMenuId(openMenuId === a.id ? null : a.id)}
+                          >
+                            <MoreVertical size={16} />
+                          </button>
+                          <RowActionMenu
+                            isOpen={openMenuId === a.id}
+                            onClose={() => setOpenMenuId(null)}
+                            onView={() => goToDetail(a)}
+                            onEdit={() => handleEditOpen(a)}
+                            onDelete={() => handleDeleteOpen(a)}
+                          />
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -554,32 +778,72 @@ export default function Agents() {
         <div style={{
           padding: '12px 16px', borderTop: '1px solid var(--border)',
           fontSize: 13, color: 'var(--text-secondary)',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
         }}>
           <span>
             Showing {sorted.length} of {pagination.total} agent{pagination.total !== 1 ? 's' : ''}
           </span>
-          {pagination.total_pages > 1 && (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {isNotInvitedFilter && (
               <button
-                onClick={() => setPage(p => p - 1)}
-                disabled={page <= 1 || isFetching}
-                style={{ padding: '4px 10px', cursor: page <= 1 ? 'not-allowed' : 'pointer' }}
+                className="btn"
+                onClick={handleBulkInvite}
+                disabled={selectedRows.size === 0 || bulkInviteMutation.isPending}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  background: 'var(--primary)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: selectedRows.size === 0 ? 'not-allowed' : 'pointer',
+                  opacity: selectedRows.size === 0 ? 0.55 : 1,
+                }}
               >
-                ‹ Prev
+                <Send size={14} /> Invite Users ({selectedRows.size})
               </button>
-              <span>Page {page} of {pagination.total_pages}</span>
-              <button
-                onClick={() => setPage(p => p + 1)}
-                disabled={page >= pagination.total_pages || isFetching}
-                style={{ padding: '4px 10px', cursor: page >= pagination.total_pages ? 'not-allowed' : 'pointer' }}
-              >
-                Next ›
-              </button>
-            </div>
-          )}
+            )}
+
+            {pagination.total_pages > 1 && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button
+                  onClick={() => setPage(p => p - 1)}
+                  disabled={page <= 1 || isFetching}
+                  style={{ padding: '4px 10px', cursor: page <= 1 ? 'not-allowed' : 'pointer' }}
+                >
+                  Prev
+                </button>
+                <span>Page {page} of {pagination.total_pages}</span>
+                <button
+                  onClick={() => setPage(p => p + 1)}
+                  disabled={page >= pagination.total_pages || isFetching}
+                  style={{ padding: '4px 10px', cursor: page >= pagination.total_pages ? 'not-allowed' : 'pointer' }}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      <EditAgentModal
+        agent={editingAgent}
+        isOpen={!!editingAgent}
+        onClose={() => setEditingAgent(null)}
+        onSave={handleEditSave}
+        isSaving={updateMutation.isPending}
+      />
+
+      <ConfirmDeleteModal
+        agent={deletingAgent}
+        isOpen={!!deletingAgent}
+        onClose={() => setDeletingAgent(null)}
+        onConfirm={handleDeleteConfirm}
+        isDeleting={deleteMutation.isPending}
+      />
     </div>
   );
 }

@@ -1,4 +1,11 @@
 import api from './api';
+import {
+  normalizeAgentStatus,
+  getAgentRouteSlug,
+  getAgentCrmSources,
+  getAgentTicketsCount,
+  getAgentStatusMeta,
+} from '../utils/helpers';
 
 // ---------------------------------------------------------------------------
 // Query key factory
@@ -28,14 +35,45 @@ function unwrap(response) {
 
 function normalizeAgent(a) {
   if (!a) return a;
+
+  const statusKey = normalizeAgentStatus(a.status, a.is_active);
+  const statusLabel = getAgentStatusMeta(statusKey).label;
+
   return {
     ...a,
-    name:   (a.name ?? `${a.first_name ?? ''} ${a.last_name ?? ''}`.trim()) || '—',
-    status: a.is_active !== undefined
-      ? (a.is_active ? 'Active' : 'Inactive')
-      : (a.status ?? 'Active'),
+    name: (a.name ?? `${a.first_name ?? ''} ${a.last_name ?? ''}`.trim()) || '—',
+    status_key: statusKey,
+    status: statusLabel,
     source: a.source_system ?? a.source ?? '—',
+    crm_sources: getAgentCrmSources({
+      ...a,
+      source: a.source_system ?? a.source,
+    }),
+    tickets_count: getAgentTicketsCount(a),
+    route_slug: getAgentRouteSlug({
+      ...a,
+      name: (a.name ?? `${a.first_name ?? ''} ${a.last_name ?? ''}`.trim()) || 'agent',
+      email: a.email,
+    }),
   };
+}
+
+async function postFirstAvailable(requests, payload) {
+  let lastError = null;
+
+  for (const req of requests) {
+    try {
+      const res = await api.post(req, payload);
+      return unwrap(res);
+    } catch (err) {
+      lastError = err;
+      if (![404, 405].includes(err?.status)) {
+        throw err;
+      }
+    }
+  }
+
+  throw lastError || new Error('No supported endpoint found for this action.');
 }
 
 // ---------------------------------------------------------------------------
@@ -73,6 +111,43 @@ export const agentService = {
     const res = await api.get(`/agents/${id}`);
     return normalizeAgent(unwrap(res));
   },
+
+  getBySlug: async (slug) => {
+    const normalizedSlug = String(slug || '').trim().toLowerCase();
+    if (!normalizedSlug) throw new Error('Missing agent slug.');
+
+    const list = await agentService.getAll({
+      page: 1,
+      page_size: 500,
+      include_inactive: true,
+    });
+
+    const found = (list.items || []).find(
+      (a) => String(a.route_slug || '').toLowerCase() === normalizedSlug,
+    );
+
+    if (!found?.id) {
+      throw new Error('Agent not found.');
+    }
+
+    return agentService.getById(found.id);
+  },
+
+  invite: (id) => postFirstAvailable([
+    `/agents/${id}/invite`,
+    '/agents/invite',
+  ], { agent_id: id }),
+
+  resendInvite: (id) => postFirstAvailable([
+    `/agents/${id}/resend-invite`,
+    `/agents/${id}/invite/resend`,
+    '/agents/invite/resend',
+  ], { agent_id: id }),
+
+  bulkInvite: (ids) => postFirstAvailable([
+    '/agents/invite/bulk',
+    '/agents/bulk-invite',
+  ], { agent_ids: ids }),
 
   create:  (data)     => api.post('/agents/', data),
   update:  (id, data) => api.put(`/agents/${id}`, data),
