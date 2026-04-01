@@ -354,7 +354,7 @@ export default function TicketDetails() {
           >
             {isAgent ? 'My Tickets' : 'Tickets'}
           </span>
-          {ticket.crm_id && <> › <span style={{ fontFamily: 'monospace' }}>{ticket.crm_id}</span></>}
+          {ticket.title && <> › <span>{ticket.title}</span></>}
         </span>
       </div>
 

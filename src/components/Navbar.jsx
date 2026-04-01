@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Navbar({ title = 'Unified Tickets Dashboard' }) {
@@ -27,31 +26,31 @@ export default function Navbar({ title = 'Unified Tickets Dashboard' }) {
       padding: '0 24px', gap: 16,
       position: 'sticky', top: 0, zIndex: 100,
     }}>
-      {/* Search */}
-      <div style={{ flex: 1, maxWidth: 500, position: 'relative' }}>
-        <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-        <input
-          placeholder="Search tickets, accounts, customers..."
-          style={{
-            width: '100%', padding: '8px 12px 8px 36px',
-            border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
-            background: 'var(--surface-2)', fontSize: 13.5,
-            outline: 'none', transition: 'all var(--transition)',
-            color: 'var(--text-primary)',
-          }}
-          onFocus={e => { e.target.style.borderColor = 'var(--primary)'; e.target.style.background = 'var(--surface)'; }}
-          onBlur={e => { e.target.style.borderColor = 'var(--border)'; e.target.style.background = 'var(--surface-2)'; }}
-        />
+      {/* Organization name - left side */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 140 }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: 8,
+          background: '#3B82F6', display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+          fontSize: 14, fontWeight: 700, color: 'white',
+          flexShrink: 0,
+        }}>
+          {user?.organization ? user.organization.charAt(0) : 'O'}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
+            {user?.organization || 'Organization'}
+          </div>
+        </div>
       </div>
 
-      {/* Title center */}
-      <div style={{ flex: 1, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-        <span style={{ fontWeight: 600, fontSize: 15 }}>{title}</span>
-        <ChevronDown size={14} color="var(--text-muted)" />
+      {/* Title center - positioned absolutely for true centering */}
+      <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        <span style={{ fontWeight: 600, fontSize: 18 }}>{title}</span>
       </div>
 
       {/* Right actions */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
 
         {/* User menu */}
         <div style={{ position: 'relative' }}>

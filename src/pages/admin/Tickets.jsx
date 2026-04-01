@@ -125,15 +125,6 @@ export default function AdminTickets() {
               animation: 'pulse 1s ease-in-out infinite',
             }} />
           )}
-
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            <input
-              type="checkbox"
-              checked={includeDeleted}
-              onChange={handleDeletedToggle}
-            />
-            Show deleted
-          </label>
         </div>
 
         <Filters filters={filters} onChange={setFilters} />

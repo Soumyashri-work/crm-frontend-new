@@ -80,13 +80,7 @@ export default function DashboardWidgets({ stats }) {
               }}>
                 <Icon size={20} color={w.color} />
               </div>
-              <span style={{
-                fontSize: 12.5, fontWeight: 600,
-                color: w.up ? '#10B981' : '#EF4444',
-                display: 'flex', alignItems: 'center', gap: 3,
-              }}>
-                {w.up ? '↗' : '↘'} {w.change}
-              </span>
+
             </div>
             <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.5px', lineHeight: 1 }}>
               {w.value}

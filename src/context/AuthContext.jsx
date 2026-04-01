@@ -57,6 +57,7 @@ export function AuthProvider({ children }) {
       name: "John Doe",
       email: "johndoe@gmail.com",
       role: "admin",
+      organization: "Global Industries Inc",
       picture: null
     };
     localStorage.setItem('access_token', fakeToken);
