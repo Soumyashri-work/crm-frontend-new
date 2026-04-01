@@ -59,6 +59,108 @@ export function crmBadgeClass(crm) {
   return 'badge ' + (crm.toLowerCase().includes('espo') ? 'badge-espocrm' : 'badge-zammad');
 }
 
+const AGENT_STATUS_LABELS = {
+  not_invited: 'Not Invited',
+  pending: 'Pending',
+  expired: 'Expired',
+  active: 'Invited',
+};
+
+export function normalizeAgentStatus(status, isActive) {
+  const raw = String(status || '').toLowerCase().trim().replace(/\s+/g, '_');
+
+  if (['active', 'accepted', 'enabled'].includes(raw)) return 'active';
+  if (['pending', 'invited', 'invite_sent'].includes(raw)) return 'pending';
+  if (['expired', 'invite_expired'].includes(raw)) return 'expired';
+  if (['not_invited', 'not-invited', 'inactive', 'new', 'uninvited'].includes(raw)) {
+    return 'not_invited';
+  }
+
+  if (typeof isActive === 'boolean') {
+    return isActive ? 'active' : 'not_invited';
+  }
+
+  return 'not_invited';
+}
+
+export function getAgentStatusMeta(status) {
+  const key = normalizeAgentStatus(status);
+  const badgeClass = key === 'active' ? 'badge-success' : key === 'pending' ? 'badge-warning' : 'badge-danger';
+
+  return {
+    key,
+    label: AGENT_STATUS_LABELS[key] || AGENT_STATUS_LABELS.not_invited,
+    badgeClass,
+  };
+}
+
+export function getAgentActiveStatus(agent) {
+  const isActive = agent?.is_active ?? agent?.active ?? false;
+  return isActive ? 'Active' : 'Inactive';
+}
+
+export function getAgentIsActive(agent) {
+  return agent?.is_active ?? agent?.active ?? false;
+}
+
+export function getAgentRouteSlug(agent) {
+  const raw =
+    agent?.public_slug ||
+    agent?.slug ||
+    agent?.email ||
+    agent?.name ||
+    'agent';
+
+  const slug = String(raw)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+
+  return slug || 'agent';
+}
+
+export function getAgentCrmSources(agent) {
+  const candidates =
+    agent?.crm_sources ||
+    agent?.crms ||
+    agent?.sources ||
+    agent?.source_systems ||
+    null;
+
+  if (Array.isArray(candidates)) {
+    const unique = [...new Set(candidates.filter(Boolean).map(String))];
+    return unique;
+  }
+
+  if (typeof candidates === 'string') {
+    const split = candidates.split(',').map(s => s.trim()).filter(Boolean);
+    if (split.length > 0) return [...new Set(split)];
+  }
+
+  if (agent?.source) return [String(agent.source)];
+  return [];
+}
+
+export function getAgentTicketsCount(agent) {
+  const val =
+    agent?.tickets_count ??
+    agent?.assigned_tickets ??
+    agent?.ticket_count ??
+    agent?.tickets ??
+    0;
+
+  return Number.isFinite(Number(val)) ? Number(val) : 0;
+}
+
+export function displayCrmBadges(crms, maxDisplay = 2) {
+  return {
+    visible: crms.slice(0, maxDisplay),
+    hidden: crms.slice(maxDisplay),
+    hasMore: crms.length > maxDisplay,
+  };
+}
+
 export function truncate(str, n = 40) {
   if (!str) return '';
   return str.length > n ? str.slice(0, n) + '…' : str;
