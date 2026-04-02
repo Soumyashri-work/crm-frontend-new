@@ -94,6 +94,17 @@
   color: #ef4444;
 }
 
+.edit-btn {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary, #2563eb);
+}
+
+.edit-btn:hover:not(:disabled) {
+  color: var(--primary-dark, #1d4ed8);
+  background-color: var(--primary-light, #dbeafe);
+}
+
 /* Body */
 .ticket-modal-body {
   flex: 1;
