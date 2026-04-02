@@ -118,7 +118,14 @@ function HoverChip({ icon, label, popup }) {
 }
 
 // ── Main Modal ────────────────────────────────────────────────────────────────
-export default function TicketModal({ ticket, isOpen, onClose, onExpand }) {
+export default function TicketModal({
+  ticket,
+  isOpen,
+  onClose,
+  onExpand,
+  onEdit,
+  isAdmin = false,
+}) {
   const [isExpanding, setIsExpanding] = useState(false);
 
   // Close on Escape key
@@ -182,6 +189,16 @@ const customerPhone = ticket.customer?.phone || null;
           </div>
 
           <div className="ticket-modal-actions">
+            {isAdmin && onEdit && (
+              <button
+                className="modal-action-btn edit-btn"
+                onClick={onEdit}
+                title="Edit ticket"
+                aria-label="Edit ticket"
+              >
+                ✏️ Edit
+              </button>
+            )}
             <button
               className="modal-action-btn expand-btn"
               onClick={handleExpand}

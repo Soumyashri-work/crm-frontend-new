@@ -6,7 +6,9 @@ import {
   formatDateTime, getInitials, getAvatarColor,
 } from '../utils/helpers';
 import TicketModal from './TicketModal/TicketModal';
+import EditTicketModal from './EditTicketModal';
 import { ticketService } from '../services/ticketService';
+import { agentService } from '../services/agentService';
 
 const PRIORITY_ORDER = { urgent: 4, high: 3, normal: 2, low: 1 };
 const STATUS_ORDER   = { open: 4, pending: 3, closed: 1 };
@@ -52,6 +54,9 @@ export default function TicketTable({
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [isModalOpen,    setIsModalOpen]    = useState(false);
   const [modalLoading,   setModalLoading]   = useState(false);
+  const [showEditModal,  setShowEditModal]  = useState(false);
+  const [editTicket,     setEditTicket]     = useState(null);
+  const [agents,         setAgents]         = useState([]);
 
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (loading) {
@@ -119,6 +124,28 @@ export default function TicketTable({
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setTimeout(() => setSelectedTicket(null), 300);
+  };
+
+  // ── Open edit modal ───────────────────────────────────────────────────────
+  const handleEditTicket = async () => {
+    if (!selectedTicket) return;
+    setEditTicket(selectedTicket);
+    setShowEditModal(true);
+    
+    // Load agents for dropdown
+    try {
+      const res = await agentService.getAll({ page_size: 100 });
+      setAgents(res.items || []);
+    } catch (err) {
+      console.error('Failed to load agents:', err);
+    }
+  };
+
+  // ── Update ticket from edit modal ─────────────────────────────────────────
+  const handleUpdateTicket = (updatedTicket) => {
+    setEditTicket(null);
+    setShowEditModal(false);
+    setSelectedTicket(updatedTicket);
   };
 
   // FIX: Pass the already-fetched full ticket through router state so
@@ -220,7 +247,17 @@ const handleExpandTicket = (ticketId) => {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onExpand={handleExpandTicket}
+        onEdit={handleEditTicket}
+        isAdmin={true}
         loading={modalLoading}
+      />
+
+      <EditTicketModal
+        ticket={editTicket}
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        onUpdate={handleUpdateTicket}
+        agents={agents}
       />
     </>
   );

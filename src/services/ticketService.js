@@ -96,9 +96,9 @@ export const ticketService = {
     return { ...data, items: (data.items ?? []).map(normalizeTicket) };
   },
 
-  /** GET /api/v1/tickets/source/{source} */
-  getBySource: async (source, params = {}) => {
-    const res  = await api.get(`/tickets/source/${source}`, { params });
+  /** GET /api/v1/tickets/filter - Filter tickets by source, status, or priority */
+  filter: async (params = {}) => {
+    const res  = await api.get('/tickets/filter', { params });
     const data = unwrap(res);
     return { ...data, items: (data.items ?? []).map(normalizeTicket) };
   },
@@ -134,8 +134,11 @@ export const ticketService = {
     return unwrap(res); // { items, total, page, page_size, total_pages }
   },
 
-  syncComments: (ticketId) =>
-  api.post(`/sync/${ticketId}/comments/sync`).then(r => r.data),
+  /** POST /api/v1/tickets/{ticketId}/comments/sync - fetch and store comments from CRM */
+  syncComments: async (ticketId) => {
+    const res = await api.post(`/tickets/${ticketId}/comments/sync`);
+    return unwrap(res);
+  },
 
   /** POST /api/v1/tickets/ */
   create: (data)        => api.post('/tickets/', data),

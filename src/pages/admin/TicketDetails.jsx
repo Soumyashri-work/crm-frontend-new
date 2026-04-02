@@ -20,9 +20,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, User, Database, Clock,
   Calendar, Mail, Phone, ExternalLink, AlertTriangle,
-  MessageCircle, Send,
+  MessageCircle, Send, Pencil,
 } from 'lucide-react';
 import { ticketService, ticketKeys } from '../../services/ticketService';
+import { agentService } from '../../services/agentService';
+import EditTicketModal from '../../components/EditTicketModal';
 import {
   statusBadgeClass, priorityBadgeClass, crmBadgeClass,
   formatDateTime, getInitials, getAvatarColor,
@@ -210,6 +212,7 @@ export default function TicketDetails() {
   const preloaded = location.state?.ticket ?? undefined;
 
   const [comment, setComment] = useState('');
+  const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
     ticketService.syncComments(id).catch(() => {});
@@ -245,6 +248,15 @@ export default function TicketDetails() {
 
   const comments     = commentsData?.items ?? [];
   const commentTotal = commentsData?.total ?? 0;
+
+  // ── Agents query for edit modal dropdown ────────────────────────────────────
+  const {
+    data: agentsData = {},
+  } = useQuery({
+    queryKey: ['agents', 'list', { page_size: 100 }],
+    queryFn: () => agentService.getAll({ page_size: 100 }),
+  });
+  const agents = agentsData.items ?? [];
 
   // ── Add comment mutation (optimistic) ─────────────────────────────────────
   const addCommentMutation = useMutation({
@@ -287,6 +299,14 @@ export default function TicketDetails() {
     if (!text) return;
     setComment('');
     addCommentMutation.mutate(text);
+  };
+
+  // ── Update ticket handler (from EditTicketModal) ──────────────────────────
+  const handleUpdateTicket = (updatedTicket) => {
+    setShowEditModal(false);
+    queryClient.setQueryData(ticketKeys.detail(id), updatedTicket);
+    setTicket(updatedTicket);
+    // Toast notification handled by EditTicketModal
   };
 
   // ── Loading ───────────────────────────────────────────────────────────────
@@ -365,10 +385,19 @@ export default function TicketDetails() {
 
           {/* Ticket header card */}
           <div className="card animate-in" style={{ padding: 24 }}>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-              <span className={statusBadgeClass(ticket.status)}>{ticket.status}</span>
-              <span className={priorityBadgeClass(ticket.priority)}>{ticket.priority}</span>
-              <span className={crmBadgeClass(ticket.crm)}>{ticket.crm}</span>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <span className={statusBadgeClass(ticket.status)}>{ticket.status}</span>
+                <span className={priorityBadgeClass(ticket.priority)}>{ticket.priority}</span>
+                <span className={crmBadgeClass(ticket.crm)}>{ticket.crm}</span>
+              </div>
+              <button
+                className="btn btn-sm"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
+                onClick={() => setShowEditModal(true)}
+              >
+                <Pencil size={16} /> Edit
+              </button>
             </div>
 
             <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{ticket.title}</h1>
@@ -575,6 +604,15 @@ export default function TicketDetails() {
           </DetailRow>
         </div>
       </div>
+
+      {/* ── Edit ticket modal ── */}
+      <EditTicketModal
+        ticket={ticket}
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        onUpdate={handleUpdateTicket}
+        agents={agents}
+      />
     </div>
   );
 }
