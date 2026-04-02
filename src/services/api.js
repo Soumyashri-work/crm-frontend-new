@@ -22,7 +22,7 @@ import axios from 'axios';
 // ---------------------------------------------------------------------------
 const BASE_URL =
   import.meta.env?.VITE_API_BASE_URL ||        // Vite
-  process.env?.REACT_APP_API_BASE_URL ||        // Create React App
+  (typeof process !== 'undefined' ? process.env?.REACT_APP_API_BASE_URL : undefined) || // CRA (guarded)
   'http://localhost:8000/api/v1';
 
 // ---------------------------------------------------------------------------

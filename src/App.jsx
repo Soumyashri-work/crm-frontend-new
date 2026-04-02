@@ -2,6 +2,11 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import SuperAdminLayout from './layouts/SuperAdminLayout';
+import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard.jsx';
+import SuperAdminTenants from './pages/superadmin/SuperAdminTenants..jsx';
+import SuperAdminAdmins from './pages/superadmin/SuperAdminAdmins.jsx';
+import SuperAdminSettings from './pages/superadmin/SuperAdminSettings.jsx';
 
 // Auth pages
 import Login from './pages/auth/Login';
@@ -79,6 +84,19 @@ export default function App() {
               <Route path="my-tickets"  element={<MyTickets />} />
               <Route path="tickets/:id" element={<TicketDetails />} />
               <Route path="profile"     element={<AgentProfile />} />
+            </Route>
+
+            {/* ✅ Added Super Admin routes here */}
+            <Route path="/superadmin" element={
+              <ProtectedRoute adminOnly>
+                <SuperAdminLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<SuperAdminDashboard />} />
+              <Route path="tenants"   element={<SuperAdminTenants />} />
+              <Route path="admins"    element={<SuperAdminAdmins />} />
+              <Route path="settings"  element={<SuperAdminSettings />} />
             </Route>
 
             {/* Fallbacks */}
