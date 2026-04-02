@@ -134,11 +134,11 @@ export const ticketService = {
     return unwrap(res); // { items, total, page, page_size, total_pages }
   },
 
-  /** POST /api/v1/tickets/{ticketId}/comments/sync - fetch and store comments from CRM */
-  syncComments: async (ticketId) => {
-    const res = await api.post(`/tickets/${ticketId}/comments/sync`);
-    return unwrap(res);
-  },
+/** POST /api/v1/sync/{ticketId}/comments/sync */
+syncComments: async (ticketId) => {
+  const res = await api.post(`/sync/${ticketId}/comments/sync`);
+  return unwrap(res);
+},
 
   /** POST /api/v1/tickets/ */
   create: (data)        => api.post('/tickets/', data),
