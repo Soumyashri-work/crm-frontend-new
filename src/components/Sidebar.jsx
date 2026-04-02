@@ -9,7 +9,6 @@ import {
 const adminNav = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/admin/tickets',   icon: Ticket,          label: 'Tickets'   },
-  // Accounts removed — admin is scoped to their own tenant
   { to: '/admin/customers', icon: UserCircle,      label: 'Customers' },
   { to: '/admin/agents',    icon: Users,           label: 'Agents'    },
   { to: '/admin/settings',  icon: Settings,        label: 'Settings'  },
@@ -21,11 +20,19 @@ const agentNav = [
   { to: '/agent/profile',    icon: UserCircle,      label: 'Profile'    },
 ];
 
-export default function Sidebar({ isAdmin }) {
+export default function Sidebar({ isAdmin, onCollapsedChange }) {
   const [collapsed, setCollapsed] = useState(false);
-  const { logout }                = useAuth();
-  const navigate                  = useNavigate();
-  const nav                       = isAdmin ? adminNav : agentNav;
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+  const nav = isAdmin ? adminNav : agentNav;
+
+  const handleCollapse = () => {
+    const newState = !collapsed;
+    setCollapsed(newState);
+    if (onCollapsedChange) {
+      onCollapsedChange(newState);
+    }
+  };
 
   const handleLogout = async () => {
     try { await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/logout`); } catch (_) {}
@@ -35,24 +42,26 @@ export default function Sidebar({ isAdmin }) {
 
   return (
     <aside style={{
+      position: 'fixed',
+      left: 0,
+      top: 0,
       width: collapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)',
-      minHeight: '100vh',
+      height: '100vh',
       background: 'var(--surface)',
       borderRight: '1px solid var(--border)',
       display: 'flex',
       flexDirection: 'column',
       transition: 'width var(--transition-slow)',
-      position: 'relative',
-      flexShrink: 0,
       overflow: 'hidden',
+      zIndex: 1000,
     }}>
-      {/* Brand */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10,
         padding: collapsed ? '18px 0' : '18px 20px',
         justifyContent: collapsed ? 'center' : 'flex-start',
         borderBottom: '1px solid var(--border)',
         minHeight: 'var(--navbar-height)',
+        flexShrink: 0,
       }}>
         <div style={{
           width: 36, height: 36, borderRadius: 10,
@@ -69,8 +78,15 @@ export default function Sidebar({ isAdmin }) {
         )}
       </div>
 
-      {/* Nav */}
-      <nav style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <nav style={{
+        flex: 1,
+        padding: '12px 10px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2,
+        overflow: 'auto',
+        minHeight: 0,
+      }}>
         {nav.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
@@ -99,10 +115,13 @@ export default function Sidebar({ isAdmin }) {
         ))}
       </nav>
 
-      {/* Collapse toggle */}
-      <div style={{ borderTop: '1px solid var(--border)', padding: '12px' }}>
+      <div style={{
+        borderTop: '1px solid var(--border)',
+        padding: '12px',
+        flexShrink: 0,
+      }}>
         <button
-          onClick={() => setCollapsed(c => !c)}
+          onClick={handleCollapse}
           title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
           style={{
             width: '100%', padding: '10px 12px',

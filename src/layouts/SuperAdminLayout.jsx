@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate, Outlet } from 'react-router-dom';
 import { LayoutDashboard, Building2, Shield, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { getInitials } from '../utils/helpers';
 
 const superAdminNav = [
   { to: '/superadmin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -14,23 +13,26 @@ const superAdminNav = [
 function SuperAdminSidebar({ collapsed, setCollapsed }) {
   return (
     <aside style={{
+      position: 'fixed',
+      left: 0,
+      top: 0,
       width: collapsed ? 72 : 220,
-      minHeight: '100vh',
+      height: '100vh',
       background: 'var(--surface)',
       borderRight: '1px solid var(--border)',
       display: 'flex',
       flexDirection: 'column',
       transition: 'width 0.35s cubic-bezier(0.4,0,0.2,1)',
-      flexShrink: 0,
       overflow: 'hidden',
+      zIndex: 1000,
     }}>
-      {/* Brand */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10,
         padding: collapsed ? '18px 0' : '18px 16px',
         justifyContent: collapsed ? 'center' : 'flex-start',
         borderBottom: '1px solid var(--border)',
         minHeight: 64,
+        flexShrink: 0,
       }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <Shield size={18} color="white" />
@@ -43,8 +45,7 @@ function SuperAdminSidebar({ collapsed, setCollapsed }) {
         )}
       </div>
 
-      {/* Nav links */}
-      <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 2, overflow: 'auto', minHeight: 0 }}>
         {superAdminNav.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
@@ -73,8 +74,7 @@ function SuperAdminSidebar({ collapsed, setCollapsed }) {
         ))}
       </nav>
 
-      {/* Collapse toggle */}
-      <div style={{ borderTop: '1px solid var(--border)', padding: 10 }}>
+      <div style={{ borderTop: '1px solid var(--border)', padding: 10, flexShrink: 0 }}>
         <button
           onClick={() => setCollapsed(c => !c)}
           style={{
@@ -100,7 +100,6 @@ function SuperAdminNavbar() {
   const [dropOpen, setDropOpen] = useState(false);
   const dropRef = useRef();
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handler = (e) => {
       if (dropRef.current && !dropRef.current.contains(e.target)) setDropOpen(false);
@@ -131,12 +130,10 @@ function SuperAdminNavbar() {
       top: 0,
       zIndex: 100,
     }}>
-      {/* Title — no search bar */}
       <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)', flex: 1 }}>
         Super Admin Portal
       </div>
 
-      {/* User profile button */}
       <div style={{ position: 'relative' }} ref={dropRef}>
         <button
           onClick={() => setDropOpen(o => !o)}
@@ -146,7 +143,6 @@ function SuperAdminNavbar() {
             padding: '4px 8px', borderRadius: 'var(--radius-sm)',
           }}
         >
-          {/* Avatar — always primary blue to match the JD screenshot */}
           <div style={{
             width: 36, height: 36, borderRadius: '50%',
             background: user?.picture ? 'transparent' : 'var(--primary)',
@@ -159,7 +155,6 @@ function SuperAdminNavbar() {
             }
           </div>
 
-          {/* Name + role pill */}
           <div style={{ textAlign: 'left' }}>
             <div style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.2 }}>
               {user?.name || 'Super Admin'}
@@ -174,7 +169,6 @@ function SuperAdminNavbar() {
           </div>
         </button>
 
-        {/* Dropdown */}
         {dropOpen && (
           <div style={{
             position: 'absolute', right: 0, top: 'calc(100% + 6px)',
@@ -182,13 +176,11 @@ function SuperAdminNavbar() {
             borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-lg)',
             minWidth: 200, zIndex: 200, overflow: 'hidden',
           }}>
-            {/* User info */}
             <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
               <div style={{ fontSize: 13.5, fontWeight: 600 }}>{user?.name || 'Super Admin'}</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{user?.email || ''}</div>
             </div>
 
-            {/* Sign out */}
             <button
               onClick={handleLogout}
               style={{
@@ -211,11 +203,19 @@ function SuperAdminNavbar() {
 
 export default function SuperAdminLayout() {
   const [collapsed, setCollapsed] = useState(false);
+  const sidebarWidth = collapsed ? 72 : 220;
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
       <SuperAdminSidebar collapsed={collapsed} setCollapsed={setCollapsed} />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        marginLeft: sidebarWidth,
+        transition: 'margin-left 0.35s cubic-bezier(0.4,0,0.2,1)',
+      }}>
         <SuperAdminNavbar />
         <main style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
           <Outlet />
