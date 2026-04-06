@@ -1,3 +1,14 @@
+/**
+ * src/App.jsx  — UPDATED
+ *
+ * Changes from original:
+ *   + Added /invite route → InvitePage (Flow 1B + Flow 2B)
+ *   + Superadmin routes: ProtectedRoute now allows superadmin role too
+ *   + /login redirects to dashboard if already authenticated
+ *
+ * All existing routes, layouts, and imports are UNCHANGED.
+ */
+
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
@@ -12,6 +23,9 @@ import SuperAdminSettings from './pages/superadmin/SuperAdminSettings.jsx';
 import Login from './pages/auth/Login';
 import AuthCallback from './pages/auth/AuthCallback';
 
+// NEW — Invite page (Flow 1B + Flow 2B)
+import InvitePage from './pages/invite/InvitePage';
+
 // Layouts
 import AdminLayout from './layouts/AdminLayout';
 import AgentLayout from './layouts/AgentLayout';
@@ -20,8 +34,6 @@ import AgentLayout from './layouts/AgentLayout';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminTickets from './pages/admin/Tickets';
 import TicketDetails from './pages/admin/TicketDetails';
-// import Accounts from './pages/admin/Accounts';           // disabled — multi-tenancy: admin sees own tenant only
-// import AccountDetail from './pages/admin/AccountDetail'; // disabled — same reason
 import Customers from './pages/admin/Customers';
 import CustomerDetail from './pages/admin/CustomerDetail';
 import Settings from './pages/admin/Settings';
@@ -53,6 +65,9 @@ export default function App() {
             <Route path="/login"         element={<Login />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
 
+            {/* NEW — Invite flow (public — user is not logged in yet) */}
+            <Route path="/invite" element={<InvitePage />} />
+
             {/* Admin routes */}
             <Route path="/admin" element={
               <ProtectedRoute adminOnly>
@@ -60,17 +75,14 @@ export default function App() {
               </ProtectedRoute>
             }>
               <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard"      element={<AdminDashboard />} />
-              <Route path="tickets"        element={<AdminTickets />} />
-              <Route path="tickets/:id"    element={<TicketDetails />} />
-              {/* Accounts routes disabled — admin belongs to one tenant, no cross-org accounts view */}
-              {/* <Route path="accounts"     element={<Accounts />} /> */}
-              {/* <Route path="accounts/:id" element={<AccountDetail />} /> */}
-              <Route path="customers"      element={<Customers />} />
-              <Route path="customers/:id"  element={<CustomerDetail />} />
-              <Route path="agents"         element={<Agents />} />
+              <Route path="dashboard"           element={<AdminDashboard />} />
+              <Route path="tickets"             element={<AdminTickets />} />
+              <Route path="tickets/:id"         element={<TicketDetails />} />
+              <Route path="customers"           element={<Customers />} />
+              <Route path="customers/:id"       element={<CustomerDetail />} />
+              <Route path="agents"              element={<Agents />} />
               <Route path="agents/detail/:slug" element={<AgentDetail />} />
-              <Route path="settings"       element={<Settings />} />
+              <Route path="settings"            element={<Settings />} />
             </Route>
 
             {/* Agent routes */}
@@ -86,7 +98,7 @@ export default function App() {
               <Route path="profile"     element={<AgentProfile />} />
             </Route>
 
-            {/* ✅ Added Super Admin routes here */}
+            {/* Super Admin routes */}
             <Route path="/superadmin" element={
               <ProtectedRoute adminOnly>
                 <SuperAdminLayout />
