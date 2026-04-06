@@ -27,7 +27,7 @@ function normalizeCustomer(c) {
   if (!c) return c;
   return {
     ...c,
-    name:   `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() || '—',
+    name:   c.name ?? '—',
     crm:    c.source_system   ?? c.crm    ?? '—',
     crm_id: c.crm_customer_id ?? c.crm_id ?? '—',
   };
