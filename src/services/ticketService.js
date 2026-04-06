@@ -149,6 +149,12 @@ syncComments: async (ticketId) => {
   /** DELETE /api/v1/tickets/{id} */
   delete: (id, data)    => api.delete(`/tickets/${id}`, { data }),
 
-  /** POST /api/v1/tickets/{id}/comments */
-  addComment: (id, data) => api.post(`/tickets/${id}/comments`, data),
+/** POST /api/v1/tickets/{ticketId}/comments */
+addComment: async (ticketId, { text, author_name = "Agent", author_email = null }) => {
+  const res = await api.post(
+    `/tickets/${ticketId}/comments`,
+    { text, author_name, author_email }
+  );
+  return unwrap(res);
+},
 };
