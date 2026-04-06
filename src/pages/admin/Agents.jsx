@@ -70,30 +70,18 @@ function RowActionMenu({ onClose, isOpen, onView, onEdit, onDelete }) {
       {[
         {
           label: 'View', icon: <Eye size={14} />,
-          onClick: () => {
-            onView();
-            onClose();
-          },
-          danger: false,
-          border: false,
+          onClick: () => { onView(); onClose(); },
+          danger: false, border: false,
         },
         {
           label: 'Edit', icon: <Edit2 size={14} />,
-          onClick: () => {
-            onEdit();
-            onClose();
-          },
-          danger: false,
-          border: true,
+          onClick: () => { onEdit(); onClose(); },
+          danger: false, border: true,
         },
         {
           label: 'Delete', icon: <UserX size={14} />,
-          onClick: () => {
-            onDelete();
-            onClose();
-          },
-          danger: true,
-          border: true,
+          onClick: () => { onDelete(); onClose(); },
+          danger: true, border: true,
         },
       ].map(({ label, icon, onClick, danger, border }) => (
         <button
@@ -130,19 +118,19 @@ function RowActionMenu({ onClose, isOpen, onView, onEdit, onDelete }) {
 // Main Agents page
 // ---------------------------------------------------------------------------
 export default function Agents() {
-  const navigate = useNavigate();
+  const navigate    = useNavigate();
   const queryClient = useQueryClient();
 
-  const [search,       setSearch]       = useState('');
-  const [sortField,    setSortField]    = useState('');
-  const [sortDir,      setSortDir]      = useState('asc');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [sourceFilter, setSourceFilter] = useState('');
-  const [page,         setPage]         = useState(1);
-  const [selectedRows, setSelectedRows] = useState(new Set());
-  const [openMenuId,   setOpenMenuId]   = useState(null);
-  const [banner,       setBanner]       = useState(null);
-  const [editingAgent, setEditingAgent] = useState(null);
+  const [search,        setSearch]        = useState('');
+  const [sortField,     setSortField]     = useState('');
+  const [sortDir,       setSortDir]       = useState('asc');
+  const [statusFilter,  setStatusFilter]  = useState('');
+  const [sourceFilter,  setSourceFilter]  = useState('');
+  const [page,          setPage]          = useState(1);
+  const [selectedRows,  setSelectedRows]  = useState(new Set());
+  const [openMenuId,    setOpenMenuId]    = useState(null);
+  const [banner,        setBanner]        = useState(null);
+  const [editingAgent,  setEditingAgent]  = useState(null);
   const [deletingAgent, setDeletingAgent] = useState(null);
 
   // ── Query ────────────────────────────────────────────────────────────────
@@ -153,7 +141,6 @@ export default function Agents() {
     ...(sourceFilter ? { source: sourceFilter } : {}),
   };
 
-  // Use /agents/filter when a source filter is active, otherwise /agents/
   const useFilterEndpoint = !!sourceFilter;
 
   const {
@@ -180,14 +167,10 @@ export default function Agents() {
     total_pages: data?.total_pages ?? 1,
   };
 
-  // ── Client-side filter + sort ────────────────────────────────────────────
-  const filtered = agents.filter(a => {
+  // ── Client-side filter + sort (memoized to prevent infinite loop) ─────────
+  const filtered = useMemo(() => agents.filter(a => {
     const statusMeta = getAgentStatusMeta(a.status);
-
-    if (statusFilter && statusMeta.key !== statusFilter) {
-      return false;
-    }
-
+    if (statusFilter && statusMeta.key !== statusFilter) return false;
     if (search) {
       const q = search.toLowerCase();
       if (
@@ -196,21 +179,45 @@ export default function Agents() {
       ) return false;
     }
     return true;
-  });
+  }), [agents, statusFilter, search]);
 
-  const sorted = sortField
-    ? [...filtered].sort((a, b) => {
-        const av = sortField === 'tickets'
-          ? Number(getAgentTicketsCount(a))
-          : String(a[sortField] ?? '').toLowerCase();
-        const bv = sortField === 'tickets'
-          ? Number(getAgentTicketsCount(b))
-          : String(b[sortField] ?? '').toLowerCase();
-        if (av < bv) return sortDir === 'asc' ? -1 :  1;
-        if (av > bv) return sortDir === 'asc' ?  1 : -1;
-        return 0;
-      })
-    : filtered;
+  const sorted = useMemo(() => {
+    if (!sortField) return filtered;
+    return [...filtered].sort((a, b) => {
+      const av = sortField === 'tickets'
+        ? Number(getAgentTicketsCount(a))
+        : String(a[sortField] ?? '').toLowerCase();
+      const bv = sortField === 'tickets'
+        ? Number(getAgentTicketsCount(b))
+        : String(b[sortField] ?? '').toLowerCase();
+      if (av < bv) return sortDir === 'asc' ? -1 :  1;
+      if (av > bv) return sortDir === 'asc' ?  1 : -1;
+      return 0;
+    });
+  }, [filtered, sortField, sortDir]);
+
+  // ── Prune selectedRows when visible agents change ─────────────────────────
+  // Uses a ref to track the previous sorted IDs so the effect only fires when
+  // the actual agent list changes — not on every render — preventing the loop.
+  const sortedIdsRef = useRef('');
+  useEffect(() => {
+    const ids = sorted.map(a => a.id).join(',');
+    if (ids === sortedIdsRef.current) return;
+    sortedIdsRef.current = ids;
+
+    setSelectedRows(prev => {
+      const visibleIds = new Set(sorted.map(a => a.id));
+      const next = new Set([...prev].filter(id => visibleIds.has(id)));
+      // Return same reference if nothing changed to avoid a re-render
+      return next.size === prev.size ? prev : next;
+    });
+  }, [sorted]);
+
+  // ── Clear selection when leaving not_invited filter ───────────────────────
+  const isNotInvitedFilter = statusFilter === 'not_invited';
+  useEffect(() => {
+    if (!isNotInvitedFilter) setSelectedRows(new Set());
+  }, [isNotInvitedFilter]);
 
   const handleSort = (field) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -225,7 +232,6 @@ export default function Agents() {
 
   const toggleAllRows = () => {
     if (!isNotInvitedFilter) return;
-
     setSelectedRows(
       selectedRows.size === sorted.length
         ? new Set()
@@ -234,26 +240,11 @@ export default function Agents() {
   };
 
   const hasActiveFilters = statusFilter || search || sourceFilter;
-  const isNotInvitedFilter = statusFilter === 'not_invited';
 
   const selectedInviteCandidates = useMemo(
     () => sorted.filter(a => selectedRows.has(a.id)),
     [sorted, selectedRows],
   );
-
-  useEffect(() => {
-    if (!isNotInvitedFilter) {
-      setSelectedRows(new Set());
-    }
-  }, [isNotInvitedFilter]);
-
-  useEffect(() => {
-    setSelectedRows((prev) => {
-      const visibleIds = new Set(sorted.map(a => a.id));
-      const next = new Set([...prev].filter(id => visibleIds.has(id)));
-      return next;
-    });
-  }, [sorted]);
 
   const clearFilters = () => {
     setStatusFilter('');
@@ -266,6 +257,7 @@ export default function Agents() {
     await queryClient.invalidateQueries({ queryKey: agentKeys.all() });
   };
 
+  // ── Mutations ─────────────────────────────────────────────────────────────
   const inviteMutation = useMutation({
     mutationFn: (id) => agentService.invite(id),
     onSuccess: async () => {
@@ -325,42 +317,31 @@ export default function Agents() {
     },
   });
 
+  // ── Handlers ──────────────────────────────────────────────────────────────
   const goToDetail = (agent) => {
     navigate(`/admin/agents/detail/${getAgentRouteSlug(agent)}`, { state: { agent } });
   };
 
-  const handleEditOpen = (agent) => {
-    setEditingAgent(agent);
-  };
+  const handleEditOpen   = (agent) => setEditingAgent(agent);
+  const handleDeleteOpen = (agent) => setDeletingAgent(agent);
 
   const handleEditSave = (formData) => {
     if (!editingAgent) return;
     updateMutation.mutate(
       { id: editingAgent.id, data: { name: formData.name } },
-      {
-        onSuccess: () => {
-          setEditingAgent(null);
-        },
-      },
+      { onSuccess: () => setEditingAgent(null) },
     );
-  };
-
-  const handleDeleteOpen = (agent) => {
-    setDeletingAgent(agent);
   };
 
   const handleDeleteConfirm = () => {
     if (!deletingAgent) return;
     deleteMutation.mutate(deletingAgent.id, {
-      onSuccess: () => {
-        setDeletingAgent(null);
-      },
+      onSuccess: () => setDeletingAgent(null),
     });
   };
 
-  const handleInvite = (agent) => inviteMutation.mutate(agent.id);
-  const handleResend = (agent) => resendMutation.mutate(agent.id);
-
+  const handleInvite     = (agent) => inviteMutation.mutate(agent.id);
+  const handleResend     = (agent) => resendMutation.mutate(agent.id);
   const handleBulkInvite = () => {
     if (selectedInviteCandidates.length === 0) return;
     bulkInviteMutation.mutate(selectedInviteCandidates.map(a => a.id));
@@ -376,17 +357,10 @@ export default function Agents() {
         onClick={() => handleInvite(agent)}
         disabled={inviteMutation.isPending}
         style={{
-          padding: '6px 12px',
-          fontSize: 12,
-          fontWeight: 600,
-          background: 'var(--primary)',
-          color: 'white',
-          border: 'none',
-          borderRadius: 'var(--radius-sm)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
+          padding: '6px 12px', fontSize: 12, fontWeight: 600,
+          background: 'var(--primary)', color: 'white',
+          border: 'none', borderRadius: 'var(--radius-sm)',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
           opacity: inviteMutation.isPending ? 0.7 : 1,
         }}
       >
@@ -400,15 +374,10 @@ export default function Agents() {
         onClick={() => handleResend(agent)}
         disabled={resendMutation.isPending}
         style={{
-          padding: '6px 12px',
-          fontSize: 12,
-          fontWeight: 600,
-          background: '#FF9500',
-          color: 'white',
-          border: 'none',
-          borderRadius: 'var(--radius-sm)',
-          cursor: 'pointer',
-          opacity: resendMutation.isPending ? 0.7 : 1,
+          padding: '6px 12px', fontSize: 12, fontWeight: 600,
+          background: '#FF9500', color: 'white',
+          border: 'none', borderRadius: 'var(--radius-sm)',
+          cursor: 'pointer', opacity: resendMutation.isPending ? 0.7 : 1,
         }}
       >
         Resend
@@ -474,7 +443,11 @@ export default function Agents() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {isFetching && !isLoading && (
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', opacity: 0.6, animation: 'pulse 1s ease-in-out infinite' }} />
+            <div style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: 'var(--primary)', opacity: 0.6,
+              animation: 'pulse 1s ease-in-out infinite',
+            }} />
           )}
           <button className="btn btn-primary">+ Add Agent</button>
         </div>
@@ -489,23 +462,23 @@ export default function Agents() {
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <span>{error?.message ?? 'Failed to load agents.'}</span>
-          <button onClick={() => refetch()} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', fontWeight: 600, fontFamily: 'inherit' }}>
+          <button
+            onClick={() => refetch()}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', fontWeight: 600, fontFamily: 'inherit' }}
+          >
             Retry
           </button>
         </div>
       )}
 
+      {/* Success / error banner */}
       {banner && (
         <div style={{
-          padding: '12px 16px',
-          borderRadius: 'var(--radius-sm)',
+          padding: '12px 16px', borderRadius: 'var(--radius-sm)',
           background: banner.type === 'success' ? '#F0FDF4' : '#FEF2F2',
           border: `1px solid ${banner.type === 'success' ? '#86EFAC' : '#FCA5A5'}`,
           color: banner.type === 'success' ? '#166534' : '#DC2626',
-          fontSize: 13.5,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          fontSize: 13.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <span>{banner.message}</span>
           <button
@@ -521,6 +494,7 @@ export default function Agents() {
       {/* Search + filters */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div className="card" style={{ padding: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+
           {/* Search */}
           <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
             <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -554,7 +528,7 @@ export default function Agents() {
             <option value="expired">Status: Expired</option>
           </select>
 
-          {/* Source filter — maps to /agents/filter?source= */}
+          {/* Source filter */}
           <select
             value={sourceFilter}
             onChange={e => { setSourceFilter(e.target.value); setPage(1); }}
@@ -577,15 +551,10 @@ export default function Agents() {
             <button
               onClick={clearFilters}
               style={{
-                padding: '8px 12px',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-sm)',
-                background: 'transparent',
-                cursor: 'pointer',
-                fontSize: 13,
-                color: 'var(--text-secondary)',
-                fontFamily: 'inherit',
-                transition: 'all 0.15s',
+                padding: '8px 12px', border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)', background: 'transparent',
+                cursor: 'pointer', fontSize: 13, color: 'var(--text-secondary)',
+                fontFamily: 'inherit', transition: 'all 0.15s',
               }}
               onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.color = 'var(--primary)'; }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
@@ -613,7 +582,10 @@ export default function Agents() {
                 fontSize: 12, color: 'var(--primary)', fontWeight: 500,
               }}>
                 {label}
-                <button onClick={onRemove} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--primary)' }}>
+                <button
+                  onClick={onRemove}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--primary)' }}
+                >
                   <X size={14} />
                 </button>
               </div>
@@ -658,7 +630,10 @@ export default function Agents() {
             <tbody>
               {sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={isNotInvitedFilter ? 8 : 7} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+                  <td
+                    colSpan={isNotInvitedFilter ? 8 : 7}
+                    style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}
+                  >
                     {agents.length === 0 ? 'No agents found.' : 'No agents match your filters.'}
                   </td>
                 </tr>
@@ -669,7 +644,9 @@ export default function Agents() {
                   style={{
                     cursor: 'pointer',
                     animationDelay: `${i * 0.04}s`,
-                    background: isNotInvitedFilter && selectedRows.has(a.id) ? 'var(--primary-light)' : 'transparent',
+                    background: isNotInvitedFilter && selectedRows.has(a.id)
+                      ? 'var(--primary-light)'
+                      : 'transparent',
                   }}
                 >
                   {isNotInvitedFilter && (
@@ -699,10 +676,7 @@ export default function Agents() {
                   </td>
 
                   {/* Email */}
-                  <td
-                    style={{ color: 'var(--text-secondary)', fontSize: 13.5 }}
-                    onClick={() => goToDetail(a)}
-                  >
+                  <td style={{ color: 'var(--text-secondary)', fontSize: 13.5 }} onClick={() => goToDetail(a)}>
                     {a.email || '—'}
                   </td>
 
@@ -717,7 +691,6 @@ export default function Agents() {
                           : meta.key === 'expired'
                             ? AlertTriangle
                             : CheckCircle2;
-
                       return (
                         <span className={`badge ${meta.badgeClass}`} style={{ gap: 6 }}>
                           <Icon size={12} /> {meta.label}
@@ -726,20 +699,19 @@ export default function Agents() {
                     })()}
                   </td>
 
-                  {/* Active Status */}
+                  {/* Active */}
                   <td onClick={() => goToDetail(a)}>
                     <span style={{ fontSize: 13.5, fontWeight: 600, color: getAgentIsActive(a) ? '#16A34A' : '#DC2626' }}>
                       {getAgentActiveStatus(a)}
                     </span>
                   </td>
 
-                  <td
-                    onClick={() => goToDetail(a)}
-                    style={{ color: 'var(--text-secondary)', fontSize: 13.5, fontWeight: 600 }}
-                  >
+                  {/* Tickets */}
+                  <td onClick={() => goToDetail(a)} style={{ color: 'var(--text-secondary)', fontSize: 13.5, fontWeight: 600 }}>
                     {getAgentTicketsCount(a)}
                   </td>
 
+                  {/* CRM */}
                   <td onClick={() => goToDetail(a)}>
                     <CrmBadgesDisplay crms={getAgentCrmSources(a)} maxDisplay={2} />
                   </td>
@@ -791,15 +763,12 @@ export default function Agents() {
                 onClick={handleBulkInvite}
                 disabled={selectedRows.size === 0 || bulkInviteMutation.isPending}
                 style={{
-                  padding: '6px 14px',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  background: 'var(--primary)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 'var(--radius-sm)',
+                  padding: '6px 14px', fontSize: 13, fontWeight: 600,
+                  background: 'var(--primary)', color: 'white',
+                  border: 'none', borderRadius: 'var(--radius-sm)',
                   cursor: selectedRows.size === 0 ? 'not-allowed' : 'pointer',
                   opacity: selectedRows.size === 0 ? 0.55 : 1,
+                  display: 'flex', alignItems: 'center', gap: 6,
                 }}
               >
                 <Send size={14} /> Invite Users ({selectedRows.size})
