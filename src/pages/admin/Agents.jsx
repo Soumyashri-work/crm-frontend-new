@@ -21,7 +21,6 @@ import { agentService, agentKeys } from '../../services/agentService';
 import {
   getInitials,
   getAvatarColor,
-  crmBadgeClass,
   getAgentStatusMeta,
   getAgentRouteSlug,
   getAgentCrmSources,
@@ -32,6 +31,7 @@ import {
 import EditAgentModal from '../../components/EditAgentModal';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import CrmBadgesDisplay from '../../components/CrmBadgesDisplay';
+import InviteAgentModal from '../../components/InviteAgentModal'; // ← NEW
 
 const PAGE_SIZE = 20;
 
@@ -121,17 +121,18 @@ export default function Agents() {
   const navigate    = useNavigate();
   const queryClient = useQueryClient();
 
-  const [search,        setSearch]        = useState('');
-  const [sortField,     setSortField]     = useState('');
-  const [sortDir,       setSortDir]       = useState('asc');
-  const [statusFilter,  setStatusFilter]  = useState('');
-  const [sourceFilter,  setSourceFilter]  = useState('');
-  const [page,          setPage]          = useState(1);
-  const [selectedRows,  setSelectedRows]  = useState(new Set());
-  const [openMenuId,    setOpenMenuId]    = useState(null);
-  const [banner,        setBanner]        = useState(null);
-  const [editingAgent,  setEditingAgent]  = useState(null);
-  const [deletingAgent, setDeletingAgent] = useState(null);
+  const [search,             setSearch]             = useState('');
+  const [sortField,          setSortField]          = useState('');
+  const [sortDir,            setSortDir]            = useState('asc');
+  const [statusFilter,       setStatusFilter]       = useState('');
+  const [sourceFilter,       setSourceFilter]       = useState('');
+  const [page,               setPage]               = useState(1);
+  const [selectedRows,       setSelectedRows]       = useState(new Set());
+  const [openMenuId,         setOpenMenuId]         = useState(null);
+  const [banner,             setBanner]             = useState(null);
+  const [editingAgent,       setEditingAgent]       = useState(null);
+  const [deletingAgent,      setDeletingAgent]      = useState(null);
+  const [inviteModalOpen,    setInviteModalOpen]    = useState(false); // ← NEW
 
   // ── Query ────────────────────────────────────────────────────────────────
   const queryParams = {
@@ -167,7 +168,7 @@ export default function Agents() {
     total_pages: data?.total_pages ?? 1,
   };
 
-  // ── Client-side filter + sort (memoized to prevent infinite loop) ─────────
+  // ── Client-side filter + sort ──────────────────────────────────────────────
   const filtered = useMemo(() => agents.filter(a => {
     const statusMeta = getAgentStatusMeta(a.status);
     if (statusFilter && statusMeta.key !== statusFilter) return false;
@@ -197,8 +198,6 @@ export default function Agents() {
   }, [filtered, sortField, sortDir]);
 
   // ── Prune selectedRows when visible agents change ─────────────────────────
-  // Uses a ref to track the previous sorted IDs so the effect only fires when
-  // the actual agent list changes — not on every render — preventing the loop.
   const sortedIdsRef = useRef('');
   useEffect(() => {
     const ids = sorted.map(a => a.id).join(',');
@@ -208,7 +207,6 @@ export default function Agents() {
     setSelectedRows(prev => {
       const visibleIds = new Set(sorted.map(a => a.id));
       const next = new Set([...prev].filter(id => visibleIds.has(id)));
-      // Return same reference if nothing changed to avoid a re-render
       return next.size === prev.size ? prev : next;
     });
   }, [sorted]);
@@ -347,6 +345,16 @@ export default function Agents() {
     bulkInviteMutation.mutate(selectedInviteCandidates.map(a => a.id));
   };
 
+  // ── NEW: handle successful agent invite from modal ────────────────────────
+  const handleInviteAgentSuccess = async (result) => {
+    setBanner({
+      type: 'success',
+      message: `Invite sent to ${result?.admin_email ?? 'agent'}. Link expires in 24 hours.`,
+    });
+    // Refresh list so the newly invited agent appears (if backend also creates a record)
+    await invalidateAgents();
+  };
+
   // ── Action button per status ──────────────────────────────────────────────
   const getActionButton = (agent) => {
     const status = getAgentStatusMeta(agent.status).key;
@@ -449,7 +457,13 @@ export default function Agents() {
               animation: 'pulse 1s ease-in-out infinite',
             }} />
           )}
-          <button className="btn btn-primary">+ Add Agent</button>
+          {/* ── UPDATED: opens InviteAgentModal ── */}
+          <button
+            className="btn btn-primary"
+            onClick={() => setInviteModalOpen(true)}
+          >
+            + Add Agent
+          </button>
         </div>
       </div>
 
@@ -798,6 +812,7 @@ export default function Agents() {
         </div>
       </div>
 
+      {/* ── Modals ── */}
       <EditAgentModal
         agent={editingAgent}
         isOpen={!!editingAgent}
@@ -812,6 +827,13 @@ export default function Agents() {
         onClose={() => setDeletingAgent(null)}
         onConfirm={handleDeleteConfirm}
         isDeleting={deleteMutation.isPending}
+      />
+
+      {/* ── NEW: Invite Agent Modal ── */}
+      <InviteAgentModal
+        isOpen={inviteModalOpen}
+        onClose={() => setInviteModalOpen(false)}
+        onSuccess={handleInviteAgentSuccess}
       />
     </div>
   );
