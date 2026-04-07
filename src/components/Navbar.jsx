@@ -17,6 +17,11 @@ export default function Navbar({ title = 'Unified Tickets Dashboard' }) {
     ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : (user?.email?.[0] || 'U').toUpperCase();
 
+  // Superadmin has no tenant — show a neutral platform label instead
+  const isSuperAdmin = user?.role === 'superadmin';
+  const orgLabel = isSuperAdmin ? 'Platform' : (user?.tenant_name ?? '…');
+  const orgInitial = isSuperAdmin ? 'P' : (user?.tenant_name?.[0] ?? '…');
+
   return (
     <header style={{
       height: 'var(--navbar-height)',
@@ -26,33 +31,33 @@ export default function Navbar({ title = 'Unified Tickets Dashboard' }) {
       padding: '0 24px', gap: 16,
       position: 'sticky', top: 0, zIndex: 100,
     }}>
-      {/* Organization name - left side */}
+      {/* Organization name — left side */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 140 }}>
         <div style={{
           width: 32, height: 32, borderRadius: 8,
-          background: '#3B82F6', display: 'flex',
-          alignItems: 'center', justifyContent: 'center',
-          fontSize: 14, fontWeight: 700, color: 'white',
-          flexShrink: 0,
+          background: isSuperAdmin ? '#6366F1' : '#3B82F6',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 14, fontWeight: 700, color: 'white', flexShrink: 0,
         }}>
-          {user?.organization ? user.organization.charAt(0) : 'O'}
+          {orgInitial}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
-            {user?.organization || 'Organization'}
+            {orgLabel}
           </div>
         </div>
       </div>
 
-      {/* Title center - positioned absolutely for true centering */}
-      <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+      {/* Title — absolutely centered */}
+      <div style={{
+        position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+      }}>
         <span style={{ fontWeight: 600, fontSize: 18 }}>{title}</span>
       </div>
 
       {/* Right actions */}
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
-
-        {/* User menu */}
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ position: 'relative' }}>
           <button
             onClick={() => setDropOpen(o => !o)}
