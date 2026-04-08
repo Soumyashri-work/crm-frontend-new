@@ -1,10 +1,3 @@
-/**
- * pages/agent/MyTickets.jsx
- *
- * Agent ticket list. React Query handles fetching, caching, and deduplication.
- * Server-side filtering on status/priority; client-side search on the fetched page.
- */
-
 import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -32,6 +25,8 @@ export default function MyTickets() {
     page_size:       DEFAULT_PAGE_SIZE,
     status:          filters.status   || undefined,
     priority:        filters.priority || undefined,
+    // Pass the CRM filter to the backend if supported, otherwise we filter client-side
+    source_system:   filters.crm      || undefined, 
     include_deleted: false,
   };
 
@@ -50,7 +45,7 @@ export default function MyTickets() {
     staleTime: 30_000,
   });
 
-  const tickets    = data?.items        ?? [];
+  const tickets    = data?.items       ?? [];
   const pagination = {
     total:       data?.total       ?? 0,
     page:        data?.page        ?? page,
@@ -69,14 +64,24 @@ export default function MyTickets() {
     setPage(1);
   };
 
-  // Client-side search only (status/priority are server-side)
+  // Client-side search + fallback CRM filter
   const filtered = tickets.filter(ticket => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      ticket.title?.toLowerCase().includes(q) ||
-      ticket.crm_id?.toLowerCase().includes(q)
-    );
+    // Fallback: If backend doesn't filter by source_system on the agent route, do it here
+    if (filters.crm) {
+      const ticketCrm = ticket.crm || ticket.source_system || '';
+      if (ticketCrm.toLowerCase() !== filters.crm.toLowerCase()) return false;
+    }
+
+    // Client-side text search
+    if (search) {
+      const q = search.toLowerCase();
+      return (
+        ticket.title?.toLowerCase().includes(q) ||
+        ticket.crm_id?.toLowerCase().includes(q)
+      );
+    }
+    
+    return true;
   });
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -93,7 +98,7 @@ export default function MyTickets() {
 
       {/* Search + Filters */}
       <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <div style={{ position: 'relative', flex: 1 }}>
             <Search size={16} style={{
               position: 'absolute', left: 12, top: '50%',
@@ -103,9 +108,9 @@ export default function MyTickets() {
             <input
               className="form-input"
               style={{ width: '100%', paddingLeft: 36 }}
-              placeholder="Search tickets…"
+              placeholder="Search tickets by title or CRM ID…"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
             />
           </div>
 
@@ -148,7 +153,7 @@ export default function MyTickets() {
         </div>
       )}
 
-      {/* Table – status/priority already filtered server-side, pass empty to avoid double-filter */}
+      {/* Table – pass empty filters to avoid double-filtering status/priority since backend did it */}
       <TicketTable
         tickets={filtered}
         loading={isLoading}
@@ -161,32 +166,35 @@ export default function MyTickets() {
       />
 
       {/* Pagination */}
-      {!isLoading && !isError && pagination.total_pages > 1 && (
+      {!isLoading && !isError && (
         <div style={{
           display: 'flex', justifyContent: 'space-between',
           alignItems: 'center', fontSize: 13, color: 'var(--text-muted)',
         }}>
           <span>
             {pagination.total} ticket{pagination.total !== 1 ? 's' : ''} total
-            {search ? ` — ${filtered.length} shown` : ''}
+            {search ? ` — ${filtered.length} shown after search` : ''}
           </span>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button
-              onClick={() => handlePageChange(page - 1)}
-              disabled={page <= 1 || isFetching}
-              style={{ padding: '4px 10px', cursor: page <= 1 ? 'not-allowed' : 'pointer' }}
-            >
-              ‹ Prev
-            </button>
-            <span>Page {pagination.page} of {pagination.total_pages}</span>
-            <button
-              onClick={() => handlePageChange(page + 1)}
-              disabled={page >= pagination.total_pages || isFetching}
-              style={{ padding: '4px 10px', cursor: page >= pagination.total_pages ? 'not-allowed' : 'pointer' }}
-            >
-              Next ›
-            </button>
-          </div>
+          
+          {pagination.total_pages > 1 && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button
+                onClick={() => handlePageChange(page - 1)}
+                disabled={page <= 1 || isFetching}
+                style={{ padding: '4px 10px', cursor: page <= 1 ? 'not-allowed' : 'pointer' }}
+              >
+                ‹ Prev
+              </button>
+              <span>Page {pagination.page} of {pagination.total_pages}</span>
+              <button
+                onClick={() => handlePageChange(page + 1)}
+                disabled={page >= pagination.total_pages || isFetching}
+                style={{ padding: '4px 10px', cursor: page >= pagination.total_pages ? 'not-allowed' : 'pointer' }}
+              >
+                Next ›
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

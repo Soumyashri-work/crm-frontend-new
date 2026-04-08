@@ -37,31 +37,34 @@ export default function SuperAdminAdmins() {
 
   // ── Filter ───────────────────────────────────────────────────────────────
   const filtered = admins.filter(a => {
-    const status = a.is_active ? 'Active' : 'Inactive';
+    const status = a.is_pending ? 'Pending' : (a.is_active ? 'Active' : 'Inactive');
     if (statusFilter && status !== statusFilter) return false;
     if (search) {
       const q = search.toLowerCase();
-      return a.email.toLowerCase().includes(q);
+      return (
+        a.email.toLowerCase().includes(q) ||
+        (a.name        && a.name.toLowerCase().includes(q)) ||
+        (a.tenant_name && a.tenant_name.toLowerCase().includes(q))
+      );
     }
     return true;
   });
 
   // ── On new admin invited ──────────────────────────────────────────────────
-  // API response: { tenant: { id, name, slug }, admin_email, invite_link, message }
-  // We optimistically add a row; a refresh will get the real record once Keycloak is set up.
   const handleAddAdmin = (result) => {
-  const optimistic = {
-    id:          Date.now(),
-    email:       result.admin_email,
-    name:        result.admin_name || 'Pending...', // Add this line
-    role:        'admin',
-    tenant_id:   result.tenant?.id   ?? '',
-    is_active:   true,
-    created_at:  new Date().toISOString(),
-    _tenantName: result.tenant?.name ?? '—',
+    const optimistic = {
+      id:          Date.now(),
+      email:       result.admin_email,
+      name:        result.admin_name || result.admin_email,
+      role:        'admin',
+      tenant_id:   result.tenant?.id   ?? '',
+      tenant_name: result.tenant?.name ?? '—',
+      is_active:   false,
+      is_pending:  true,
+      created_at:  new Date().toISOString(),
+    };
+    setAdmins(prev => [optimistic, ...prev]);
   };
-  setAdmins(prev => [optimistic, ...prev]);
-};
 
   const formatDate = (iso) => {
     if (!iso) return '—';
@@ -92,7 +95,7 @@ export default function SuperAdminAdmins() {
         <div style={{ position: 'relative', flex: 1, maxWidth: 480 }}>
           <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
           <input className="form-input" style={{ paddingLeft: 36, width: '100%' }}
-            placeholder="Search by email…" value={search} onChange={e => setSearch(e.target.value)} />
+            placeholder="Search by name, email or tenant…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <div style={{ position: 'relative' }}>
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
@@ -100,6 +103,7 @@ export default function SuperAdminAdmins() {
             <option value="">Status: All</option>
             <option value="Active">Active</option>
             <option value="Inactive">Inactive</option>
+            <option value="Pending">Pending</option>
           </select>
           <ChevronDown size={14} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)' }} />
         </div>
@@ -123,7 +127,7 @@ export default function SuperAdminAdmins() {
             <thead>
               <tr>
                 <th>ADMIN</th>
-                <th>TENANT ID</th>
+                <th>TENANT</th>
                 <th>ROLE</th>
                 <th>STATUS</th>
                 <th>CREATED</th>
@@ -145,46 +149,71 @@ export default function SuperAdminAdmins() {
                 </tr>
               ) : filtered.map((a, i) => (
                 <tr key={a.id} className="animate-in" style={{ animationDelay: `${i * 0.03}s` }}>
-               {/* NEW CODE */}
-<td>
-  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-    <div style={{
-      width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-      // Use name for color and initials if available, fallback to email
-      background: getAvatarColor(a.name || a.email),
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: 12, fontWeight: 700, color: 'white',
-    }}>
-      <div style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 500 }}>{a._tenantName}</div>
-      {getInitials(a.name || a.email)}
-    </div>
-    <div>
-      {/* Primary text is now the Admin Name */}
-      <div style={{ fontWeight: 600, fontSize: 14 }}>{a.name || '—'}</div>
-      {/* Email remains as the secondary sub-text */}
-      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{a.email}</div>
-    </div>
-  </div>
-</td>
-                  <td style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                    {String(a.tenant_id).slice(0, 8)}…
+
+                  {/* ADMIN column */}
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                        background: getAvatarColor(a.name || a.email),
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 12, fontWeight: 700, color: 'white',
+                      }}>
+                        {getInitials(a.name || a.email)}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{a.name || '—'}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{a.email}</div>
+                      </div>
+                    </div>
                   </td>
+
+                  {/* TENANT column */}
+                  <td>
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '3px 10px', borderRadius: 99,
+                      fontSize: 12, fontWeight: 600,
+                      background: 'var(--primary-subtle, #EEF2FF)',
+                      color: 'var(--primary, #4F46E5)',
+                      maxWidth: 160, overflow: 'hidden',
+                      textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {a.tenant_name || '—'}
+                    </span>
+                  </td>
+
+                  {/* ROLE column */}
                   <td>
                     <span style={{ padding: '2px 8px', borderRadius: 99, fontSize: 12, fontWeight: 600, background: '#F3E8FF', color: '#7C3AED' }}>
                       {a.role}
                     </span>
                   </td>
+
+                  {/* STATUS column — Pending / Active / Inactive */}
                   <td>
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 5,
-                      padding: '3px 10px', borderRadius: 99, fontSize: 12, fontWeight: 600,
-                      background: a.is_active ? '#ECFDF5' : '#FEF2F2',
-                      color:      a.is_active ? '#059669' : '#DC2626',
-                    }}>
-                      {a.is_active && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#059669', display: 'inline-block' }} />}
-                      {a.is_active ? 'Active' : 'Inactive'}
-                    </span>
+                    {a.is_pending ? (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        padding: '3px 10px', borderRadius: 99, fontSize: 12, fontWeight: 600,
+                        background: '#FFF7ED', color: '#C2410C',
+                      }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F97316', display: 'inline-block' }} />
+                        Pending
+                      </span>
+                    ) : (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        padding: '3px 10px', borderRadius: 99, fontSize: 12, fontWeight: 600,
+                        background: a.is_active ? '#ECFDF5' : '#FEF2F2',
+                        color:      a.is_active ? '#059669' : '#DC2626',
+                      }}>
+                        {a.is_active && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#059669', display: 'inline-block' }} />}
+                        {a.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    )}
                   </td>
+
                   <td style={{ color: 'var(--text-secondary)', fontSize: 13.5 }}>{formatDate(a.created_at)}</td>
                   <td onClick={e => e.stopPropagation()}>
                     <button className="btn btn-ghost" style={{ padding: '5px 8px' }} onClick={e => e.preventDefault()}>

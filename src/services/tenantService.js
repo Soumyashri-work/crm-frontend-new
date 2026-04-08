@@ -4,7 +4,8 @@
  * Tenant-scoped API calls + React Query key factories.
  *
  * Key shape:
- *   ['tenant', 'me']  – current user's tenant info
+ * ['tenant', 'me']            – current user's tenant info
+ * ['tenant', 'sourceSystems'] – active CRMs for the current tenant
  */
 
 import api from './api';
@@ -15,6 +16,7 @@ import api from './api';
 export const tenantKeys = {
   all: () => ['tenant'],
   me:  () => ['tenant', 'me'],
+  sourceSystems: () => ['tenant', 'sourceSystems'],
 };
 
 // ---------------------------------------------------------------------------
@@ -56,12 +58,18 @@ export const tenantService = {
   /**
    * GET /api/v1/tenants/me
    * Returns { id, name, slug } for the currently authenticated user.
-   * Only valid for admin and agent roles — superadmin will get a 403.
-   *
-   * @returns {{ id: string, name: string, slug: string }}
    */
   getMyTenant: async () => {
     const res = await api.get('/tenants/me');
+    return unwrap(res);
+  },
+
+  /**
+   * GET /api/v1/tenants/me/source-systems
+   * Returns the array of configured source CRMs (e.g., [{id: 1, system_name: "espocrm"}])
+   */
+  getSourceSystems: async () => {
+    const res = await api.get('/tenants/me/source-systems');
     return unwrap(res);
   },
 };

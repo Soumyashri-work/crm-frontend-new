@@ -125,12 +125,15 @@ export default function AgentDetail() {
 
   if (!agent) return null;
 
-  const statusMeta = getAgentStatusMeta(agent.status);
+  // ── UPDATED: Look for invitation_status first ──
+  const statusMeta = getAgentStatusMeta(agent.invitation_status || agent.status);
+  
+  // ── UPDATED: Handle 'rejected' icon fallback ──
   const StatusIcon = statusMeta.key === 'not_invited'
     ? XCircle
     : statusMeta.key === 'pending'
       ? Clock3
-      : statusMeta.key === 'expired'
+      : statusMeta.key === 'expired' || statusMeta.key === 'rejected'
         ? AlertTriangle
         : CheckCircle2;
 
