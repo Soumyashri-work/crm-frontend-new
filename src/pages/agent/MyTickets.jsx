@@ -10,6 +10,7 @@ const DEFAULT_PAGE_SIZE = 20;
 
 export default function MyTickets() {
   const { user } = useAuth();
+  console.log(user);
 
   const [filters, setFilters] = useState({});
   const [search,  setSearch]  = useState('');
