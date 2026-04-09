@@ -14,31 +14,32 @@ const superAdminNav = [
 function SuperAdminSidebar({ collapsed, setCollapsed }) {
   return (
     <aside style={{
-      width: collapsed ? 72 : 220,
+      width: collapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)',
       minHeight: '100vh',
       background: 'var(--surface)',
       borderRight: '1px solid var(--border)',
       display: 'flex',
       flexDirection: 'column',
-      transition: 'width 0.35s cubic-bezier(0.4,0,0.2,1)',
+      transition: 'width var(--transition-slow)',
       flexShrink: 0,
       overflow: 'hidden',
     }}>
       {/* Brand */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10,
-        padding: collapsed ? '18px 0' : '18px 16px',
+        padding: collapsed ? '18px 0' : '18px 24px',
         justifyContent: collapsed ? 'center' : 'flex-start',
         borderBottom: '1px solid var(--border)',
-        minHeight: 64,
+        height: 'var(--navbar-height)',
+        lineHeight: 1,
       }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <Shield size={18} color="white" />
         </div>
         {!collapsed && (
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.2 }}>Super Admin</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Multi-Tenant Portal</div>
+          <div style={{ lineHeight: 1.2, display: 'flex', flexDirection: 'column', gap: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.2, margin: 0 }}>Super Admin</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.2, margin: 0 }}>Multi-Tenant Portal</div>
           </div>
         )}
       </div>
@@ -74,15 +75,15 @@ function SuperAdminSidebar({ collapsed, setCollapsed }) {
       </nav>
 
       {/* Collapse toggle */}
-      <div style={{ borderTop: '1px solid var(--border)', padding: 10 }}>
+      <div style={{ borderTop: '1px solid var(--border)', padding: '12px' }}>
         <button
           onClick={() => setCollapsed(c => !c)}
           style={{
-            width: '100%', padding: '9px', borderRadius: 'var(--radius-sm)',
+            width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-sm)',
             background: 'var(--surface-2)', border: '1px solid var(--border)',
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
             gap: 8, fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)',
-            fontFamily: 'inherit', transition: 'all 0.2s',
+            fontFamily: 'inherit', transition: 'all var(--transition)',
           }}
           onMouseEnter={e => { e.currentTarget.style.background = 'var(--primary-light)'; e.currentTarget.style.color = 'var(--primary)'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
@@ -121,7 +122,7 @@ function SuperAdminNavbar() {
 
   return (
     <header style={{
-      height: 64,
+      height: 'var(--navbar-height)',
       background: 'var(--surface)',
       borderBottom: '1px solid var(--border)',
       display: 'flex',

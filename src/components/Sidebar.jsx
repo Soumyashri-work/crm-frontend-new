@@ -49,10 +49,11 @@ export default function Sidebar({ isAdmin }) {
       {/* Brand */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10,
-        padding: collapsed ? '18px 0' : '18px 20px',
+        padding: collapsed ? '18px 0' : '18px 24px',
         justifyContent: collapsed ? 'center' : 'flex-start',
         borderBottom: '1px solid var(--border)',
-        minHeight: 'var(--navbar-height)',
+        height: 'var(--navbar-height)',
+        lineHeight: 1,
       }}>
         <div style={{
           width: 36, height: 36, borderRadius: 10,
@@ -62,9 +63,9 @@ export default function Sidebar({ isAdmin }) {
           <Ticket size={18} color="white" />
         </div>
         {!collapsed && (
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.2 }}>Unified CRM</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>Ticket System</div>
+          <div style={{ lineHeight: 1.2, display: 'flex', flexDirection: 'column', gap: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.2, margin: 0 }}>Unified CRM</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, lineHeight: 1.2, margin: 0 }}>Ticket System</div>
           </div>
         )}
       </div>
