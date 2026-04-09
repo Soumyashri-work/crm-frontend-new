@@ -1,155 +1,145 @@
+/**
+ * services/agentService.js
+ *
+ * All Agent API calls + React Query key factories.
+ *
+ * Key shape:
+ *   ['agents', 'list', params]   – paginated list / filtered list
+ *   ['agents', 'detail', slug]   – single agent by slug
+ */
+
 import api from './api';
-import {
-  normalizeAgentStatus,
-  getAgentRouteSlug,
-  getAgentCrmSources,
-  getAgentTicketsCount,
-  getAgentStatusMeta,
-} from '../utils/helpers';
 
 // ---------------------------------------------------------------------------
 // Query key factory
 // ---------------------------------------------------------------------------
 export const agentKeys = {
   all:    ()             => ['agents'],
-  lists:  ()             => ['agents', 'list'],
   list:   (params = {})  => ['agents', 'list', params],
-  detail: (id)           => ['agents', 'detail', id],
+  detail: (slug)         => ['agents', 'detail', slug],
 };
 
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Unwraps a standard { success, message, data } envelope.
+ * Falls back gracefully for plain-array or raw-object responses.
+ */
 function unwrap(response) {
-  const body = response.data;
-  if (typeof body?.success === 'boolean') {
-    if (!body.success) {
-      const err  = new Error(body.message || 'An unexpected error occurred');
-      err.status = response.status;
-      throw err;
-    }
-    return body.data;
-  }
-  return body;
-}
+  const body = response?.data;
 
-function normalizeAgent(a) {
-  if (!a) return a;
-
-  const statusKey = normalizeAgentStatus(a.status, a.is_active);
-  const statusLabel = getAgentStatusMeta(statusKey).label;
-
-  return {
-    ...a,
-    name: (a.name ?? `${a.first_name ?? ''} ${a.last_name ?? ''}`.trim()) || '—',
-    status_key: statusKey,
-    status: statusLabel,
-    source: a.source_system ?? a.source ?? '—',
-    crm_sources: getAgentCrmSources({
-      ...a,
-      source: a.source_system ?? a.source,
-    }),
-    tickets_count: getAgentTicketsCount(a),
-    route_slug: getAgentRouteSlug({
-      ...a,
-      name: (a.name ?? `${a.first_name ?? ''} ${a.last_name ?? ''}`.trim()) || 'agent',
-      email: a.email,
-    }),
-  };
-}
-
-async function postFirstAvailable(requests, payload) {
-  let lastError = null;
-
-  for (const req of requests) {
-    try {
-      const res = await api.post(req, payload);
-      return unwrap(res);
-    } catch (err) {
-      lastError = err;
-      if (![404, 405].includes(err?.status)) {
-        throw err;
-      }
-    }
+  if (body == null) {
+    const err = new Error('No response body received from the server.');
+    err.status = response?.status;
+    throw err;
   }
 
-  throw lastError || new Error('No supported endpoint found for this action.');
+  if (typeof body !== 'object' || !('success' in body)) {
+    return body;
+  }
+
+  if (!body.success) {
+    const err  = new Error(body.message?.trim() || 'An unexpected error occurred.');
+    err.status = response?.status;
+    err.data   = body.data ?? null;
+    throw err;
+  }
+
+  return body.data;
 }
 
 // ---------------------------------------------------------------------------
 // Agent service
 // ---------------------------------------------------------------------------
 export const agentService = {
-  /** GET /agents/?page=&page_size=&include_inactive= */
+
+  // ── List / filter ─────────────────────────────────────────────────────────
+
+  /** GET /api/v1/agents?page=1&page_size=20&include_inactive=true */
   getAll: async (params = {}) => {
-    const res  = await api.get('/agents/', { params });
-    const data = unwrap(res);
-    if (Array.isArray(data)) {
-      return { items: data.map(normalizeAgent), total: data.length, total_pages: 1 };
-    }
-    return {
-      ...data,
-      items: (data.items ?? []).map(normalizeAgent),
-    };
+    const res = await api.get('/agents', { params });
+    return unwrap(res);
   },
 
-  /** GET /agents/filter?source=&include_inactive=&page=&page_size= */
+  /**
+   * GET /api/v1/agents/filter?source=zammad&...
+   * Used when a source filter is active.
+   */
   filter: async (params = {}) => {
-    const res  = await api.get('/agents/filter', { params });
-    const data = unwrap(res);
-    if (Array.isArray(data)) {
-      return { items: data.map(normalizeAgent), total: data.length, total_pages: 1 };
-    }
-    return {
-      ...data,
-      items: (data.items ?? []).map(normalizeAgent),
-    };
+    const res = await api.get('/agents/filter', { params });
+    return unwrap(res);
   },
 
-  /** GET /agents/{id} */
-  getById: async (id) => {
-    const res = await api.get(`/agents/${id}`);
-    return normalizeAgent(unwrap(res));
-  },
+  // ── Single agent ──────────────────────────────────────────────────────────
 
+  /** GET /api/v1/agents/:slug */
   getBySlug: async (slug) => {
-    const normalizedSlug = String(slug || '').trim().toLowerCase();
-    if (!normalizedSlug) throw new Error('Missing agent slug.');
-
-    const list = await agentService.getAll({
-      page: 1,
-      page_size: 500,
-      include_inactive: true,
-    });
-
-    const found = (list.items || []).find(
-      (a) => String(a.route_slug || '').toLowerCase() === normalizedSlug,
-    );
-
-    if (!found?.id) {
-      throw new Error('Agent not found.');
-    }
-
-    return agentService.getById(found.id);
+    const res = await api.get(`/agents/${slug}`);
+    return unwrap(res);
   },
 
-  invite: (id) => postFirstAvailable([
-    `/agents/${id}/invite`,
-    '/agents/invite',
-  ], { agent_id: id }),
+  // ── Mutations ─────────────────────────────────────────────────────────────
 
-  resendInvite: (id) => postFirstAvailable([
-    `/agents/${id}/resend-invite`,
-    `/agents/${id}/invite/resend`,
-    '/agents/invite/resend',
-  ], { agent_id: id }),
+  /** PUT /api/v1/agents/:id */
+  update: async (id, data) => {
+    const res = await api.put(`/agents/${id}`, data);
+    return unwrap(res);
+  },
 
-  bulkInvite: (ids) => postFirstAvailable([
-    '/agents/invite/bulk',
-    '/agents/bulk-invite',
-  ], { agent_ids: ids }),
+  /** DELETE /api/v1/agents/:id */
+  delete: async (id) => {
+    const res = await api.delete(`/agents/${id}`);
+    return unwrap(res);
+  },
 
-  create:  (data)     => api.post('/agents/', data),
-  update:  (id, data) => api.put(`/agents/${id}`, data),
-  delete:  (id)       => api.delete(`/agents/${id}`),
+  // ── Invitations ───────────────────────────────────────────────────────────
+
+  /**
+   * POST /api/v1/invitations/invite-agent
+   *
+   * Called by an org admin to invite a new agent.
+   * Requires admin JWT (sent automatically via axios interceptor).
+   *
+   * @param {{
+   *   email:      string,
+   *   first_name: string,
+   *   last_name:  string,
+   *   name:       string,
+   *   role:       string   // always "agent"
+   * }} data
+   */
+  inviteAgent: async (data) => {
+    const res = await api.post('/invitations/invite-agent', data);
+    return unwrap(res);
+  },
+
+  /**
+   * POST /api/v1/agents/:id/invite
+   * Invite a single already-imported agent (status: not_invited).
+   */
+  invite: async (id) => {
+    const res = await api.post(`/agents/${id}/invite`);
+    return unwrap(res);
+  },
+
+  /**
+   * POST /api/v1/agents/:id/resend-invite
+   * Resend an invite to an agent whose previous invite expired.
+   */
+  resendInvite: async (id) => {
+    const res = await api.post(`/agents/${id}/resend-invite`);
+    return unwrap(res);
+  },
+
+  /**
+   * POST /api/v1/agents/bulk-invite
+   * Invite multiple not_invited agents in one call.
+   * @param {string[]} ids
+   */
+  bulkInvite: async (ids) => {
+    const res = await api.post('/agents/bulk-invite', { agent_ids: ids });
+    return unwrap(res);
+  },
 };

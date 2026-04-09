@@ -1,83 +1,97 @@
 /**
- * services/api.js
+ * src/services/api.js  — UPDATED for Keycloak
  *
- * Axios instance pre-configured to talk to the UnifiedCRM backend.
+ * One change: the request interceptor now reads the live Keycloak token
+ * instead of the static localStorage value.
  *
- * Base URL is read from the environment variable:
- *   VITE_API_BASE_URL  (Vite)
- *   REACT_APP_API_BASE_URL  (Create React App)
+ * Falls back to localStorage 'access_token' so existing code that sets it
+ * manually still works during transition.
  *
- * If neither is set, falls back to http://localhost:8000/api/v1
- *
- * Setup:
- *   1. Create a .env file in your frontend root
- *   2. Add: VITE_API_BASE_URL=http://localhost:8000/api/v1
- *   3. Import this file wherever you need to call the backend
+ * All other config (base URL, timeout, error normalisation) is unchanged.
  */
 
 import axios from 'axios';
+import { getKeycloak } from '../auth/keycloak';
 
-// ---------------------------------------------------------------------------
-// Base URL — reads from .env, falls back to local backend
-// ---------------------------------------------------------------------------
 const BASE_URL =
-  import.meta.env?.VITE_API_BASE_URL ||        // Vite
-  (typeof process !== 'undefined' ? process.env?.REACT_APP_API_BASE_URL : undefined) || // CRA (guarded)
+  import.meta.env?.VITE_API_BASE_URL ||
+  (typeof process !== 'undefined' ? process.env?.REACT_APP_API_BASE_URL : undefined) ||
   'http://localhost:8000/api/v1';
 
-// ---------------------------------------------------------------------------
-// Axios instance
-// ---------------------------------------------------------------------------
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 30000,                               // 30s — syncs can be slow
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
-    'Accept':       'application/json',
+    Accept: 'application/json',
   },
 });
 
 // ---------------------------------------------------------------------------
-// Request interceptor
-// Attach JWT token from localStorage if present (ready for auth later)
+// Request interceptor — attach live Keycloak token
 // ---------------------------------------------------------------------------
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  async (config) => {
+    try {
+      // Try to get a fresh token from the Keycloak singleton
+      const kc = await getKeycloak();
+      if (kc && kc.authenticated) {
+        // Refresh if expiring within 30 seconds
+        await kc.updateToken(30).catch(() => {});
+        if (kc.token) {
+          config.headers.Authorization = `Bearer ${kc.token}`;
+          return config;
+        }
+      }
+    } catch {
+      // Keycloak not yet initialised — fall through to localStorage
     }
+
+    // Fallback: static token (supports legacy manual login during transition)
+    const stored = localStorage.getItem('access_token');
+    if (stored) {
+      config.headers.Authorization = `Bearer ${stored}`;
+    }
+
     return config;
   },
   (error) => Promise.reject(error),
 );
 
 // ---------------------------------------------------------------------------
-// Response interceptor
-// Normalises errors so callers always get a clean Error object
+// Response interceptor — normalise errors + handle 401 (session expired)
 // ---------------------------------------------------------------------------
 api.interceptors.response.use(
   (response) => response,
-
-  (error) => {
+  async (error) => {
     if (error.response) {
-      // Server responded with a non-2xx status
-      const body    = error.response.data;
-      const message = body?.message || body?.detail || `Error ${error.response.status}`;
-      const err     = new Error(message);
-      err.status    = error.response.status;
-      err.data      = body?.data ?? null;
+      const { status, data } = error.response;
+
+      // Session expired — redirect to Keycloak login
+      if (status === 401) {
+        try {
+          const kc = await getKeycloak();
+          if (kc) { kc.login(); return; }
+        } catch { /* ignore */ }
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+        return;
+      }
+
+      const message = data?.message || data?.detail || `Error ${status}`;
+      const err = new Error(message);
+      err.status = status;
+      err.data = data?.data ?? null;
       return Promise.reject(err);
     }
 
     if (error.request) {
-      // Request was made but no response — backend down or network issue
       return Promise.reject(
-        new Error('Cannot reach the server. Check your connection or try again later.')
+        new Error('Cannot reach the server. Check your connection or try again later.'),
       );
     }
 
-    // Something else went wrong building the request
     return Promise.reject(error);
   },
 );

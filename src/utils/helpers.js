@@ -63,15 +63,19 @@ const AGENT_STATUS_LABELS = {
   not_invited: 'Not Invited',
   pending: 'Pending',
   expired: 'Expired',
-  active: 'Invited',
+  rejected: 'Rejected', 
+  active: 'Active',     
 };
 
 export function normalizeAgentStatus(status, isActive) {
   const raw = String(status || '').toLowerCase().trim().replace(/\s+/g, '_');
 
+  // 'accepted' comes from our Invitation table now
   if (['active', 'accepted', 'enabled'].includes(raw)) return 'active';
   if (['pending', 'invited', 'invite_sent'].includes(raw)) return 'pending';
   if (['expired', 'invite_expired'].includes(raw)) return 'expired';
+  if (['rejected'].includes(raw)) return 'rejected'; // <-- ADDED
+  
   if (['not_invited', 'not-invited', 'inactive', 'new', 'uninvited'].includes(raw)) {
     return 'not_invited';
   }
@@ -85,7 +89,12 @@ export function normalizeAgentStatus(status, isActive) {
 
 export function getAgentStatusMeta(status) {
   const key = normalizeAgentStatus(status);
-  const badgeClass = key === 'active' ? 'badge-success' : key === 'pending' ? 'badge-warning' : 'badge-danger';
+  // Give 'rejected' a danger badge too
+  const badgeClass = key === 'active' 
+    ? 'badge-success' 
+    : key === 'pending' 
+      ? 'badge-warning' 
+      : 'badge-danger';
 
   return {
     key,

@@ -18,10 +18,11 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { agentService, agentKeys } from '../../services/agentService';
+// ── ADDED: Import tenantService to fetch dynamic CRMs ──
+import { tenantService, tenantKeys } from '../../services/tenantService';
 import {
   getInitials,
   getAvatarColor,
-  crmBadgeClass,
   getAgentStatusMeta,
   getAgentRouteSlug,
   getAgentCrmSources,
@@ -32,6 +33,7 @@ import {
 import EditAgentModal from '../../components/EditAgentModal';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import CrmBadgesDisplay from '../../components/CrmBadgesDisplay';
+import InviteAgentModal from '../../components/InviteAgentModal';
 
 const PAGE_SIZE = 20;
 
@@ -121,17 +123,26 @@ export default function Agents() {
   const navigate    = useNavigate();
   const queryClient = useQueryClient();
 
-  const [search,        setSearch]        = useState('');
-  const [sortField,     setSortField]     = useState('');
-  const [sortDir,       setSortDir]       = useState('asc');
-  const [statusFilter,  setStatusFilter]  = useState('');
-  const [sourceFilter,  setSourceFilter]  = useState('');
-  const [page,          setPage]          = useState(1);
-  const [selectedRows,  setSelectedRows]  = useState(new Set());
-  const [openMenuId,    setOpenMenuId]    = useState(null);
-  const [banner,        setBanner]        = useState(null);
-  const [editingAgent,  setEditingAgent]  = useState(null);
-  const [deletingAgent, setDeletingAgent] = useState(null);
+  const [search,             setSearch]             = useState('');
+  const [sortField,          setSortField]          = useState('');
+  const [sortDir,            setSortDir]            = useState('asc');
+  const [statusFilter,       setStatusFilter]       = useState('');
+  const [sourceFilter,       setSourceFilter]       = useState('');
+  const [page,               setPage]               = useState(1);
+  const [selectedRows,       setSelectedRows]       = useState(new Set());
+  const [openMenuId,         setOpenMenuId]         = useState(null);
+  const [banner,             setBanner]             = useState(null);
+  const [editingAgent,       setEditingAgent]       = useState(null);
+  const [deletingAgent,      setDeletingAgent]      = useState(null);
+  const [inviteModalOpen,    setInviteModalOpen]    = useState(false);
+  const [inviteTargetAgent,  setInviteTargetAgent]  = useState(null);
+
+  // ── Fetch dynamic CRM sources for the filters ────────────────────────────
+  const { data: sourceSystems = [], isLoading: isSourceLoading } = useQuery({
+    queryKey: tenantKeys.sourceSystems(),
+    queryFn: () => tenantService.getSourceSystems(),
+    staleTime: 5 * 60 * 1000, // cache for 5 minutes
+  });
 
   // ── Query ────────────────────────────────────────────────────────────────
   const queryParams = {
@@ -167,9 +178,9 @@ export default function Agents() {
     total_pages: data?.total_pages ?? 1,
   };
 
-  // ── Client-side filter + sort (memoized to prevent infinite loop) ─────────
+  // ── Client-side filter + sort ──────────────────────────────────────────────
   const filtered = useMemo(() => agents.filter(a => {
-    const statusMeta = getAgentStatusMeta(a.status);
+    const statusMeta = getAgentStatusMeta(a.invitation_status || a.status);
     if (statusFilter && statusMeta.key !== statusFilter) return false;
     if (search) {
       const q = search.toLowerCase();
@@ -179,7 +190,7 @@ export default function Agents() {
       ) return false;
     }
     return true;
-  }), [agents, statusFilter, search]);
+  }), [agents, statusFilter, search])
 
   const sorted = useMemo(() => {
     if (!sortField) return filtered;
@@ -197,8 +208,6 @@ export default function Agents() {
   }, [filtered, sortField, sortDir]);
 
   // ── Prune selectedRows when visible agents change ─────────────────────────
-  // Uses a ref to track the previous sorted IDs so the effect only fires when
-  // the actual agent list changes — not on every render — preventing the loop.
   const sortedIdsRef = useRef('');
   useEffect(() => {
     const ids = sorted.map(a => a.id).join(',');
@@ -208,7 +217,6 @@ export default function Agents() {
     setSelectedRows(prev => {
       const visibleIds = new Set(sorted.map(a => a.id));
       const next = new Set([...prev].filter(id => visibleIds.has(id)));
-      // Return same reference if nothing changed to avoid a re-render
       return next.size === prev.size ? prev : next;
     });
   }, [sorted]);
@@ -340,16 +348,35 @@ export default function Agents() {
     });
   };
 
-  const handleInvite     = (agent) => inviteMutation.mutate(agent.id);
+  const handleInvite = (agent) => {
+    const [first_name = '', ...rest] = (agent.name ?? '').split(' ');
+    const last_name = rest.join(' ');
+    setInviteTargetAgent({
+      id:         agent.id,
+      first_name,
+      last_name,
+      email:      agent.email ?? '',
+    });
+    setInviteModalOpen(true);
+  };
   const handleResend     = (agent) => resendMutation.mutate(agent.id);
   const handleBulkInvite = () => {
     if (selectedInviteCandidates.length === 0) return;
     bulkInviteMutation.mutate(selectedInviteCandidates.map(a => a.id));
   };
 
+  // ── NEW: handle successful agent invite from modal ────────────────────────
+  const handleInviteAgentSuccess = async (result) => {
+    setBanner({
+      type: 'success',
+      message: `Invite sent to ${result?.admin_email ?? 'agent'}. Link expires in 24 hours.`,
+    });
+    await invalidateAgents();
+  };
+
   // ── Action button per status ──────────────────────────────────────────────
   const getActionButton = (agent) => {
-    const status = getAgentStatusMeta(agent.status).key;
+    const status = getAgentStatusMeta(agent.invitation_status || agent.status).key;
 
     if (status === 'not_invited') return (
       <button
@@ -449,7 +476,12 @@ export default function Agents() {
               animation: 'pulse 1s ease-in-out infinite',
             }} />
           )}
-          <button className="btn btn-primary">+ Add Agent</button>
+          <button
+            className="btn btn-primary"
+            onClick={() => setInviteModalOpen(true)}
+          >
+            + Add Agent
+          </button>
         </div>
       </div>
 
@@ -526,25 +558,37 @@ export default function Agents() {
             <option value="not_invited">Status: Not Invited</option>
             <option value="pending">Status: Pending</option>
             <option value="expired">Status: Expired</option>
+            <option value="rejected">Status: Rejected</option>
           </select>
 
-          {/* Source filter */}
+          {/* Source filter ── NOW DYNAMICALLY MAPPED FROM DB ── */}
           <select
             value={sourceFilter}
             onChange={e => { setSourceFilter(e.target.value); setPage(1); }}
+            disabled={isSourceLoading}
             style={{
               appearance: 'none', padding: '8px 28px 8px 12px',
               border: `1px solid ${sourceFilter ? 'var(--primary)' : 'var(--border)'}`,
               borderRadius: 'var(--radius-sm)',
               background: sourceFilter ? 'var(--primary-light)' : 'var(--surface)',
               fontSize: 13.5, color: sourceFilter ? 'var(--primary)' : 'var(--text-primary)',
-              cursor: 'pointer', outline: 'none', fontFamily: 'inherit',
+              cursor: isSourceLoading ? 'not-allowed' : 'pointer', 
+              outline: 'none', fontFamily: 'inherit',
               fontWeight: sourceFilter ? 600 : 400, minWidth: 150,
+              opacity: isSourceLoading ? 0.7 : 1,
             }}
           >
-            <option value="">Source: All</option>
-            <option value="zammad">Source: Zammad</option>
-            <option value="espocrm">Source: EspoCRM</option>
+            <option value="">{isSourceLoading ? 'Loading Sources...' : 'Source: All'}</option>
+            {sourceSystems.map(system => {
+              const label = system.system_name.toLowerCase() === 'espocrm' 
+                ? 'EspoCRM' 
+                : system.system_name.charAt(0).toUpperCase() + system.system_name.slice(1);
+              return (
+                <option key={system.id} value={system.system_name}>
+                  Source: {label}
+                </option>
+              );
+            })}
           </select>
 
           {hasActiveFilters && (
@@ -683,12 +727,12 @@ export default function Agents() {
                   {/* Status */}
                   <td onClick={() => goToDetail(a)}>
                     {(() => {
-                      const meta = getAgentStatusMeta(a.status);
+                      const meta = getAgentStatusMeta(a.invitation_status || a.status);
                       const Icon = meta.key === 'not_invited'
                         ? XCircle
                         : meta.key === 'pending'
                           ? Clock3
-                          : meta.key === 'expired'
+                          : meta.key === 'expired' || meta.key === 'rejected'
                             ? AlertTriangle
                             : CheckCircle2;
                       return (
@@ -698,7 +742,6 @@ export default function Agents() {
                       );
                     })()}
                   </td>
-
                   {/* Active */}
                   <td onClick={() => goToDetail(a)}>
                     <span style={{ fontSize: 13.5, fontWeight: 600, color: getAgentIsActive(a) ? '#16A34A' : '#DC2626' }}>
@@ -720,7 +763,7 @@ export default function Agents() {
                   <td onClick={e => e.stopPropagation()} style={{ position: 'relative' }}>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       {getActionButton(a)}
-                      {getAgentStatusMeta(a.status).key === 'active' && (
+                      {getAgentStatusMeta(a.invitation_status || a.status).key === 'active' && (
                         <>
                           <button
                             className="btn btn-ghost"
@@ -798,6 +841,7 @@ export default function Agents() {
         </div>
       </div>
 
+      {/* ── Modals ── */}
       <EditAgentModal
         agent={editingAgent}
         isOpen={!!editingAgent}
@@ -812,6 +856,20 @@ export default function Agents() {
         onClose={() => setDeletingAgent(null)}
         onConfirm={handleDeleteConfirm}
         isDeleting={deleteMutation.isPending}
+      />
+
+      <InviteAgentModal
+        isOpen={inviteModalOpen}
+        onClose={() => {
+          setInviteModalOpen(false);
+          setInviteTargetAgent(null);   // clear target on close
+        }}
+        onSuccess={handleInviteAgentSuccess}
+        // These two props are undefined when "+ Add Agent" opens the modal,
+        // so the modal stays in "new agent" mode. They are set when a row
+        // Invite button is clicked.
+        agentId={inviteTargetAgent?.id ?? null}
+        initialData={inviteTargetAgent ?? null}
       />
     </div>
   );

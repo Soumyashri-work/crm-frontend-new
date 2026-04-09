@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Eye, Search, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Eye, Search, ArrowUp, ArrowDown, ArrowUpDown, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { customerService, customerKeys } from '../../services/customerService';
+// ── ADDED: Import tenantService to fetch dynamic CRMs ──
+import { tenantService, tenantKeys } from '../../services/tenantService';
 import { crmBadgeClass, getInitials, getAvatarColor } from '../../utils/helpers';
 
 const PAGE_SIZE = 20;
@@ -10,13 +12,27 @@ const PAGE_SIZE = 20;
 export default function Customers() {
   const navigate = useNavigate();
 
-  const [search,       setSearch]     = useState('');
-  const [sortField,    setSortField]  = useState('');
-  const [sortDir,      setSortDir]    = useState('asc');
-  const [page,         setPage]       = useState(1);
+  const [search,       setSearch]       = useState('');
+  const [sourceFilter, setSourceFilter] = useState(''); // ── ADDED: Source filter state ──
+  const [sortField,    setSortField]    = useState('');
+  const [sortDir,      setSortDir]      = useState('asc');
+  const [page,         setPage]         = useState(1);
+
+  // ── Fetch dynamic CRM sources for the filters ────────────────────────────
+  const { data: sourceSystems = [], isLoading: isSourceLoading } = useQuery({
+    queryKey: tenantKeys.sourceSystems(),
+    queryFn: () => tenantService.getSourceSystems(),
+    staleTime: 5 * 60 * 1000, // cache for 5 minutes
+  });
 
   // ── Query ─────────────────────────────────────────────────────────────────
-  const queryParams = { page, page_size: PAGE_SIZE };
+  // Note: if your customerService supports backend filtering by source, 
+  // you can pass `source: sourceFilter` here.
+  const queryParams = { 
+    page, 
+    page_size: PAGE_SIZE,
+    ...(sourceFilter ? { source: sourceFilter } : {})
+  };
 
   const {
     data,
@@ -38,13 +54,27 @@ export default function Customers() {
     total_pages: data?.total_pages ?? 1,
   };
 
-  // ── Client-side search + sort on the current page ─────────────────────────
-  const filtered = customers.filter(c =>
-    !search ||
-    c.name?.toLowerCase().includes(search.toLowerCase()) ||
-    c.email?.toLowerCase().includes(search.toLowerCase()) ||
-    c.crm?.toLowerCase().includes(search.toLowerCase())
-  );
+  // ── Client-side search + filter + sort on the current page ────────────────
+  const filtered = customers.filter(c => {
+    // 1. Check CRM filter
+    if (sourceFilter) {
+      // Normalize comparison in case DB returns varying cases
+      const crmMatch = String(c.crm || c.source_system || '').toLowerCase() === String(sourceFilter).toLowerCase();
+      if (!crmMatch) return false;
+    }
+    
+    // 2. Check Search query
+    if (search) {
+      const q = search.toLowerCase();
+      return (
+        c.name?.toLowerCase().includes(q) ||
+        c.email?.toLowerCase().includes(q) ||
+        c.crm?.toLowerCase().includes(q)
+      );
+    }
+
+    return true;
+  });
 
   const sorted = sortField ? [...filtered].sort((a, b) => {
     let av = a[sortField] ?? '', bv = b[sortField] ?? '';
@@ -57,6 +87,14 @@ export default function Customers() {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortField(field); setSortDir('asc'); }
   };
+
+  const clearFilters = () => {
+    setSearch('');
+    setSourceFilter('');
+    setPage(1);
+  };
+
+  const hasActiveFilters = Boolean(search || sourceFilter);
 
   const SortIcon = ({ field }) => {
     if (sortField !== field) return <ArrowUpDown size={13} style={{ opacity: 0.35, marginLeft: 4 }} />;
@@ -141,11 +179,12 @@ export default function Customers() {
         </div>
       )}
 
-      <div className="card" style={{ overflow: 'hidden' }}>
-
-        {/* Search */}
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ position: 'relative', maxWidth: 400 }}>
+      {/* Search + Filters Container */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="card" style={{ padding: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          
+          {/* Search Input */}
+          <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
             <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
             <input
               className="form-input"
@@ -155,8 +194,85 @@ export default function Customers() {
               onChange={e => { setSearch(e.target.value); setPage(1); }}
             />
           </div>
+
+          {/* CRM Source Filter (Dynamically Loaded) */}
+          <select
+            value={sourceFilter}
+            onChange={e => { setSourceFilter(e.target.value); setPage(1); }}
+            disabled={isSourceLoading}
+            style={{
+              appearance: 'none', padding: '8px 28px 8px 12px',
+              border: `1px solid ${sourceFilter ? 'var(--primary)' : 'var(--border)'}`,
+              borderRadius: 'var(--radius-sm)',
+              background: sourceFilter ? 'var(--primary-light)' : 'var(--surface)',
+              fontSize: 13.5, color: sourceFilter ? 'var(--primary)' : 'var(--text-primary)',
+              cursor: isSourceLoading ? 'not-allowed' : 'pointer', 
+              outline: 'none', fontFamily: 'inherit',
+              fontWeight: sourceFilter ? 600 : 400, minWidth: 160,
+              opacity: isSourceLoading ? 0.7 : 1,
+            }}
+          >
+            <option value="">{isSourceLoading ? 'Loading Sources...' : 'All CRM Systems'}</option>
+            {sourceSystems.map(system => {
+              const label = system.system_name.toLowerCase() === 'espocrm' 
+                ? 'EspoCRM' 
+                : system.system_name.charAt(0).toUpperCase() + system.system_name.slice(1);
+              return (
+                <option key={system.id} value={system.system_name}>
+                  {label}
+                </option>
+              );
+            })}
+          </select>
+
+          {/* Clear Filters Button */}
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              style={{
+                padding: '8px 12px', border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)', background: 'transparent',
+                cursor: 'pointer', fontSize: 13, color: 'var(--text-secondary)',
+                fontFamily: 'inherit', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.color = 'var(--primary)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+            >
+              Clear Filters
+            </button>
+          )}
         </div>
 
+        {/* Active Filter Pills */}
+        {hasActiveFilters && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>Active Filters:</span>
+            {[
+              sourceFilter && { label: `CRM: ${sourceFilter}`, onRemove: () => { setSourceFilter(''); setPage(1); } },
+              search       && { label: `Search: ${search}`,    onRemove: () => { setSearch(''); setPage(1); } },
+            ].filter(Boolean).map(({ label, onRemove }) => (
+              <div key={label} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '4px 10px',
+                backgroundColor: 'var(--primary-light)',
+                border: '1px solid var(--primary)',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: 12, color: 'var(--primary)', fontWeight: 500,
+              }}>
+                {label}
+                <button
+                  onClick={onRemove}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center' }}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ overflow: 'hidden' }}>
         {/* Table */}
         <div className="table-wrap">
           <table>
@@ -175,7 +291,7 @@ export default function Customers() {
               {sorted.length === 0 ? (
                 <tr>
                   <td colSpan={5} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
-                    {search ? 'No customers match your search.' : 'No customers found.'}
+                    {hasActiveFilters ? 'No customers match your filters.' : 'No customers found.'}
                   </td>
                 </tr>
               ) : sorted.map((c, i) => (
@@ -195,7 +311,7 @@ export default function Customers() {
                   </td>
                   <td style={{ color: 'var(--text-secondary)', fontSize: 13.5 }}>{c.email || '—'}</td>
                   <td style={{ color: 'var(--text-secondary)', fontSize: 13.5 }}>{c.phone || '—'}</td>
-                  <td><span className={crmBadgeClass(c.crm)}>{c.crm}</span></td>
+                  <td><span className={crmBadgeClass(c.crm || c.source_system)}>{c.crm || c.source_system}</span></td>
                   <td onClick={e => e.stopPropagation()}>
                     <button
                       className="btn btn-ghost"
@@ -219,7 +335,7 @@ export default function Customers() {
         }}>
           <span>
             {pagination.total} customer{pagination.total !== 1 ? 's' : ''} total
-            {search ? ` — ${sorted.length} shown` : ''}
+            {hasActiveFilters ? ` — ${sorted.length} shown` : ''}
           </span>
           {pagination.total_pages > 1 && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
