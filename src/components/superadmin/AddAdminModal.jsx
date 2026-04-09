@@ -52,7 +52,8 @@ export default function AddAdminModal({ isOpen, onClose, onSubmit }) {
   function validate() {
     const e = {};
     if (!form.tenant_id)           e.tenant_id   = 'Please select a tenant.';
-    if (!form.admin_name.trim())   e.admin_name  = 'Admin full name is required.';
+    if (!form.first_name.trim())   e.first_name  = 'First name is required.';
+    if (!form.last_name.trim())    e.last_name   = 'Last name is required.';
     if (!form.admin_email.trim())  e.admin_email = 'Admin email is required.';
     else if (!/\S+@\S+\.\S+/.test(form.admin_email)) e.admin_email = 'Enter a valid email.';
     return e;
@@ -67,7 +68,8 @@ export default function AddAdminModal({ isOpen, onClose, onSubmit }) {
     try {
       const result = await superAdminService.inviteAdmin({
         tenant_id:   form.tenant_id,
-        admin_name:  form.admin_name.trim(),
+        first_name:  form.first_name.trim(),
+        last_name:   form.last_name.trim(),
         admin_email: form.admin_email.trim(),
       });
       onSubmit(result);
@@ -131,14 +133,24 @@ export default function AddAdminModal({ isOpen, onClose, onSubmit }) {
                 {!errors.tenant_id && !tenantsError && <p style={s.hint}>Select which organization this admin belongs to</p>}
               </div>
 
-              <Field label="Admin Full Name" required error={errors.admin_name}>
-                <div style={s.inputWrap}>
-                  <User size={15} style={s.inputIcon} />
-                  <input style={{ ...s.input, paddingLeft: 36, borderColor: errors.admin_name ? 'var(--danger)' : undefined }}
-                    placeholder="e.g. John Anderson" value={form.admin_name}
-                    onChange={e => field('admin_name', e.target.value)} autoFocus />
-                </div>
-              </Field>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <Field label="First Name" required error={errors.first_name}>
+                  <div style={s.inputWrap}>
+                    <User size={15} style={s.inputIcon} />
+                    <input style={{ ...s.input, paddingLeft: 36, borderColor: errors.first_name ? 'var(--danger)' : undefined }}
+                      placeholder="e.g. John" value={form.first_name}
+                      onChange={e => field('first_name', e.target.value)} autoFocus />
+                  </div>
+                </Field>
+                <Field label="Last Name" required error={errors.last_name}>
+                  <div style={s.inputWrap}>
+                    <User size={15} style={s.inputIcon} />
+                    <input style={{ ...s.input, paddingLeft: 36, borderColor: errors.last_name ? 'var(--danger)' : undefined }}
+                      placeholder="e.g. Anderson" value={form.last_name}
+                      onChange={e => field('last_name', e.target.value)} />
+                  </div>
+                </Field>
+              </div>
 
               <Field label="Admin Email" required error={errors.admin_email} hint="An invite link will be sent to this address">
                 <div style={s.inputWrap}>
@@ -263,7 +275,7 @@ function Field({ label, required, error, hint, children }) {
   );
 }
 
-const EMPTY_FORM    = { tenant_id: '', admin_name: '', admin_email: '' };
+const EMPTY_FORM    = { tenant_id: '', first_name: '', last_name: '', admin_email: '' };
 const GLOBAL_STYLES = `@keyframes spin { to { transform: rotate(360deg); } }`;
 
 const s = {

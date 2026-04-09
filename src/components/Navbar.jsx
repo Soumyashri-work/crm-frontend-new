@@ -30,6 +30,7 @@ export default function Navbar({ title = 'Unified Tickets Dashboard' }) {
       display: 'flex', alignItems: 'center',
       padding: '0 24px', gap: 16,
       position: 'sticky', top: 0, zIndex: 100,
+      lineHeight: 1,
     }}>
       {/* Organization name — left side */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 140 }}>

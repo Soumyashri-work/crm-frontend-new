@@ -134,7 +134,7 @@ export const superAdminService = {
 
   /**
    * POST /api/v1/super-admin/admins/invite
-   * @param {{ tenant_id: string, admin_email: string, admin_name: string }} data
+   * @param {{ tenant_id: string, admin_email: string, first_name: string, last_name: string }} data
    */
   inviteAdmin: async (data) => {
     const res = await api.post('/super-admin/admins/invite', data);
