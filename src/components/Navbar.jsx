@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-export default function Navbar({ title = 'Unified Tickets Dashboard' }) {
+export default function Navbar({ title = 'Unified CRM Ticket Dashboard' }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [dropOpen, setDropOpen] = useState(false);

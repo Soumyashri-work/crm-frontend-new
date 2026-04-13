@@ -30,7 +30,6 @@ export default function AgentDashboard() {
     setSort(s => ({ field, dir: s.field === field && s.dir === 'asc' ? 'desc' : 'asc' }));
   };
 
-  // Build chart data from agent stats
   const statusData = stats ? [
     { name: 'Open',    value: stats.by_status?.open    || 0, color: '#2563EB' },
     { name: 'Closed',  value: stats.by_status?.closed  || 0, color: '#10B981' },
@@ -47,8 +46,8 @@ export default function AgentDashboard() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700 }}>My Dashboard</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, marginTop: 2 }}>
+        <h1>Unified CRM Ticket Dashboard</h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 6 }}>
           Hi {user?.name?.split(' ')[0] || 'there'}! Here are your assigned tickets.
         </p>
       </div>
@@ -57,7 +56,7 @@ export default function AgentDashboard() {
       <Charts statusData={statusData} priorityData={priorityData} />
 
       <div>
-        <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>My Recent Tickets</h3>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>My Recent Tickets</h3>
         <TicketTable
           tickets={myTickets}
           loading={loading}
