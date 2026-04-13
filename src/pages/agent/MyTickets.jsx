@@ -10,7 +10,6 @@ const DEFAULT_PAGE_SIZE = 20;
 
 export default function MyTickets() {
   const { user } = useAuth();
-  console.log(user);
 
   const [filters, setFilters] = useState({});
   const [search,  setSearch]  = useState('');
@@ -19,15 +18,12 @@ export default function MyTickets() {
 
   const agentId = user?.agent_id;
 
-  // Server-side filter params included in the cache key —
-  // a new key = new fetch, same key = cache hit.
   const queryParams = {
     page,
     page_size:       DEFAULT_PAGE_SIZE,
     status:          filters.status   || undefined,
     priority:        filters.priority || undefined,
-    // Pass the CRM filter to the backend if supported, otherwise we filter client-side
-    source_system:   filters.crm      || undefined, 
+    source_system:   filters.source_system || undefined,
     include_deleted: false,
   };
 
@@ -41,7 +37,7 @@ export default function MyTickets() {
   } = useQuery({
     queryKey: ticketKeys.byAgent(agentId, queryParams),
     queryFn:  () => ticketService.getByAgent(agentId, queryParams),
-    enabled:  !!agentId, // don't fire until we have an agentId
+    enabled:  !!agentId,
     placeholderData: (prev) => prev,
     staleTime: 30_000,
   });
@@ -53,27 +49,21 @@ export default function MyTickets() {
     total_pages: data?.total_pages ?? 1,
   };
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
   const handleSort = (field) =>
     setSort(s => ({ field, dir: s.field === field && s.dir === 'asc' ? 'desc' : 'asc' }));
 
   const handlePageChange = (newPage) => setPage(newPage);
 
-  // Reset to page 1 when server-side filters change
   const handleFiltersChange = (newFilters) => {
     setFilters(newFilters);
     setPage(1);
   };
 
-  // Client-side search + fallback CRM filter
   const filtered = tickets.filter(ticket => {
-    // Fallback: If backend doesn't filter by source_system on the agent route, do it here
-    if (filters.crm) {
+    if (filters.source_system) {
       const ticketCrm = ticket.crm || ticket.source_system || '';
-      if (ticketCrm.toLowerCase() !== filters.crm.toLowerCase()) return false;
+      if (ticketCrm.toLowerCase() !== filters.source_system.toLowerCase()) return false;
     }
-
-    // Client-side text search
     if (search) {
       const q = search.toLowerCase();
       return (
@@ -81,51 +71,43 @@ export default function MyTickets() {
         ticket.crm_id?.toLowerCase().includes(q)
       );
     }
-    
     return true;
   });
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* Breadcrumb + heading */}
+      {/* Header */}
       <div>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>
-          Dashboard › <span style={{ color: 'var(--text-primary)' }}>My Tickets</span>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 500 }}>
+          Dashboard <span style={{ margin: '0 4px' }}>›</span>
+          <span style={{ color: 'var(--text-secondary)' }}>My Tickets</span>
         </div>
-        <h2 style={{ fontSize: 20, fontWeight: 700 }}>My Tickets</h2>
+        <h1>My Tickets</h1>
       </div>
 
       {/* Search + Filters */}
-      <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <Search size={16} style={{
-              position: 'absolute', left: 12, top: '50%',
-              transform: 'translateY(-50%)', color: 'var(--text-muted)',
-              pointerEvents: 'none',
-            }} />
-            <input
-              className="form-input"
-              style={{ width: '100%', paddingLeft: 36 }}
-              placeholder="Search tickets by title or CRM ID…"
-              value={search}
-              onChange={e => { setSearch(e.target.value); setPage(1); }}
-            />
-          </div>
-
-          {/* Subtle background-refetch indicator */}
+      <div className="filter-toolbar">
+        {/* Full-width search */}
+        <div className="filter-search-row">
+          <Search size={16} className="filter-search-icon" />
+          <input
+            className="filter-search-input"
+            placeholder="Search tickets by title or CRM ID…"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+          />
           {isFetching && !isLoading && (
             <div style={{
-              width: 8, height: 8, borderRadius: '50%',
+              position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+              width: 7, height: 7, borderRadius: '50%',
               background: 'var(--primary)', opacity: 0.6,
               animation: 'pulse 1s ease-in-out infinite',
             }} />
           )}
         </div>
 
-        {/* Filters drive server-side params via handleFiltersChange */}
+        {/* Dropdowns */}
         <Filters filters={filters} onChange={handleFiltersChange} />
       </div>
 
@@ -134,13 +116,13 @@ export default function MyTickets() {
         <div style={{
           padding: '12px 16px', borderRadius: 'var(--radius-sm)',
           background: '#FEF2F2', border: '1px solid #FCA5A5',
-          color: '#DC2626', fontSize: 13.5,
+          color: '#B91C1C', fontSize: 13.5,
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <span>{error?.message ?? 'Failed to load your tickets.'}</span>
           <button
             onClick={() => refetch()}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', fontWeight: 600, fontFamily: 'inherit' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#B91C1C', fontWeight: 600, fontFamily: 'inherit' }}
           >
             Retry
           </button>
@@ -154,7 +136,6 @@ export default function MyTickets() {
         </div>
       )}
 
-      {/* Table – pass empty filters to avoid double-filtering status/priority since backend did it */}
       <TicketTable
         tickets={filtered}
         loading={isLoading}
@@ -176,7 +157,7 @@ export default function MyTickets() {
             {pagination.total} ticket{pagination.total !== 1 ? 's' : ''} total
             {search ? ` — ${filtered.length} shown after search` : ''}
           </span>
-          
+
           {pagination.total_pages > 1 && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <button

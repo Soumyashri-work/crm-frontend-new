@@ -1,140 +1,145 @@
-import { ChevronDown, X } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { tenantService, tenantKeys } from '../services/tenantService';
+/**
+ * components/Filters.jsx
+ *
+ * Unified filter toolbar used across Tickets pages.
+ * Layout: full-width search on top, dropdowns aligned left below.
+ * Matches the strict design template with outlined dropdowns + chevron icons.
+ */
 
-function FilterSelect({ label, options, value, onChange, disabled = false }) {
-  const active = !!value;
-  return (
-    <div style={{ position: 'relative' }}>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        disabled={disabled}
-        style={{
-          appearance: 'none',
-          padding: '8px 32px 8px 12px',
-          border: `1px solid ${active ? 'var(--primary)' : 'var(--border)'}`,
-          borderRadius: 'var(--radius-sm)',
-          background: active ? 'var(--primary-light)' : disabled ? 'var(--surface-2)' : 'var(--surface)',
-          fontSize: 13.5,
-          color: active ? 'var(--primary)' : disabled ? 'var(--text-muted)' : 'var(--text-primary)',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          outline: 'none',
-          fontFamily: 'inherit',
-          fontWeight: active ? 600 : 500,
-          minWidth: 130,
-          transition: 'all 0.15s',
-          opacity: disabled ? 0.7 : 1,
-        }}
-      >
-        <option value="">{label}</option>
-        {options.map(o => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
-      <ChevronDown size={14} style={{
-        position: 'absolute', right: 10, top: '50%',
-        transform: 'translateY(-50%)', pointerEvents: 'none',
-        color: active ? 'var(--primary)' : 'var(--text-muted)',
-      }} />
-    </div>
-  );
-}
+import { Search, ChevronDown } from 'lucide-react';
 
-export default function Filters({ filters, onChange, extraFilters = [] }) {
-  // ── Fetch dynamic CRM sources scoped to this tenant ──
-  const { data: sourceSystems = [], isLoading: isCrmLoading } = useQuery({
-    queryKey: tenantKeys.sourceSystems(),
-    queryFn: () => tenantService.getSourceSystems(),
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes globally
-  });
+const STATUS_OPTIONS = [
+  { value: '',           label: 'All' },
+  { value: 'open',       label: 'Open' },
+  { value: 'closed',     label: 'Closed' },
+  { value: 'pending',    label: 'Pending' },
+  { value: 'in_progress',label: 'In Progress' },
+];
 
-  // Map the backend DB values into the { value, label } shape
-  const dynamicCrmOpts = sourceSystems.map(system => {
-    // e.g., "espocrm" -> "Espocrm", "zammad" -> "Zammad"
-    // Adjust capitalization logic here if you want specific branding like "EspoCRM"
-    const label = system.system_name.toLowerCase() === 'espocrm' 
-      ? 'EspoCRM' 
-      : system.system_name.charAt(0).toUpperCase() + system.system_name.slice(1);
-    
-    return {
-      value: system.system_name,
-      label: label
-    };
-  });
+const PRIORITY_OPTIONS = [
+  { value: '',       label: 'All' },
+  { value: 'urgent', label: 'Urgent' },
+  { value: 'high',   label: 'High' },
+  { value: 'normal', label: 'Normal' },
+  { value: 'low',    label: 'Low' },
+];
 
-  const statusOpts = [
-    { value: 'open',    label: 'Open'        },
-    { value: 'closed',  label: 'Closed'      },
-    { value: 'pending', label: 'Pending'     },
-  ];
+const SOURCE_OPTIONS = [
+  { value: '',        label: 'All' },
+  { value: 'EspoCRM', label: 'EspoCRM' },
+  { value: 'Zammad',  label: 'Zammad' },
+];
 
-  const priorityOpts = [
-    { value: 'urgent', label: 'Urgent' },
-    { value: 'high',   label: 'High'   },
-    { value: 'normal', label: 'Normal' },
-    { value: 'low',    label: 'Low'    },
-  ];
-
-  const hasActiveFilters = filters.status || filters.priority || filters.crm ||
-    extraFilters.some(f => filters[f.key]);
-
-  const clearAll = () => {
-    const cleared = { ...filters };
-    delete cleared.status;
-    delete cleared.priority;
-    delete cleared.crm;
-    extraFilters.forEach(f => delete cleared[f.key]);
-    onChange(cleared);
-  };
+/**
+ * Props:
+ *   filters   – { status?, priority?, source_system? }
+ *   onChange  – (newFilters) => void
+ *   search    – string (optional, if parent manages search)
+ *   onSearch  – (val: string) => void (optional)
+ *   placeholder – string (optional, page-specific search placeholder)
+ */
+export default function Filters({
+  filters = {},
+  onChange,
+  search,
+  onSearch,
+  placeholder = 'Search…',
+}) {
+  const set = (key, val) => onChange({ ...filters, [key]: val || undefined });
 
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
-      <FilterSelect
-        label="All Status"
-        options={statusOpts}
-        value={filters.status || ''}
-        onChange={v => onChange({ ...filters, status: v || undefined })}
-      />
-      <FilterSelect
-        label="All Priorities"
-        options={priorityOpts}
-        value={filters.priority || ''}
-        onChange={v => onChange({ ...filters, priority: v || undefined })}
-      />
-      
-      {/* ── Now driven entirely by the database ── */}
-      <FilterSelect
-        label={isCrmLoading ? 'Loading CRMs...' : 'All CRM Sources'}
-        options={dynamicCrmOpts}
-        value={filters.crm || ''}
-        disabled={isCrmLoading}
-        onChange={v => onChange({ ...filters, crm: v || undefined })}
-      />
-      
-      {extraFilters.map(f => (
-        <FilterSelect
-          key={f.key} label={f.label} options={f.options}
-          value={filters[f.key] || ''}
-          onChange={v => onChange({ ...filters, [f.key]: v || undefined })}
-        />
-      ))}
-      {hasActiveFilters && (
-        <button
-          onClick={clearAll}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: '7px 12px', border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-sm)', background: 'none',
-            cursor: 'pointer', fontSize: 13, color: 'var(--text-secondary)',
-            fontFamily: 'inherit', transition: 'all 0.15s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.borderColor = 'var(--danger)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
-        >
-          <X size={13} /> Clear filters
-        </button>
+    <div className="filter-toolbar">
+      {/* ── Top row: full-width search ── */}
+      {onSearch !== undefined && (
+        <div className="filter-search-row">
+          <Search size={16} className="filter-search-icon" />
+          <input
+            className="filter-search-input"
+            placeholder={placeholder}
+            value={search ?? ''}
+            onChange={e => onSearch(e.target.value)}
+          />
+        </div>
       )}
+
+      {/* ── Bottom row: dropdowns ── */}
+      <div className="filter-dropdowns-row">
+
+        {/* Status */}
+        <div className="filter-select-wrap">
+          <select
+            className={`filter-select${filters.status ? ' active' : ''}`}
+            value={filters.status ?? ''}
+            onChange={e => set('status', e.target.value)}
+          >
+            <option value="" disabled hidden>Status</option>
+            {STATUS_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>
+                {o.value === '' ? 'Status: All' : o.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={13} className="filter-chevron" />
+        </div>
+
+        {/* Priority */}
+        <div className="filter-select-wrap">
+          <select
+            className={`filter-select${filters.priority ? ' active' : ''}`}
+            value={filters.priority ?? ''}
+            onChange={e => set('priority', e.target.value)}
+          >
+            <option value="" disabled hidden>Priority</option>
+            {PRIORITY_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>
+                {o.value === '' ? 'Priority: All' : o.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={13} className="filter-chevron" />
+        </div>
+
+        {/* Source CRM */}
+        <div className="filter-select-wrap">
+          <select
+            className={`filter-select${filters.source_system ? ' active' : ''}`}
+            value={filters.source_system ?? ''}
+            onChange={e => set('source_system', e.target.value)}
+          >
+            <option value="" disabled hidden>Source CRM</option>
+            {SOURCE_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>
+                {o.value === '' ? 'Source CRM: All' : o.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={13} className="filter-chevron" />
+        </div>
+
+        {/* Clear button — only when active */}
+        {(filters.status || filters.priority || filters.source_system) && (
+          <button
+            onClick={() => onChange({})}
+            style={{
+              padding: '8px 12px',
+              border: '1.5px solid var(--border-dark)',
+              borderRadius: 'var(--radius-sm)',
+              background: 'transparent',
+              cursor: 'pointer',
+              fontSize: 12.5,
+              fontWeight: 500,
+              color: 'var(--text-secondary)',
+              fontFamily: 'inherit',
+              transition: 'all 0.15s',
+              whiteSpace: 'nowrap',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.color = 'var(--primary)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+          >
+            Clear Filters
+          </button>
+        )}
+      </div>
     </div>
   );
 }

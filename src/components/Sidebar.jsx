@@ -65,7 +65,7 @@ export default function Sidebar({ isAdmin }) {
         {!collapsed && (
           <div style={{ lineHeight: 1.2, display: 'flex', flexDirection: 'column', gap: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.2, margin: 0 }}>Unified CRM</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, lineHeight: 1.2, margin: 0 }}>Ticket System</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, lineHeight: 1.2, margin: 0 }}>Ticket Dashboard</div>
           </div>
         )}
       </div>

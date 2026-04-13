@@ -1,12 +1,3 @@
-/**
- * pages/admin/AdminTickets.jsx
- *
- * Uses React Query so the GET /tickets/ result is shared with the dashboard.
- * When the user navigates here from the dashboard, the cached data is served
- * instantly — no extra network call is made unless the data is stale
- * (default staleTime: 30 s, see QueryClient setup).
- */
-
 import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -23,9 +14,6 @@ export default function AdminTickets() {
   const [page,           setPage]           = useState(1);
   const [includeDeleted, setIncludeDeleted] = useState(false);
 
-  // ── Query params object – drives the cache key ──────────────────────────
-  // When these values match what the dashboard already fetched (e.g. page 1,
-  // no deleted), React Query returns the cached result immediately.
   const queryParams = {
     page,
     page_size:       DEFAULT_PAGE_SIZE,
@@ -42,9 +30,8 @@ export default function AdminTickets() {
   } = useQuery({
     queryKey: ticketKeys.list(queryParams),
     queryFn:  () => ticketService.getAll(queryParams),
-    // Keep previous page data visible while new page loads (no flash of empty)
     placeholderData: (prev) => prev,
-    staleTime: 30_000, // treat cached data as fresh for 30 s
+    staleTime: 30_000,
   });
 
   const tickets    = data?.items        ?? [];
@@ -54,18 +41,11 @@ export default function AdminTickets() {
     total_pages: data?.total_pages ?? 1,
   };
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
   const handleSort = (field) =>
     setSort(s => ({ field, dir: s.field === field && s.dir === 'asc' ? 'desc' : 'asc' }));
 
   const handlePageChange = (newPage) => setPage(newPage);
 
-  const handleDeletedToggle = (e) => {
-    setIncludeDeleted(e.target.checked);
-    setPage(1); // reset to page 1 whenever the scope changes
-  };
-
-  // ── Client-side search + filter + sort on top of the fetched page ─────────
   const filtered = tickets
     .filter(ticket => {
       const q = search.toLowerCase();
@@ -76,8 +56,8 @@ export default function AdminTickets() {
       );
     })
     .filter(ticket => {
-      if (filters.status   && ticket.status   !== filters.status)   return false;
-      if (filters.priority && ticket.priority !== filters.priority)  return false;
+      if (filters.status        && ticket.status        !== filters.status)        return false;
+      if (filters.priority      && ticket.priority      !== filters.priority)      return false;
       if (filters.source_system && ticket.source_system !== filters.source_system) return false;
       return true;
     })
@@ -88,46 +68,45 @@ export default function AdminTickets() {
         : String(val(b)).localeCompare(String(val(a)));
     });
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* Breadcrumb */}
-      <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-        <a href="/admin/dashboard" style={{ color: 'var(--text-muted)' }}>Dashboard</a>
-        <span style={{ margin: '0 6px' }}>›</span>
-        <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>Tickets</span>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 500 }}>
+            <a href="/admin/dashboard" style={{ color: 'var(--text-muted)' }}>Dashboard</a>
+            <span style={{ margin: '0 6px' }}>›</span>
+            <span style={{ color: 'var(--text-secondary)' }}>Tickets</span>
+          </div>
+          <h1>Tickets</h1>
+        </div>
+        {isFetching && !isLoading && (
+          <div style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: 'var(--primary)', opacity: 0.6,
+            animation: 'pulse 1s ease-in-out infinite', marginBottom: 8,
+          }} />
+        )}
       </div>
 
       {/* Search + Filters */}
-      <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <Search size={16} style={{
-              position: 'absolute', left: 12, top: '50%',
-              transform: 'translateY(-50%)', color: 'var(--text-muted)',
-              pointerEvents: 'none',
-            }} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        <div className="filter-toolbar">
+          {/* Full-width search */}
+          <div className="filter-search-row">
+            <Search size={16} className="filter-search-icon" />
             <input
-              className="form-input"
-              style={{ width: '100%', paddingLeft: 36 }}
+              className="filter-search-input"
               placeholder="Search by title or CRM ticket ID…"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
           </div>
 
-          {/* Subtle "refetching" indicator */}
-          {isFetching && !isLoading && (
-            <div style={{
-              width: 8, height: 8, borderRadius: '50%',
-              background: 'var(--primary)', opacity: 0.6,
-              animation: 'pulse 1s ease-in-out infinite',
-            }} />
-          )}
+          {/* Dropdowns row */}
+          <Filters filters={filters} onChange={setFilters} />
         </div>
-
-        <Filters filters={filters} onChange={setFilters} />
       </div>
 
       {/* Error banner */}
@@ -135,13 +114,13 @@ export default function AdminTickets() {
         <div style={{
           padding: '12px 16px', borderRadius: 'var(--radius-sm)',
           background: '#FEF2F2', border: '1px solid #FCA5A5',
-          color: '#DC2626', fontSize: 13.5,
+          color: '#B91C1C', fontSize: 13.5,
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <span>{error?.message ?? 'Failed to load tickets.'}</span>
           <button
             onClick={() => refetch()}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', fontWeight: 600, fontSize: 13, fontFamily: 'inherit', padding: '0 4px' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#B91C1C', fontWeight: 600, fontSize: 13, fontFamily: 'inherit', padding: '0 4px' }}
           >
             Retry
           </button>
@@ -159,7 +138,7 @@ export default function AdminTickets() {
         search={search}
       />
 
-      {/* Pagination + row count */}
+      {/* Pagination */}
       {!isLoading && !isError && (
         <div style={{
           display: 'flex', justifyContent: 'space-between',

@@ -8,16 +8,12 @@ const RECENT_PARAMS = { page: 1, page_size: 5 };
 
 export default function AdminDashboard() {
 
-  // ── Stats ─────────────────────────────────────────────────────────────────
   const { data: stats } = useQuery({
     queryKey: ticketKeys.stats(),
     queryFn:  ticketService.getStats,
-    staleTime: 60_000,   // stats change slowly — cache for 1 min
+    staleTime: 60_000,
   });
 
-  // ── Recent tickets ────────────────────────────────────────────────────────
-  // queryKey matches what Tickets.jsx uses for page 1 — cache is shared,
-  // so navigating Dashboard → Tickets shows data instantly with no refetch.
   const {
     data: recentData,
     isLoading: ticketsLoading,
@@ -29,7 +25,6 @@ export default function AdminDashboard() {
 
   const recentTickets = recentData?.items ?? [];
 
-  // ── Chart data derived from stats ─────────────────────────────────────────
   const statusData = stats ? [
     { name: 'Open',    value: stats.by_status?.open    || 0, color: '#2563EB' },
     { name: 'Closed',  value: stats.by_status?.closed  || 0, color: '#10B981' },
@@ -46,8 +41,8 @@ export default function AdminDashboard() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700 }}>Dashboard</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, marginTop: 2 }}>
+        <h1>Unified CRM Ticket Dashboard</h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 6 }}>
           Welcome back! Here's what's happening today.
         </p>
       </div>
@@ -57,8 +52,8 @@ export default function AdminDashboard() {
 
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 600 }}>Recent Tickets</h3>
-          <a href="/admin/tickets" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 500 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700 }}>Recent Tickets</h3>
+          <a href="/admin/tickets" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
             View all →
           </a>
         </div>

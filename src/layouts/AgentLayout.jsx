@@ -6,10 +6,12 @@ export default function AgentLayout() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
       <Sidebar isAdmin={false} />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <Navbar />
         <main style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
-          <Outlet />
+          <div className="main-content-wrapper">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>
