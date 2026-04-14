@@ -52,11 +52,7 @@ export default function DashboardWidgets({ stats }) {
   ] : WIDGETS;
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-      gap: 16,
-    }}>
+    <div className="widget-grid">
       {widgets.map((w, i) => {
         const Icon = w.icon;
         return (
@@ -77,12 +73,12 @@ export default function DashboardWidgets({ stats }) {
                 width: 40, height: 40, borderRadius: 10,
                 background: w.bg, display: 'flex',
                 alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
               }}>
                 <Icon size={20} color={w.color} />
               </div>
-
             </div>
-            <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.5px', lineHeight: 1 }}>
+            <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.5px', lineHeight: 1, wordBreak: 'break-word' }}>
               {w.value}
             </div>
             <div style={{ marginTop: 4, fontSize: 13.5, color: 'var(--text-secondary)' }}>

@@ -7,17 +7,13 @@ import { ticketService, ticketKeys } from '../../services/ticketService';
 const RECENT_PARAMS = { page: 1, page_size: 5 };
 
 export default function AdminDashboard() {
-
   const { data: stats } = useQuery({
     queryKey: ticketKeys.stats(),
     queryFn:  ticketService.getStats,
     staleTime: 60_000,
   });
 
-  const {
-    data: recentData,
-    isLoading: ticketsLoading,
-  } = useQuery({
+  const { data: recentData, isLoading: ticketsLoading } = useQuery({
     queryKey: ticketKeys.list(RECENT_PARAMS),
     queryFn:  () => ticketService.getAll(RECENT_PARAMS),
     staleTime: 30_000,
@@ -39,9 +35,9 @@ export default function AdminDashboard() {
   ].filter(d => d.tickets > 0) : null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <>
       <div>
-        <h1>Unified CRM Ticket Dashboard</h1>
+        <h1>Dashboard</h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 6 }}>
           Welcome back! Here's what's happening today.
         </p>
@@ -52,13 +48,11 @@ export default function AdminDashboard() {
 
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700 }}>Recent Tickets</h3>
-          <a href="/admin/tickets" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
-            View all →
-          </a>
+          <h3>Recent Tickets</h3>
+          <a href="/admin/tickets" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>View all →</a>
         </div>
         <TicketTable tickets={recentTickets} loading={ticketsLoading} />
       </div>
-    </div>
+    </>
   );
 }

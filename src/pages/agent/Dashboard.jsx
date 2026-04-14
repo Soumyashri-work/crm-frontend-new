@@ -7,28 +7,19 @@ import TicketTable from '../../components/TicketTable';
 
 export default function AgentDashboard() {
   const { user } = useAuth();
-  const [stats, setStats]         = useState(null);
+  const [stats, setStats]       = useState(null);
   const [myTickets, setMyTickets] = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [sort, setSort]           = useState({ field: 'updated', dir: 'desc' });
+  const [loading, setLoading]   = useState(true);
+  const [sort, setSort]         = useState({ field: 'updated', dir: 'desc' });
 
   useEffect(() => {
     if (!user?.agent_id) return;
-
-    ticketService.getAgentStats(user.agent_id)
-      .then(data => setStats(data))
-      .catch(() => setStats(null));
-
+    ticketService.getAgentStats(user.agent_id).then(d => setStats(d)).catch(() => setStats(null));
     ticketService.getByAgent(user.agent_id, { page: 1, page_size: 5 })
-      .then(data => setMyTickets(data.items ?? []))
+      .then(d => setMyTickets(d.items ?? []))
       .catch(() => setMyTickets([]))
       .finally(() => setLoading(false));
-
   }, [user?.agent_id]);
-
-  const handleSort = (field) => {
-    setSort(s => ({ field, dir: s.field === field && s.dir === 'asc' ? 'desc' : 'asc' }));
-  };
 
   const statusData = stats ? [
     { name: 'Open',    value: stats.by_status?.open    || 0, color: '#2563EB' },
@@ -44,9 +35,9 @@ export default function AgentDashboard() {
   ].filter(d => d.tickets > 0) : null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <>
       <div>
-        <h1>Unified CRM Ticket Dashboard</h1>
+        <h1>Dashboard</h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 6 }}>
           Hi {user?.name?.split(' ')[0] || 'there'}! Here are your assigned tickets.
         </p>
@@ -56,16 +47,11 @@ export default function AgentDashboard() {
       <Charts statusData={statusData} priorityData={priorityData} />
 
       <div>
-        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>My Recent Tickets</h3>
-        <TicketTable
-          tickets={myTickets}
-          loading={loading}
-          isAgent
-          onSort={handleSort}
-          sortField={sort.field}
-          sortDir={sort.dir}
-        />
+        <h3 style={{ marginBottom: 12 }}>My Recent Tickets</h3>
+        <TicketTable tickets={myTickets} loading={loading} isAgent
+          onSort={f => setSort(s => ({ field: f, dir: s.field === f && s.dir === 'asc' ? 'desc' : 'asc' }))}
+          sortField={sort.field} sortDir={sort.dir} />
       </div>
-    </div>
+    </>
   );
 }

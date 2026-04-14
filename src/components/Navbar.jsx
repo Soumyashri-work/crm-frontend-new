@@ -32,7 +32,7 @@ export default function Navbar({ title = 'Unified CRM Ticket Dashboard' }) {
       position: 'sticky', top: 0, zIndex: 100,
       lineHeight: 1,
     }}>
-      {/* Organization name — left side */}
+      {/* Organization name — left side (hidden on mobile) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 140 }}>
         <div style={{
           width: 32, height: 32, borderRadius: 8,
@@ -49,7 +49,7 @@ export default function Navbar({ title = 'Unified CRM Ticket Dashboard' }) {
         </div>
       </div>
 
-      {/* Title — absolutely centered */}
+      {/* Title — absolutely centered (hidden on mobile) */}
       <div style={{
         position: 'absolute', left: '50%', transform: 'translateX(-50%)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -73,6 +73,7 @@ export default function Navbar({ title = 'Unified CRM Ticket Dashboard' }) {
               background: user?.picture ? 'transparent' : 'var(--primary)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               overflow: 'hidden',
+              flexShrink: 0,
             }}>
               {user?.picture
                 ? <img src={user.picture} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -117,6 +118,41 @@ export default function Navbar({ title = 'Unified CRM Ticket Dashboard' }) {
           )}
         </div>
       </div>
+
+      {/* Mobile responsive styles */}
+      <style>{`
+        @media (max-width: 820px) {
+          header {
+            padding: 0 14px 0 50px !important;
+            gap: 0 !important;
+          }
+          header > div:first-child {
+            display: none !important;
+          }
+          header > div:nth-child(2) {
+            position: absolute !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            font-size: 13px !important;
+          }
+          header button > div:nth-child(2) {
+            display: none !important;
+          }
+        }
+
+        @media (max-width: 640px) {
+          header {
+            padding: 0 12px 0 48px !important;
+          }
+          header > div:nth-child(2) {
+            font-size: 12px !important;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+        }
+      `}</style>
     </header>
   );
 }

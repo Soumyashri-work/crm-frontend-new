@@ -31,7 +31,7 @@ export default function Charts({ statusData, priorityData }) {
   const pd = priorityData || PRIORITY_DATA;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
+    <div className="charts-grid" style={{ marginTop: 16 }}>
       {/* Pie Chart */}
       <div className="card animate-in" style={{ padding: '24px', animationDelay: '0.2s' }}>
         <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 20 }}>Tickets by Status</h3>
@@ -51,10 +51,10 @@ export default function Charts({ statusData, priorityData }) {
             <Tooltip formatter={(val, name) => [val, name]} />
           </PieChart>
         </ResponsiveContainer>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
           {sd.map(d => (
             <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}>
-              <span style={{ width: 10, height: 10, borderRadius: '50%', background: d.color, display: 'inline-block' }} />
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: d.color, display: 'inline-block', flexShrink: 0 }} />
               <span style={{ color: 'var(--text-secondary)' }}>{d.name}</span>
               <span style={{ fontWeight: 600, color: d.color }}>{Math.round(d.value / sd.reduce((a,b) => a + b.value, 0) * 100)}%</span>
             </div>
