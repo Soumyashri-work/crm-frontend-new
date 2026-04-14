@@ -24,24 +24,18 @@
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @keyframes slideUp {
-  from {
-    opacity: 0;
-    scale: 0.95;
-  }
-  to {
-    opacity: 1;
-    scale: 1;
-  }
+  from { opacity: 0; scale: 0.95; }
+  to   { opacity: 1; scale: 1;    }
 }
+
+/* -------------------------------------------------------------------------
+ * Header
+ * ---------------------------------------------------------------------- */
 
 .edit-ticket-modal-header {
   display: flex;
@@ -75,6 +69,10 @@
   background: var(--surface-2);
 }
 
+/* -------------------------------------------------------------------------
+ * Form body
+ * ---------------------------------------------------------------------- */
+
 .edit-ticket-form {
   padding: 24px;
   flex: 1;
@@ -90,13 +88,19 @@
 }
 
 .form-label {
-  display: block;
+  display: flex;
+  align-items: center;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 8px;
+}
+
+.form-label-required {
+  color: var(--danger, #DC2626);
+  margin-left: 2px;
 }
 
 .form-select {
@@ -109,6 +113,7 @@
   color: var(--text-primary);
   font-family: inherit;
   transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
 }
 
 .form-select:hover {
@@ -128,6 +133,61 @@
   opacity: 0.6;
 }
 
+/* Hint text below a field */
+.form-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* -------------------------------------------------------------------------
+ * Pending deadline field — subtle highlight to draw attention
+ * ---------------------------------------------------------------------- */
+
+.form-group:has(input[name="pending_until"]) .form-select,
+.form-group:has(input[name="pending_until"]) input[type="datetime-local"] {
+  border-color: var(--warning-border, #F59E0B);
+  background: var(--warning-surface, #FFFBEB);
+}
+
+.form-group:has(input[name="pending_until"]) input[type="datetime-local"]:focus {
+  border-color: var(--warning, #D97706);
+  box-shadow: 0 0 0 3px var(--warning-light, rgba(245, 158, 11, 0.15));
+}
+
+/* -------------------------------------------------------------------------
+ * Error banner
+ * ---------------------------------------------------------------------- */
+
+.edit-ticket-error-banner {
+  background: #FEF2F2;
+  border: 1px solid #FEC2C2;
+  color: #DC2626;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+/* -------------------------------------------------------------------------
+ * Agent permission note
+ * ---------------------------------------------------------------------- */
+
+.edit-ticket-permission-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+
+/* -------------------------------------------------------------------------
+ * Footer
+ * ---------------------------------------------------------------------- */
+
 .edit-ticket-modal-footer {
   display: flex;
   gap: 12px;
@@ -136,6 +196,10 @@
   flex-shrink: 0;
   justify-content: flex-end;
 }
+
+/* -------------------------------------------------------------------------
+ * Buttons
+ * ---------------------------------------------------------------------- */
 
 .btn {
   padding: 10px 16px;
