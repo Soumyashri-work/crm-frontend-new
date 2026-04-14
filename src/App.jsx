@@ -35,10 +35,8 @@ import AdminDashboard from './pages/admin/Dashboard';
 import AdminTickets from './pages/admin/Tickets';
 import TicketDetails from './pages/admin/TicketDetails';
 import Customers from './pages/admin/Customers';
-import CustomerDetail from './pages/admin/CustomerDetail';
 import Settings from './pages/admin/Settings';
 import Agents from './pages/admin/Agents';
-import AgentDetail from './pages/admin/AgentDetail';
 
 // Agent pages
 import AgentDashboard from './pages/agent/Dashboard';
@@ -79,9 +77,7 @@ export default function App() {
               <Route path="tickets"             element={<AdminTickets />} />
               <Route path="tickets/:id"         element={<TicketDetails />} />
               <Route path="customers"           element={<Customers />} />
-              <Route path="customers/:id"       element={<CustomerDetail />} />
               <Route path="agents"              element={<Agents />} />
-              <Route path="agents/detail/:slug" element={<AgentDetail />} />
               <Route path="settings"            element={<Settings />} />
             </Route>
 

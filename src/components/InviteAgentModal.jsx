@@ -375,7 +375,23 @@ function Field({ label, required, error, hint, children }) {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const EMPTY_FORM = { first_name: '', last_name: '', email: '' };
-const GLOBAL_STYLES = `@keyframes spin { to { transform: rotate(360deg); } }`;
+const GLOBAL_STYLES = `
+  @keyframes spin { to { transform: rotate(360deg); } }
+  
+  @media (max-width: 820px) {
+    /* Mobile responsive styles for InviteAgentModal overlay */
+    .invite-modal-overlay {
+      padding: 12px !important;
+    }
+  }
+  
+  @media (max-width: 640px) {
+    /* Small mobile responsive styles */
+    .invite-modal-overlay {
+      padding: 8px !important;
+    }
+  }
+`;
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 

@@ -251,7 +251,7 @@ function SourceSystemMultiSelect({ loading, error, systems, selected, onToggle, 
             key={sys.id}
             style={{
               ...s.checkboxRow,
-              background: checked ? 'var(--primary-subtle, #EEF2FF)' : 'transparent',
+              background: checked ? 'var(--primary-subtle, #efe2e2)' : 'transparent',
               borderColor: checked ? 'var(--primary)' : 'transparent',
             }}
           >
@@ -263,17 +263,18 @@ function SourceSystemMultiSelect({ loading, error, systems, selected, onToggle, 
               style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
             />
 
-            {/* Custom checkbox box */}
-            <span
-              style={{
-                ...s.checkBox,
-                background:   checked ? 'var(--primary)' : 'var(--surface)',
-                borderColor:  checked ? 'var(--primary)' : 'var(--border)',
-              }}
-              aria-hidden="true"
-            >
-              {checked && <Check size={11} color="white" strokeWidth={3} />}
-            </span>
+{/* Custom checkbox box */}
+<span
+  style={{
+    ...s.checkBox,
+    background:   checked ? 'var(--primary)' : 'var(--surface)',
+    // Update the unselected border color here (e.g., '#333')
+    borderColor:  checked ? 'var(--primary)' : '#333', 
+  }}
+  aria-hidden="true"
+>
+  {checked && <Check size={11} color="white" strokeWidth={3} />}
+</span>
 
             <Globe size={14} style={{ color: checked ? 'var(--primary)' : 'var(--text-muted)', flexShrink: 0 }} />
             <span style={{ fontSize: 13.5, color: 'var(--text-primary)', fontWeight: checked ? 600 : 400 }}>
