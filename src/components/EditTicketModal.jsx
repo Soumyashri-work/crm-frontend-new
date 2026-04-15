@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Clock } from 'lucide-react';
 import {
   TICKET_STATUSES,
@@ -14,6 +15,9 @@ import './EditTicketModal.css';
 
 /**
  * EditTicketModal — Complete ticket update flow with error handling.
+ *
+ * Rendered via ReactDOM.createPortal into document.body so it always
+ * sits above any parent stacking context (including TicketModal).
  *
  * Pending state contract:
  * When status is set to "pending", a `pending_until` datetime field appears
@@ -40,27 +44,44 @@ export default function EditTicketModal({
     status:        '',
     priority:      '',
     agent_id:      null,
-    pending_until: '',   // datetime-local string ("YYYY-MM-DDTHH:MM") or ''
+    pending_until: '',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError]         = useState(null);
 
   const role            = getUserRole();
-  const isPendingStatus = formValues.status === 'pending' && ticket.crm === 'zammad';
+  const isPendingStatus = formValues.status === 'pending' && ticket?.crm === 'zammad';
 
   // Initialize form whenever the modal opens or the ticket changes.
   useEffect(() => {
     if (ticket && isOpen) {
       setFormValues({
-        status:        ticket.status  ?? '',
+        status:        ticket.status   ?? '',
         priority:      ticket.priority ?? '',
         agent_id:      ticket.agent?.id ?? null,
-        // Convert stored ISO string back to local datetime format for the input
         pending_until: toDatetimeLocalString(ticket.pending_until),
       });
       setError(null);
     }
   }, [ticket, isOpen]);
+
+  // Prevent body scroll while modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e) => { if (e.key === 'Escape' && !isLoading) onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, isLoading, onClose]);
 
   if (!isOpen || !ticket) return null;
 
@@ -73,8 +94,6 @@ export default function EditTicketModal({
     setFormValues((prev) => ({
       ...prev,
       status: newStatus,
-      // Clear pending_until immediately when leaving pending so the
-      // payload builder never picks up a stale value.
       ...(newStatus !== 'pending' ? { pending_until: '' } : {}),
     }));
   };
@@ -108,9 +127,6 @@ export default function EditTicketModal({
     e.preventDefault();
     setError(null);
 
-    // Client-side validation first — catches the pending_until case
-    // before we even build the payload, so the user gets an inline
-    // error rather than a round-trip 422.
     const validationError = validate();
     if (validationError) {
       setError(validationError);
@@ -130,12 +146,10 @@ export default function EditTicketModal({
       const res           = await ticketService.update(ticket.id, payload);
       const updatedTicket = res.data?.data ?? res.data;
 
-      if (onUpdate) {
-        onUpdate(updatedTicket);
-      }
+      if (onUpdate) onUpdate(updatedTicket);
 
       setFormValues({
-        status:        updatedTicket.status  ?? '',
+        status:        updatedTicket.status   ?? '',
         priority:      updatedTicket.priority ?? '',
         agent_id:      updatedTicket.agent?.id ?? null,
         pending_until: toDatetimeLocalString(updatedTicket.pending_until),
@@ -143,9 +157,7 @@ export default function EditTicketModal({
 
       onClose();
 
-      if (onSave) {
-        onSave(updatedTicket);
-      }
+      if (onSave) onSave(updatedTicket);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -158,24 +170,23 @@ export default function EditTicketModal({
   // ----------------------------------------------------------------
 
   const canEdit = {
-    status:    isFieldVisible('status', role),
-    priority:  isFieldVisible('priority', role),
-    agent_id:  isFieldVisible('agent_id', role),
+    status:   isFieldVisible('status',   role),
+    priority: isFieldVisible('priority', role),
+    agent_id: isFieldVisible('agent_id', role),
   };
 
-  // Minimum datetime string for the pending_until input — prevents
-  // the user selecting a time in the past at the browser level.
-  // Passing new Date() directly ensures we use local time, not UTC.
   const minDatetime = toDatetimeLocalString(new Date());
 
   // ----------------------------------------------------------------
-  // Render
+  // Render — portalled into document.body so it escapes any parent
+  // stacking context (e.g. TicketModal or its backdrop).
   // ----------------------------------------------------------------
 
-  return (
+  const modalContent = (
     <div
       className="edit-ticket-modal-overlay"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ zIndex: 1300 }}
+      onClick={(e) => { if (e.target === e.currentTarget && !isLoading) onClose(); }}
     >
       <div className="edit-ticket-modal-content">
 
@@ -223,7 +234,7 @@ export default function EditTicketModal({
             </div>
           )}
 
-          {/* Pending deadline — shown only when status is "pending" */}
+          {/* Pending deadline */}
           {isPendingStatus && (
             <div className="form-group">
               <label className="form-label">
@@ -325,6 +336,8 @@ export default function EditTicketModal({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
 
 // ---------------------------------------------------------------------------
@@ -332,27 +345,15 @@ export default function EditTicketModal({
 // ---------------------------------------------------------------------------
 
 /**
- * Convert an ISO 8601 string (or Date) to the "YYYY-MM-DDTHH:MM" format
- * required by <input type="datetime-local">.
- *
- * Extracts the date and time using local browser timezone methods rather
- * than forcing a UTC conversion.
- *
- * @param {string|Date|null|undefined} dateInput
- * @returns {string}
+ * Convert an ISO 8601 string (or Date) to "YYYY-MM-DDTHH:MM" for
+ * <input type="datetime-local">. Uses local browser timezone methods.
  */
 function toDatetimeLocalString(dateInput) {
   if (!dateInput) return '';
   const d = new Date(dateInput);
   if (isNaN(d.getTime())) return '';
 
-  const pad = (num) => String(num).padStart(2, '0');
+  const pad = (n) => String(n).padStart(2, '0');
 
-  const year = d.getFullYear();
-  const month = pad(d.getMonth() + 1);
-  const day = pad(d.getDate());
-  const hours = pad(d.getHours());
-  const minutes = pad(d.getMinutes());
-
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
