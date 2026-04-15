@@ -31,6 +31,8 @@ export default function Navbar({ title = 'Unified CRM Ticket Dashboard' }) {
       padding: '0 24px', gap: 16,
       position: 'sticky', top: 0, zIndex: 100,
       lineHeight: 1,
+      width: '100%',
+      flexShrink: 0,
     }}>
       {/* Organization name — left side (hidden on mobile) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 140 }}>

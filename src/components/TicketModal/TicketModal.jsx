@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Expand, User, Database, Mail, Phone, Clock, Calendar } from 'lucide-react';
+import { X, Expand, Database, Mail, Phone, Clock, Calendar } from 'lucide-react';
 // Building2 removed — Account chip disabled under multi-tenancy
 import { statusBadgeClass, priorityBadgeClass, crmBadgeClass, formatDateTime, getInitials, getAvatarColor } from '../../utils/helpers';
 import './TicketModal.css';
@@ -178,11 +178,23 @@ const customerPhone = ticket.customer?.phone || null;
         {/* ── Header ── */}
         <div className="ticket-modal-header">
           <div className="ticket-modal-title-section">
-            <div style={{ width: 34, height: 34, borderRadius: 8, flexShrink: 0, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--primary)' }}>
-     {getInitials(ticket.title)}
+            <div style={{
+              width: 34,
+              height: 34,
+              borderRadius: '50%',
+              flexShrink: 0,
+              background: getAvatarColor(ticket.title || ticket.crm || String(ticket.id || '')),
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 12,
+              fontWeight: 700,
+              color: 'white',
+            }}>
+              {getInitials(ticket.title)}
             </div>
             <div style={{ minWidth: 0 }}>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <h2 style={{ margin: 0, fontSize: 17, lineHeight: 1.2, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {ticket.title}
               </h2>
             </div>
@@ -309,7 +321,7 @@ const customerPhone = ticket.customer?.phone || null;
           {/* Timestamps */}
           <div className="modal-section">
             <h3 className="modal-section-title">Timeline</h3>
-            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
               <div>
                 <label className="modal-label" style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
                   <Calendar size={11} /> Created

@@ -280,7 +280,6 @@ export default function SuperAdminLayout() {
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
         marginLeft: isMobile ? 0 : sidebarWidth,
         transition: 'margin-left var(--transition-slow)',
       }}>
