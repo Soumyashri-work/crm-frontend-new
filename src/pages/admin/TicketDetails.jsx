@@ -177,15 +177,23 @@ function CrmPopup({ crm }) {
 // ─── Detail Row ───────────────────────────────────────────────────────────────
 function DetailRow({ icon: Icon, label, children }) {
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: '116px minmax(0, 1fr)',
+      alignItems: 'center',
+      gap: 8,
+      padding: '10px 0',
+    }}>
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 5, fontSize: 11,
+        display: 'flex', alignItems: 'center', gap: 6, fontSize: 11,
         color: 'var(--text-muted)', textTransform: 'uppercase',
-        letterSpacing: '0.06em', fontWeight: 600, marginBottom: 5,
+        letterSpacing: '0.06em', fontWeight: 700,
       }}>
-        <Icon size={11} /> {label}
+        <Icon size={12} /> {label}
       </div>
-      <div style={{ fontSize: 13.5, fontWeight: 500 }}>{children}</div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', minWidth: 0 }}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -198,8 +206,9 @@ function Chip({ onClick, avatarName, label, icon, linkable }) {
       role={linkable ? 'button' : undefined}
       tabIndex={linkable ? 0 : undefined}
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: 8,
-        padding: '4px 8px', borderRadius: 'var(--radius-sm)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+        width: '100%',
+        padding: '6px 8px', borderRadius: 'var(--radius-sm)',
         background: 'var(--surface-2)',
         cursor: linkable ? 'pointer' : 'default',
         transition: 'background 0.15s',
@@ -533,7 +542,15 @@ export default function TicketDetails() {
   if (!ticket) return null;
 
   return (
-    <div style={{ margin: '0 auto', padding: '0 40px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{
+      margin: '0 auto',
+      width: '100%',
+      maxWidth: 1280,
+      padding: '0 24px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 16,
+    }}>
 
       {/* Global keyframes */}
       <style>{`
@@ -541,6 +558,9 @@ export default function TicketDetails() {
         @keyframes pulse          { 0%, 100% { opacity: 1 } 50% { opacity: 0.45 } }
         @keyframes commentsFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeIn         { from { opacity: 0; } to { opacity: 1; } }
+        @media (max-width: 1024px) {
+          .ticket-details-grid { grid-template-columns: 1fr !important; }
+        }
       `}</style>
 
       {/* Back / breadcrumb */}
@@ -561,7 +581,15 @@ export default function TicketDetails() {
         </span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 340px', gap: 16, alignItems: 'start' }}>
+      <div
+        className="ticket-details-grid"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) clamp(240px, 22vw, 300px)',
+          gap: 16,
+          alignItems: 'start',
+        }}
+      >
 
         {/* ── Left: ticket + comments ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -731,63 +759,73 @@ export default function TicketDetails() {
         </div>
 
         {/* ── Right: sidebar ── */}
-        <div className="card animate-in" style={{ padding: 20, animationDelay: '0.08s' }}>
+        <div
+          className="card animate-in"
+          style={{
+            padding: '16px',
+            animationDelay: '0.08s',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 14,
+            background: 'linear-gradient(135deg, var(--surface) 0%, rgba(99, 102, 241, 0.02) 100%)',
+          }}
+        >
           <div style={{
-            fontSize: 11, fontWeight: 700, color: 'var(--text-muted)',
-            textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 18,
+            fontSize: 11, fontWeight: 700, color: 'var(--primary)',
+            textTransform: 'uppercase', letterSpacing: '0.08em',
           }}>
             Details
           </div>
 
-          <DetailRow icon={User} label="Raised By">
-            <HoverPopup popup={
-              <PersonPopup name={customerName} email={customer.email} phone={customer.phone}
-                extra={customer.account ? `Account: ${customer.account}` : null} />
-            }>
-              <Chip
-                onClick={() => customer.id && navigate(`${base}/customers/${customer.id}`)}
-                avatarName={customerName} label={customerName} linkable={!!customer.id}
-              />
-            </HoverPopup>
-          </DetailRow>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <DetailRow icon={User} label="Raised By">
+              <HoverPopup popup={
+                <PersonPopup name={customerName} email={customer.email} phone={customer.phone}
+                  extra={customer.account ? `Account: ${customer.account}` : null} />
+              }>
+                <Chip
+                  onClick={() => customer.id && navigate(`${base}/customers/${customer.id}`)}
+                  avatarName={customerName} label={customerName} linkable={!!customer.id}
+                />
+              </HoverPopup>
+            </DetailRow>
 
-          <DetailRow icon={User} label="Assignee">
-            <HoverPopup popup={
-              <PersonPopup name={assigneeName} email={assignee.email} role={assignee.role || 'Agent'} />
-            }>
-              <Chip
-                onClick={() => assignee.id && navigate(`${base}/users/${assignee.id}`)}
-                avatarName={assigneeName} label={assigneeName} linkable={!!assignee.id}
-              />
-            </HoverPopup>
-          </DetailRow>
+            <DetailRow icon={User} label="Assignee">
+              <HoverPopup popup={
+                <PersonPopup name={assigneeName} email={assignee.email} role={assignee.role || 'Agent'} />
+              }>
+                <Chip
+                  onClick={() => assignee.id && navigate(`${base}/users/${assignee.id}`)}
+                  avatarName={assigneeName} label={assigneeName} linkable={!!assignee.id}
+                />
+              </HoverPopup>
+            </DetailRow>
 
-          <DetailRow icon={Database} label="Source CRM">
-            <HoverPopup popup={<CrmPopup crm={ticket.crm} />}>
-              <span
-                className={crmBadgeClass(ticket.crm)}
-                style={{ cursor: 'default' }}
-                onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
-                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-              >
-                {ticket.crm}
+            <DetailRow icon={Database} label="Source CRM">
+              <HoverPopup popup={<CrmPopup crm={ticket.crm} />}>
+                <span
+                  className={crmBadgeClass(ticket.crm)}
+                  style={{ cursor: 'default' }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
+                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                >
+                  {ticket.crm}
+                </span>
+              </HoverPopup>
+            </DetailRow>
+
+            <DetailRow icon={Calendar} label="Created">
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                {formatDateTime(ticket.created) || '—'}
               </span>
-            </HoverPopup>
-          </DetailRow>
+            </DetailRow>
 
-          <div style={{ height: 1, background: 'var(--border)', margin: '4px 0 16px' }} />
-
-          <DetailRow icon={Calendar} label="Created">
-            <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-              {formatDateTime(ticket.created) || '—'}
-            </span>
-          </DetailRow>
-
-          <DetailRow icon={Clock} label="Last Updated">
-            <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-              {formatDateTime(ticket.updated) || '—'}
-            </span>
-          </DetailRow>
+            <DetailRow icon={Clock} label="Last Updated">
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                {formatDateTime(ticket.updated) || '—'}
+              </span>
+            </DetailRow>
+          </div>
         </div>
       </div>
 
