@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import {
-  Eye, Edit2, UserX, Search, ArrowUp, ArrowDown, ArrowUpDown,
-  MoreVertical, Send, X, XCircle, Clock3, AlertTriangle, CheckCircle2, ChevronDown,
+  Edit2, UserX, Search, ArrowUp, ArrowDown, ArrowUpDown,
+  Send, X, XCircle, Clock3, AlertTriangle, CheckCircle2, ChevronDown,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -17,33 +17,6 @@ import InviteAgentModal from '../../components/InviteAgentModal';
 
 const PAGE_SIZE = 20;
 
-function RowActionMenu({ onClose, isOpen, onView, onEdit, onDelete }) {
-  const menuRef = useRef();
-  useEffect(() => {
-    const h = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) onClose(); };
-    if (isOpen) window.addEventListener('mousedown', h);
-    return () => window.removeEventListener('mousedown', h);
-  }, [isOpen, onClose]);
-  if (!isOpen) return null;
-
-  return (
-    <div ref={menuRef} style={{ position: 'absolute', bottom: -110, right: 0, background: 'var(--surface)', border: '1.5px solid var(--border-dark)', borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow-lg)', zIndex: 100, minWidth: 140, animation: 'fadeIn 0.15s ease' }}>
-      {[
-        ...(onView ? [{ label: 'View',   icon: <Eye    size={14} />, onClick: () => { onView();   onClose(); }, danger: false }] : []),
-        { label: 'Edit',   icon: <Edit2  size={14} />, onClick: () => { onEdit();   onClose(); }, danger: false },
-        { label: 'Delete', icon: <UserX  size={14} />, onClick: () => { onDelete(); onClose(); }, danger: true  },
-      ].map(({ label, icon, onClick, danger }) => (
-        <button key={label} onClick={onClick} style={{ width: '100%', padding: '10px 14px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: danger ? 'var(--danger)' : 'var(--text-primary)', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 8 }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-        >
-          {icon} {label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export default function Agents() {
   const navigate    = useNavigate();
   const queryClient = useQueryClient();
@@ -55,7 +28,6 @@ export default function Agents() {
   const [sourceFilter,      setSourceFilter]      = useState('');
   const [page,              setPage]              = useState(1);
   const [selectedRows,      setSelectedRows]      = useState(new Set());
-  const [openMenuId,        setOpenMenuId]        = useState(null);
   const [banner,            setBanner]            = useState(null);
   const [editingAgent,      setEditingAgent]      = useState(null);
   const [deletingAgent,     setDeletingAgent]     = useState(null);
@@ -340,13 +312,29 @@ export default function Agents() {
                   </td>
                   <td style={{ color: 'var(--text-secondary)', fontSize: 13.5, fontWeight: 600 }}>{getAgentTicketsCount(a)}</td>
                   <td><CrmBadgesDisplay crms={getAgentCrmSources(a)} maxDisplay={2} /></td>
-                  <td onClick={e => e.stopPropagation()} style={{ position: 'relative' }}>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <td onClick={e => e.stopPropagation()}>
+                    <div className="row-actions">
                       {getActionButton(a)}
                       {getAgentStatusMeta(a.invitation_status || a.status).key === 'active' && (
                         <>
-                          <button className="btn btn-ghost" style={{ padding: '5px 8px', position: 'relative' }} onClick={() => setOpenMenuId(openMenuId === a.id ? null : a.id)}><MoreVertical size={16} /></button>
-                          <RowActionMenu isOpen={openMenuId === a.id} onClose={() => setOpenMenuId(null)} onView={undefined} onEdit={() => setEditingAgent(a)} onDelete={() => setDeletingAgent(a)} />
+                          <button
+                            className="icon-action-btn edit"
+                            type="button"
+                            title="Edit agent"
+                            aria-label="Edit agent"
+                            onClick={() => setEditingAgent(a)}
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            className="icon-action-btn delete"
+                            type="button"
+                            title="Delete agent"
+                            aria-label="Delete agent"
+                            onClick={() => setDeletingAgent(a)}
+                          >
+                            <UserX size={14} />
+                          </button>
                         </>
                       )}
                     </div>

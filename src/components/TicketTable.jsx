@@ -171,7 +171,7 @@ const handleExpandTicket = (ticketId) => {
     <>
       <div className="card" style={{ overflow: 'hidden' }}>
         <div className="table-wrap">
-          <table>
+          <table className="tickets-table">
             <thead>
               <tr>
                 <th>TICKET</th>
@@ -198,20 +198,16 @@ const handleExpandTicket = (ticketId) => {
                   >
                     {/* Ticket title + CRM ID */}
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{
-                          width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                          background: 'var(--primary-light)',
+                          width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+                          background: getAvatarColor(ticket.title || ticket.crm_id || String(ticket.id || '')),
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 11, fontWeight: 700, color: 'var(--primary)',
+                          fontSize: 12, fontWeight: 700, color: 'white',
                         }}>
                           {getInitials(ticket.title)}
                         </div>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 14 }}>{ticket.title}</div>
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                          </div>
-                        </div>
+                        <span style={{ fontWeight: 600, fontSize: 14, lineHeight: 1.2 }}>{ticket.title}</span>
                       </div>
                     </td>
 

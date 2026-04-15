@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Plus, Building2, ChevronDown, MoreVertical, RefreshCw, Loader2 } from 'lucide-react';
+import { Search, Plus, Building2, ChevronDown, RefreshCw, Loader2, Edit2, Trash2 } from 'lucide-react';
 import AddTenantModal from '../../components/superadmin/AddTenantModal';
 import { superAdminService } from '../../services/superAdminService';
 
@@ -152,7 +152,26 @@ export default function SuperAdminTenants() {
                   </td>
                   <td style={{ color: 'var(--text-secondary)', fontSize: 13.5 }}>{formatDate(t.created_at)}</td>
                   <td onClick={e => e.stopPropagation()}>
-                    <button className="btn btn-ghost" style={{ padding: '5px 8px' }}><MoreVertical size={16} /></button>
+                    <div className="row-actions">
+                      <button
+                        className="icon-action-btn edit"
+                        type="button"
+                        title="Edit tenant (coming soon)"
+                        aria-label="Edit tenant"
+                        disabled
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button
+                        className="icon-action-btn delete"
+                        type="button"
+                        title="Delete tenant (coming soon)"
+                        aria-label="Delete tenant"
+                        disabled
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

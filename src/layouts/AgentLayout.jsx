@@ -14,7 +14,6 @@ export default function AgentLayout() {
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
         marginLeft: sidebarWidth,
         transition: 'margin-left var(--transition-slow)',
       }}>
