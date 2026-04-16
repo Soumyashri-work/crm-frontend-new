@@ -72,4 +72,10 @@ export const tenantService = {
     const res = await api.get('/tenants/me/source-systems');
     return unwrap(res);
   },
+
+  // Add/Ensure this in tenantService.js
+getSourceSystems: async () => {
+  const res = await api.get('/tenants/me/source-systems');
+  return unwrap(res);
+},
 };

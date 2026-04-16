@@ -15,7 +15,7 @@ import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import SuperAdminLayout from './layouts/SuperAdminLayout';
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard.jsx';
-import SuperAdminTenants from './pages/superadmin/SuperAdminTenants..jsx';
+import SuperAdminTenants from './pages/superadmin/SuperAdminTenants.jsx';
 import SuperAdminAdmins from './pages/superadmin/SuperAdminAdmins.jsx';
 import SuperAdminSettings from './pages/superadmin/SuperAdminSettings.jsx';
 

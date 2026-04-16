@@ -1,18 +1,17 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Ticket, Users, UserCircle,
   Settings, ChevronLeft, ChevronRight, ClipboardList
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const adminNav = [
-  { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/admin/tickets',   icon: Ticket,          label: 'Tickets'   },
-  // Accounts removed — admin is scoped to their own tenant
-  { to: '/admin/customers', icon: UserCircle,      label: 'Customers' },
-  { to: '/admin/agents',    icon: Users,           label: 'Agents'    },
-  { to: '/admin/settings',  icon: Settings,        label: 'Settings'  },
+  { to: '/admin/dashboard',  icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/admin/tickets',    icon: Ticket,          label: 'Tickets'   },
+  { to: '/admin/customers',  icon: Users,           label: 'Customers' },
+  { to: '/admin/agents',     icon: UserCircle,      label: 'Agents'    },
+  { to: '/admin/settings',   icon: Settings,        label: 'Settings'  },
 ];
 
 const agentNav = [
@@ -56,94 +55,94 @@ export default function Sidebar({ isAdmin, onCollapsedChange }) {
       overflow: 'hidden',
       zIndex: 1000,
     }}>
-        {/* Brand */}
+      {/* Brand */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: collapsed ? '18px 0' : '18px 24px',
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        borderBottom: '1px solid var(--border)',
+        height: 'var(--navbar-height)',
+        lineHeight: 1,
+      }}>
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: collapsed ? '18px 0' : '18px 24px',
-          justifyContent: collapsed ? 'center' : 'flex-start',
-          borderBottom: '1px solid var(--border)',
-          height: 'var(--navbar-height)',
-          lineHeight: 1,
+          width: 36, height: 36, borderRadius: 10,
+          background: 'var(--primary)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: 'var(--primary)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          }}>
-            <Ticket size={18} color="white" />
+          <Ticket size={18} color="white" />
+        </div>
+        {!collapsed && (
+          <div style={{ lineHeight: 1.2, display: 'flex', flexDirection: 'column', gap: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.2, margin: 0 }}>Unified CRM</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, lineHeight: 1.2, margin: 0 }}>Ticket Dashboard</div>
           </div>
-          {!collapsed && (
-            <div style={{ lineHeight: 1.2, display: 'flex', flexDirection: 'column', gap: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.2, margin: 0 }}>Unified CRM</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, lineHeight: 1.2, margin: 0 }}>Ticket Dashboard</div>
-            </div>
-          )}
-        </div>
+        )}
+      </div>
 
-        {/* Nav */}
-        <nav style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 2, overflow: 'auto', minHeight: 0 }}>
-          {nav.map(({ to, icon: Icon, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              title={collapsed ? label : undefined}
-              style={({ isActive }) => ({
-                display: 'flex', alignItems: 'center',
-                gap: 10, padding: collapsed ? '10px 0' : '10px 12px',
-                justifyContent: collapsed ? 'center' : 'flex-start',
-                borderRadius: 'var(--radius-sm)',
-                fontWeight: isActive ? 600 : 400,
-                fontSize: 14,
-                color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
-                background: isActive ? 'var(--primary-light)' : 'transparent',
-                transition: 'all var(--transition)',
-                textDecoration: 'none',
-              })}
-            >
-              {({ isActive }) => (
-                <>
-                  <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
-                  {!collapsed && <span>{label}</span>}
-                </>
-              )}
-            </NavLink>
-          ))}
-        </nav>
-
-        {/* Collapse toggle */}
-        <div style={{ padding: '12px', flexShrink: 0 }}>
-          <button
-            onClick={handleCollapse}
-            title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-            style={{
-              width: '100%',
-              height: '40px',
+      {/* Nav */}
+      <nav style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 2, overflow: 'auto', minHeight: 0 }}>
+        {nav.map(({ to, icon: Icon, label }) => (
+          <NavLink
+            key={to}
+            to={to}
+            title={collapsed ? label : undefined}
+            style={({ isActive }) => ({
+              display: 'flex', alignItems: 'center',
+              gap: 10, padding: collapsed ? '10px 0' : '10px 12px',
+              justifyContent: collapsed ? 'center' : 'flex-start',
               borderRadius: 'var(--radius-sm)',
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 0,
-              fontSize: 13,
-              fontWeight: 500,
-              color: 'var(--text-secondary)',
+              fontWeight: isActive ? 600 : 400,
+              fontSize: 14,
+              color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
+              background: isActive ? 'var(--primary-light)' : 'transparent',
               transition: 'all var(--transition)',
-              fontFamily: 'inherit',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'var(--primary-light)';
-              e.currentTarget.style.color = 'var(--primary)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'var(--surface-2)';
-              e.currentTarget.style.color = 'var(--text-secondary)';
-            }}
+              textDecoration: 'none',
+            })}
           >
-            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          </button>
-        </div>
-      </aside>
+            {({ isActive }) => (
+              <>
+                <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
+                {!collapsed && <span>{label}</span>}
+              </>
+            )}
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* Collapse toggle */}
+      <div style={{ padding: '12px', flexShrink: 0 }}>
+        <button
+          onClick={handleCollapse}
+          title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+          style={{
+            width: '100%',
+            height: '40px',
+            borderRadius: 'var(--radius-sm)',
+            background: 'var(--surface-2)',
+            border: '1px solid var(--border)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 0,
+            fontSize: 13,
+            fontWeight: 500,
+            color: 'var(--text-secondary)',
+            transition: 'all var(--transition)',
+            fontFamily: 'inherit',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'var(--primary-light)';
+            e.currentTarget.style.color = 'var(--primary)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'var(--surface-2)';
+            e.currentTarget.style.color = 'var(--text-secondary)';
+          }}
+        >
+          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+        </button>
+      </div>
+    </aside>
   );
 }

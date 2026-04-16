@@ -15,45 +15,55 @@ function SuperAdminSidebar({ collapsed, setCollapsed, isMobile, sidebarOpen, set
     if (isMobile) setSidebarOpen(false);
   };
 
+  const sidebarLeft = isMobile ? (sidebarOpen ? '0' : '-100%') : '0';
+
   return (
     <aside style={{
       position: 'fixed',
-      left: 0,
+      left: sidebarLeft,
       top: 0,
-      width: collapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)',
+      width: collapsed ? 'var(--sidebar-collapsed, 70px)' : 'var(--sidebar-width, 260px)',
       height: '100vh',
       background: 'var(--surface)',
       borderRight: '1.5px solid var(--border)',
       display: 'flex',
       flexDirection: 'column',
-      transition: 'width var(--transition-slow)',
+      transition: 'all var(--transition-slow)',
       overflow: 'hidden',
       zIndex: 1000,
     }}>
-      {/* Brand */}
+      {/* Brand Section */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: collapsed ? '18px 0' : '18px 24px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: collapsed ? '0' : '0 20px',
         justifyContent: collapsed ? 'center' : 'flex-start',
         borderBottom: '1.5px solid var(--border)',
-        height: 'var(--navbar-height)',
+        height: 'var(--navbar-height, 60px)',
+        flexShrink: 0,
       }}>
         <div style={{
-          width: 36, height: 36, borderRadius: 10, background: 'var(--primary)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 32,
+          height: 32,
+          background: 'var(--primary)',
+          borderRadius: '8px'
         }}>
           <Shield size={18} color="white" />
         </div>
         {!collapsed && (
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: '#000', lineHeight: 1.2 }}>Super Admin</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>Multi-Tenant Portal</div>
+          <div style={{ lineHeight: 1.2, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>Super Admin</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Multi-Tenant Portal</span>
           </div>
         )}
       </div>
 
-      {/* Nav */}
-      <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 2, overflow: 'auto', minHeight: 0 }}>
+      {/* Nav Links */}
+      <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 4, overflowY: 'auto', minHeight: 0 }}>
         {superAdminNav.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
@@ -61,10 +71,12 @@ function SuperAdminSidebar({ collapsed, setCollapsed, isMobile, sidebarOpen, set
             onClick={handleNavClick}
             title={collapsed ? label : undefined}
             style={({ isActive }) => ({
-              display: 'flex', alignItems: 'center',
-              gap: 10, padding: collapsed ? '10px 0' : '10px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: collapsed ? '10px 0' : '10px 12px',
               justifyContent: collapsed ? 'center' : 'flex-start',
-              borderRadius: 'var(--radius-sm)',
+              borderRadius: 'var(--radius-sm, 6px)',
               fontWeight: isActive ? 700 : 500,
               fontSize: 13.5,
               color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
@@ -83,34 +95,29 @@ function SuperAdminSidebar({ collapsed, setCollapsed, isMobile, sidebarOpen, set
         ))}
       </nav>
 
-      {/* Collapse toggle */}
-      <div style={{ padding: '12px', flexShrink: 0 }}>
-        <button
-          onClick={() => setCollapsed(c => !c)}
-          title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-          style={{
-            width: '100%',
-            height: '40px',
-            borderRadius: 'var(--radius-sm)',
-            background: 'var(--surface-2)',
-            border: '1.5px solid var(--border-dark)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 0,
-            fontSize: 13,
-            fontWeight: 500,
-            color: 'var(--text-secondary)',
-            fontFamily: 'inherit',
-            transition: 'all var(--transition)',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--primary-light)'; e.currentTarget.style.color = 'var(--primary)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-        >
-          {collapsed ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}
-        </button>
-      </div>
+      {/* Collapse toggle (Desktop only) */}
+      {!isMobile && (
+        <div style={{ padding: '12px', flexShrink: 0, borderTop: '1px solid var(--border)' }}>
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            style={{
+              width: '100%',
+              height: '36px',
+              borderRadius: 'var(--radius-sm, 6px)',
+              background: 'var(--surface-2, #f9fafb)',
+              border: '1.5px solid var(--border)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--text-secondary)',
+              transition: 'all var(--transition)',
+            }}
+          >
+            {collapsed ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}
+          </button>
+        </div>
+      )}
     </aside>
   );
 }
@@ -130,18 +137,16 @@ function SuperAdminNavbar({ isMobile, sidebarOpen, setSidebarOpen }) {
   }, [dropOpen]);
 
   const handleLogout = async () => {
-    try { await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/logout`); } catch (_) {}
+    try {
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/logout`);
+    } catch (_) {}
     logout();
     navigate('/login');
   };
 
-  const initials = user?.name
-    ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-    : 'SA';
-
   return (
     <header style={{
-      height: 'var(--navbar-height)',
+      height: 'var(--navbar-height, 60px)',
       background: 'var(--surface)',
       borderBottom: '1.5px solid var(--border)',
       display: 'flex',
@@ -152,7 +157,6 @@ function SuperAdminNavbar({ isMobile, sidebarOpen, setSidebarOpen }) {
       zIndex: 100,
       flexShrink: 0,
     }}>
-      {/* Mobile hamburger button */}
       {isMobile && (
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -165,47 +169,37 @@ function SuperAdminNavbar({ isMobile, sidebarOpen, setSidebarOpen }) {
             padding: '4px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
           }}
-          aria-label="Toggle sidebar"
         >
           {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
       )}
 
-      <div style={{ fontWeight: 600, fontSize: isMobile ? 14 : 18, color: '#000', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+      <div style={{ fontWeight: 600, fontSize: isMobile ? 14 : 18, color: 'var(--text-primary)', flex: 1 }}>
         Unified CRM Ticket Dashboard
       </div>
 
       <div style={{ position: 'relative' }} ref={dropRef}>
         <button
           onClick={() => setDropOpen(o => !o)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            background: 'none', border: 'none', cursor: 'pointer',
-            padding: '4px 8px', borderRadius: 'var(--radius-sm)',
-          }}
+          style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}
         >
           <div style={{
-            width: 36, height: 36, borderRadius: '50%',
-            background: user?.picture ? 'transparent' : 'var(--primary)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            overflow: 'hidden', flexShrink: 0,
+            width: 34, height: 34, borderRadius: '50%', background: 'var(--primary)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: 13
           }}>
-            {user?.picture
-              ? <img src={user.picture} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : <span style={{ color: 'white', fontSize: 13, fontWeight: 700 }}>{initials}</span>
-            }
+            {user?.name?.[0]?.toUpperCase() || 'S'}
           </div>
           {!isMobile && (
             <div style={{ textAlign: 'left' }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.2, color: '#000' }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.2, color: 'var(--text-primary)' }}>
                 {user?.name || 'Super Admin'}
               </div>
               <div style={{
-                fontSize: 11, fontWeight: 700, color: 'var(--primary)',
+                fontSize: 10, fontWeight: 800, color: 'var(--primary)',
                 background: 'var(--primary-light)', padding: '1px 7px',
                 borderRadius: 99, display: 'inline-block', marginTop: 2,
+                textTransform: 'uppercase'
               }}>
                 SUPER ADMIN
               </div>
@@ -215,27 +209,33 @@ function SuperAdminNavbar({ isMobile, sidebarOpen, setSidebarOpen }) {
 
         {dropOpen && (
           <div style={{
-            position: 'absolute', right: 0, top: 'calc(100% + 6px)',
+            position: 'absolute', right: 0, top: 'calc(100% + 8px)',
             background: 'var(--surface)', border: '1.5px solid var(--border-dark)',
-            borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-lg)',
-            minWidth: 200, zIndex: 200, overflow: 'hidden',
+            borderRadius: 'var(--radius-sm, 6px)', boxShadow: 'var(--shadow-lg)',
+            width: 210, zIndex: 200, overflow: 'hidden'
           }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, color: '#000' }}>{user?.name || 'Super Admin'}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{user?.email || ''}</div>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-light)', background: 'white' }}>
+              <div style={{ fontWeight: 700, fontSize: 13.5, color: '#000', lineHeight: 1.2 }}>
+                {user?.name || 'User Name'}
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>
+                {user?.email || 'admin@example.com'}
+              </div>
             </div>
-            <button
-              onClick={handleLogout}
-              style={{
-                width: '100%', padding: '11px 16px', background: 'none', border: 'none',
-                cursor: 'pointer', textAlign: 'left', fontSize: 13.5,
-                color: 'var(--danger)', fontFamily: 'inherit',
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = '#FEF2F2'}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}
-            >
-              Sign out
-            </button>
+            <div style={{ padding: '4px' }}>
+              <button
+                onClick={handleLogout}
+                style={{
+                  width: '100%', padding: '10px 12px', background: 'none', border: 'none',
+                  cursor: 'pointer', textAlign: 'left', color: 'var(--danger, #ef4444)',
+                  fontSize: 13, fontWeight: 500, borderRadius: '4px', transition: 'background 0.2s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#FEF2F2'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}
+              >
+                Sign out
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -247,41 +247,41 @@ export default function SuperAdminLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 820);
-  const sidebarWidth = collapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)';
+
+  const sidebarWidth = collapsed ? 'var(--sidebar-collapsed, 70px)' : 'var(--sidebar-width, 260px)';
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth <= 820);
-      if (window.innerWidth > 820) {
-        setSidebarOpen(false);
-      }
+      const mobile = window.innerWidth <= 820;
+      setIsMobile(mobile);
+      if (!mobile) setSidebarOpen(false);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
-      {/* Mobile overlay */}
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg, #f3f4f6)' }}>
       {isMobile && sidebarOpen && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 998,
-          }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 998 }}
           onClick={() => setSidebarOpen(false)}
         />
       )}
-
-      <SuperAdminSidebar collapsed={collapsed} setCollapsed={setCollapsed} isMobile={isMobile} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      <SuperAdminSidebar
+        collapsed={collapsed}
+        setCollapsed={setCollapsed}
+        isMobile={isMobile}
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+      />
       <div style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
         marginLeft: isMobile ? 0 : sidebarWidth,
         transition: 'margin-left var(--transition-slow)',
+        minWidth: 0,
       }}>
         <SuperAdminNavbar isMobile={isMobile} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
         <main style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
