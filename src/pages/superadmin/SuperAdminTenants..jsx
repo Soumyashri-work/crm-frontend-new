@@ -124,7 +124,7 @@ export default function SuperAdminTenants() {
             <thead>
               <tr>
                 <th>TENANT</th>
-                <th>SLUG</th>
+                <th>CONTACT EMAIL</th>
                 <th>STATUS</th>
                 <th>CREATED</th>
                 <th>ACTIONS</th>
