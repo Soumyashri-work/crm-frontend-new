@@ -2,9 +2,12 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import {
   LayoutDashboard, Ticket, Users, UserCircle,
-  Settings, ChevronLeft, ChevronRight, ClipboardList
+  Settings, ChevronLeft, ChevronRight, ClipboardList,
+  Building2, Shield,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+
+// ─── Nav configs per role ────────────────────────────────────────────────────
 
 const adminNav = [
   { to: '/admin/dashboard',  icon: LayoutDashboard, label: 'Dashboard' },
@@ -20,18 +23,54 @@ const agentNav = [
   { to: '/agent/profile',    icon: UserCircle,      label: 'Profile'    },
 ];
 
-export default function Sidebar({ isAdmin, onCollapsedChange }) {
+const superAdminNav = [
+  { to: '/superadmin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/superadmin/tenants',   icon: Building2,       label: 'Tenants'   },
+  { to: '/superadmin/admins',    icon: Shield,          label: 'Admins'    },
+  { to: '/superadmin/settings',  icon: Settings,        label: 'Settings'  },
+];
+
+// ─── Brand icon / label per role ─────────────────────────────────────────────
+
+const brandConfig = {
+  superadmin: {
+    icon:     Shield,
+    title:    'Super Admin',
+    subtitle: 'Multi-Tenant Portal',
+  },
+  admin: {
+    icon:     Ticket,
+    title:    'Unified CRM',
+    subtitle: 'Ticket Dashboard',
+  },
+  agent: {
+    icon:     Ticket,
+    title:    'Unified CRM',
+    subtitle: 'Ticket Dashboard',
+  },
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function Sidebar({ role, isAdmin, onCollapsedChange }) {
   const [collapsed, setCollapsed] = useState(false);
   const { logout }                = useAuth();
   const navigate                  = useNavigate();
-  const nav                       = isAdmin ? adminNav : agentNav;
+
+  // Resolve role — prefer explicit `role` prop, fall back to `isAdmin` boolean
+  const resolvedRole = role ?? (isAdmin ? 'admin' : 'agent');
+
+  const nav    = resolvedRole === 'superadmin' ? superAdminNav
+               : resolvedRole === 'admin'      ? adminNav
+               :                                 agentNav;
+
+  const brand  = brandConfig[resolvedRole] ?? brandConfig.admin;
+  const BrandIcon = brand.icon;
 
   const handleCollapse = () => {
-    const newState = !collapsed;
-    setCollapsed(newState);
-    if (onCollapsedChange) {
-      onCollapsedChange(newState);
-    }
+    const next = !collapsed;
+    setCollapsed(next);
+    onCollapsedChange?.(next);
   };
 
   const handleLogout = async () => {
@@ -42,66 +81,94 @@ export default function Sidebar({ isAdmin, onCollapsedChange }) {
 
   return (
     <aside style={{
-      position: 'fixed',
-      left: 0,
-      top: 0,
-      width: collapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)',
-      height: '100vh',
-      background: 'var(--surface)',
-      borderRight: '1px solid var(--border)',
-      display: 'flex',
-      flexDirection: 'column',
-      transition: 'width var(--transition-slow)',
-      overflow: 'hidden',
-      zIndex: 1000,
+      position:        'fixed',
+      left:            0,
+      top:             0,
+      width:           collapsed ? 'var(--sidebar-collapsed, 64px)' : 'var(--sidebar-width, 220px)',
+      height:          '100vh',
+      background:      'var(--surface)',
+      borderRight:     '1px solid var(--border)',
+      display:         'flex',
+      flexDirection:   'column',
+      transition:      'width var(--transition-slow, 0.3s ease)',
+      overflow:        'visible', // ✅ MUST be visible so the button can hang over the edge
+      zIndex:          1000,
     }}>
-      {/* Brand */}
+
+      {/* ── Brand ─────────────────────────────────────────────────────────── */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: collapsed ? '18px 0' : '18px 24px',
+        display:        'flex',
+        alignItems:     'center',
+        gap:            10,
+        padding:        collapsed ? '18px 0' : '18px 24px',
         justifyContent: collapsed ? 'center' : 'flex-start',
-        borderBottom: '1px solid var(--border)',
-        height: 'var(--navbar-height)',
-        lineHeight: 1,
+        borderBottom:   '1px solid var(--border)',
+        height:         'var(--navbar-height, 60px)',
+        lineHeight:     1,
+        flexShrink:     0,
+        overflow:       'hidden', // ✅ prevents text spill during transition
       }}>
         <div style={{
-          width: 36, height: 36, borderRadius: 10,
-          background: 'var(--primary)', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          width:           36,
+          height:          36,
+          borderRadius:    10,
+          background:      'var(--primary)',
+          display:         'flex',
+          alignItems:      'center',
+          justifyContent:  'center',
+          flexShrink:      0,
         }}>
-          <Ticket size={18} color="white" />
+          <BrandIcon size={18} color="white" />
         </div>
+
         {!collapsed && (
-          <div style={{ lineHeight: 1.2, display: 'flex', flexDirection: 'column', gap: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.2, margin: 0 }}>Unified CRM</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, lineHeight: 1.2, margin: 0 }}>Ticket Dashboard</div>
+          <div style={{ lineHeight: 1.2, display: 'flex', flexDirection: 'column', gap: 0, overflow: 'hidden' }}>
+            <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.2, margin: 0, whiteSpace: 'nowrap' }}>
+              {brand.title}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, lineHeight: 1.2, margin: 0, whiteSpace: 'nowrap' }}>
+              {brand.subtitle}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Nav */}
-      <nav style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 2, overflow: 'auto', minHeight: 0 }}>
+      {/* ── Nav links ─────────────────────────────────────────────────────── */}
+      <nav style={{
+        flex:          1,
+        padding:       '12px 10px',
+        display:       'flex',
+        flexDirection: 'column',
+        gap:           2,
+        overflowX:     'hidden', // ✅ hides text while width transitions
+        overflowY:     'auto',
+        minHeight:     0,
+      }}>
         {nav.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             title={collapsed ? label : undefined}
             style={({ isActive }) => ({
-              display: 'flex', alignItems: 'center',
-              gap: 10, padding: collapsed ? '10px 0' : '10px 12px',
+              display:        'flex',
+              alignItems:     'center',
+              gap:            10,
+              padding:        collapsed ? '10px 0' : '10px 12px',
               justifyContent: collapsed ? 'center' : 'flex-start',
-              borderRadius: 'var(--radius-sm)',
-              fontWeight: isActive ? 600 : 400,
-              fontSize: 14,
-              color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
-              background: isActive ? 'var(--primary-light)' : 'transparent',
-              transition: 'all var(--transition)',
+              borderRadius:   'var(--radius-sm)',
+              fontWeight:     isActive ? 600 : 400,
+              fontSize:       14,
+              color:          isActive ? 'var(--primary)' : 'var(--text-secondary)',
+              background:     isActive ? 'var(--primary-light)' : 'transparent',
+              transition:     'all var(--transition, 0.2s)',
               textDecoration: 'none',
+              whiteSpace:     'nowrap', // ✅ stops text wrapping onto multiple lines
+              overflow:       'hidden',
             })}
           >
             {({ isActive }) => (
               <>
-                <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
+                <Icon size={18} strokeWidth={isActive ? 2.5 : 2} style={{ flexShrink: 0 }} />
                 {!collapsed && <span>{label}</span>}
               </>
             )}
@@ -109,40 +176,47 @@ export default function Sidebar({ isAdmin, onCollapsedChange }) {
         ))}
       </nav>
 
-      {/* Collapse toggle */}
-      <div style={{ padding: '12px', flexShrink: 0 }}>
-        <button
-          onClick={handleCollapse}
-          title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-          style={{
-            width: '100%',
-            height: '40px',
-            borderRadius: 'var(--radius-sm)',
-            background: 'var(--surface-2)',
-            border: '1px solid var(--border)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 0,
-            fontSize: 13,
-            fontWeight: 500,
-            color: 'var(--text-secondary)',
-            transition: 'all var(--transition)',
-            fontFamily: 'inherit',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = 'var(--primary-light)';
-            e.currentTarget.style.color = 'var(--primary)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = 'var(--surface-2)';
-            e.currentTarget.style.color = 'var(--text-secondary)';
-          }}
-        >
-          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-        </button>
-      </div>
+      {/* ── Circular Collapse Toggle ──────────────────────────────────────── */}
+      <button
+        onClick={handleCollapse}
+        title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+        style={{
+          position: 'absolute',
+          right: -14,
+          top: 'calc(var(--navbar-height, 60px) + 24px)', // Adjust positioning as needed
+          width: 28,
+          height: 28,
+          borderRadius: '50%',
+          background: 'var(--surface)',
+          border: '2px solid var(--border)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 200,
+          color: 'var(--text-secondary)',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+          transition: 'background 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s',
+          padding: 0,
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.background = 'var(--primary)';
+          e.currentTarget.style.color = 'white';
+          e.currentTarget.style.borderColor = 'var(--primary)';
+          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.18)';
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.background = 'var(--surface)';
+          e.currentTarget.style.color = 'var(--text-secondary)';
+          e.currentTarget.style.borderColor = 'var(--border)';
+          e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.12)';
+        }}
+      >
+        {collapsed
+          ? <ChevronRight size={14} strokeWidth={2.5} />
+          : <ChevronLeft  size={14} strokeWidth={2.5} />
+        }
+      </button>
     </aside>
   );
 }
