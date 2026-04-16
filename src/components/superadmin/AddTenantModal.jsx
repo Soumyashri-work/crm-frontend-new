@@ -65,27 +65,27 @@ export default function AddTenantModal({ isOpen, onClose, onSubmit }) {
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
-  async function handleSubmit(e) {
-    e.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
+async function handleSubmit(e) {
+  e.preventDefault();
+  const errs = validate();
+  if (Object.keys(errs).length) { setErrors(errs); return; }
 
-    setSubmitting(true);
-    setApiError('');
-    try {
-      const tenant = await superAdminService.createTenant({
-        name:               form.name.trim(),
-        email:              form.email.trim(),
-        source_system_ids:  form.source_system_ids.map(Number),
-      });
-      onSubmit(tenant);
-      onClose();
-    } catch (err) {
-      setApiError(err.message || 'Something went wrong. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
+  setSubmitting(true);
+  setApiError('');
+  try {
+    const tenant = await superAdminService.createTenant({
+      name:              form.name.trim(),
+      email:             form.email.trim(),
+      source_system_ids: form.source_system_ids.map(Number),
+    });
+    onSubmit(tenant); // ✅ pass raw API response — it has result.source_systems
+    onClose();
+  } catch (err) {
+    setApiError(err.message || 'Something went wrong. Please try again.');
+  } finally {
+    setSubmitting(false);
   }
+}
 
   function field(key, value) {
     setForm(f => ({ ...f, [key]: value }));
