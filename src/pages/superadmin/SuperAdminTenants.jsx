@@ -1,52 +1,128 @@
-import { useState, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import { Link } from 'react-router-dom'; // Added Link for navigation
-import {
-  Search,
-  Plus,
-  Building2,
-  ChevronDown,
-  MoreVertical,
-  RefreshCw,
-  Loader2,
-  X,
-  Mail,
-  Globe,
-  Check,
-  ChevronLeft,
-  ChevronRight
-} from 'lucide-react';
+/**
+ * src/pages/superadmin/SuperAdminTenants.jsx — REFACTORED (PHASE 6)
+ *
+ * Uses DataTable component for search, sort, filter, pagination
+ * Maintains edit/delete functionality
+ * Pagination logic now internal to DataTable component
+ */
+
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Building2, Plus, Edit2, Trash2, X } from 'lucide-react';
+import { DataTable } from '../../components/DataTable';
 import AddTenantModal from '../../components/superadmin/AddTenantModal';
 import { superAdminService } from '../../services/superAdminService';
+import { PAGE_SIZE } from '../../constants/pagination';
 
-// --- Edit Tenant Modal Component ---
+// ─── Modal styles ────────────────────────────────────────────────────
+const ms = {
+  overlay: {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 1000,
+    background: 'rgba(0,0,0,0.45)',
+    backdropFilter: 'blur(3px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  modal: {
+    background: 'var(--surface)',
+    borderRadius: 'var(--radius)',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+    width: '100%',
+    maxWidth: 480,
+    border: '1px solid var(--border)',
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '20px 24px',
+    borderBottom: '1px solid var(--border)',
+  },
+  iconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    background: 'var(--primary)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  input: {
+    width: '100%',
+    padding: '9px 12px',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    background: 'var(--surface)',
+    fontSize: 13.5,
+    outline: 'none',
+    fontFamily: 'inherit',
+    boxSizing: 'border-box',
+  },
+  label: { display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 },
+  fieldError: { fontSize: 11.5, color: 'var(--danger)', marginTop: 4 },
+  footer: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: 10,
+    padding: '16px 24px',
+    borderTop: '1px solid var(--border)',
+  },
+  submitBtn: {
+    padding: '9px 20px',
+    borderRadius: 'var(--radius-sm)',
+    background: 'var(--primary)',
+    color: 'white',
+    fontWeight: 600,
+    cursor: 'pointer',
+    border: 'none',
+    fontFamily: 'inherit',
+  },
+  closeBtn: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' },
+  errorBanner: {
+    marginBottom: 16,
+    padding: '10px 14px',
+    background: '#FEF2F2',
+    border: '1px solid #FECACA',
+    color: '#DC2626',
+    borderRadius: 'var(--radius-sm)',
+    fontSize: 13,
+  },
+};
+
+// ─── Edit Tenant Modal ───────────────────────────────────────────────
 function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
-  const initialSelected = (tenant?.source_systems || []).map(s =>
-    typeof s === 'string' ? s : (s.system_name || '')
-  ).filter(Boolean);
-
   const [form, setForm] = useState({
     name: tenant?.name || '',
-    email: tenant?.email || tenant?.contact_email || ''
+    email: tenant?.email || tenant?.contact_email || '',
   });
-  const [selectedSystems, setSelectedSystems] = useState(initialSelected);
+  const [selectedSystems, setSelectedSystems] = useState(
+    (tenant?.source_systems || [])
+      .map((s) => (typeof s === 'string' ? s : s.system_name || ''))
+      .filter(Boolean)
+  );
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState('');
 
-  function validate() {
+  const validate = () => {
     const e = {};
     if (!form.name.trim()) e.name = 'Tenant name is required.';
     if (!form.email.trim()) e.email = 'Contact email is required.';
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Enter a valid email.';
     if (selectedSystems.length === 0) e.systems = 'Select at least one CRM system.';
     return e;
-  }
+  };
 
-  async function handleSubmit(e) {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      return;
+    }
     setSubmitting(true);
     setApiError('');
     try {
@@ -55,7 +131,7 @@ function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
         name: form.name.trim(),
         email: form.email.trim(),
         contact_email: form.email.trim(),
-        source_systems: selectedSystems.map(s => ({ system_name: s })),
+        source_systems: selectedSystems.map((s) => ({ system_name: s })),
       });
       onClose();
     } catch (err) {
@@ -63,34 +139,35 @@ function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
     } finally {
       setSubmitting(false);
     }
-  }
+  };
 
-  function field(key, value) {
-    setForm(f => ({ ...f, [key]: value }));
-    if (errors[key]) setErrors(e => ({ ...e, [key]: '' }));
-  }
-
-  function toggleSystem(sys) {
-    setSelectedSystems(prev =>
-      prev.includes(sys) ? prev.filter(s => s !== sys) : [...prev, sys]
+  const toggleSystem = (sys) => {
+    setSelectedSystems((prev) =>
+      prev.includes(sys) ? prev.filter((s) => s !== sys) : [...prev, sys]
     );
-    if (errors.systems) setErrors(e => ({ ...e, systems: '' }));
-  }
+    if (errors.systems) setErrors((e) => ({ ...e, systems: '' }));
+  };
 
-  const systemOptions = allSystems.map(s => s.system_name || s);
+  const systemOptions = allSystems.map((s) => s.system_name || s);
 
   return (
-    <div style={ms.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div style={ms.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div style={ms.modal} role="dialog" aria-modal="true">
         <div style={ms.header}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={ms.iconBox}><Building2 size={18} color="white" /></div>
+            <div style={ms.iconBox}>
+              <Building2 size={18} color="white" />
+            </div>
             <div>
               <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Edit Tenant</h2>
-              <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: 0 }}>Update organization details</p>
+              <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: 0 }}>
+                Update organization details
+              </p>
             </div>
           </div>
-          <button onClick={onClose} style={ms.closeBtn} aria-label="Close"><X size={18} /></button>
+          <button onClick={onClose} style={ms.closeBtn} aria-label="Close">
+            <X size={18} />
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} noValidate>
@@ -98,43 +175,51 @@ function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
             {apiError && <div style={ms.errorBanner} role="alert">{apiError}</div>}
 
             <div style={{ marginBottom: 18 }}>
-              <label style={ms.label}>Tenant Name <span style={{ color: 'var(--danger)' }}>*</span></label>
-              <div style={{ position: 'relative' }}>
-                <Building2 size={15} style={ms.inputIcon} />
-                <input
-                  style={{ ...ms.input, paddingLeft: 36, borderColor: errors.name ? 'var(--danger)' : undefined }}
-                  placeholder="e.g. Global Industries Corp"
-                  value={form.name}
-                  onChange={e => field('name', e.target.value)}
-                  autoFocus
-                />
-              </div>
-              {errors.name && <p role="alert" style={ms.fieldError}>{errors.name}</p>}
+              <label style={ms.label}>
+                Tenant Name <span style={{ color: 'var(--danger)' }}>*</span>
+              </label>
+              <input
+                style={ms.input}
+                placeholder="e.g. Global Industries Corp"
+                value={form.name}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, name: e.target.value }));
+                  if (errors.name) setErrors((e) => ({ ...e, name: '' }));
+                }}
+                autoFocus
+              />
+              {errors.name && <p style={ms.fieldError}>{errors.name}</p>}
             </div>
 
             <div style={{ marginBottom: 18 }}>
-              <label style={ms.label}>Contact Email <span style={{ color: 'var(--danger)' }}>*</span></label>
-              <div style={{ position: 'relative' }}>
-                <Mail size={15} style={ms.inputIcon} />
-                <input
-                  type="email"
-                  style={{ ...ms.input, paddingLeft: 36, borderColor: errors.email ? 'var(--danger)' : undefined }}
-                  placeholder="admin@company.com"
-                  value={form.email}
-                  onChange={e => field('email', e.target.value)}
-                />
-              </div>
-              {errors.email && <p role="alert" style={ms.fieldError}>{errors.email}</p>}
+              <label style={ms.label}>
+                Contact Email <span style={{ color: 'var(--danger)' }}>*</span>
+              </label>
+              <input
+                type="email"
+                style={ms.input}
+                placeholder="admin@company.com"
+                value={form.email}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, email: e.target.value }));
+                  if (errors.email) setErrors((e) => ({ ...e, email: '' }));
+                }}
+              />
+              {errors.email && <p style={ms.fieldError}>{errors.email}</p>}
             </div>
 
             <div style={{ marginBottom: 18 }}>
-              <label style={ms.label}>Source / CRM Systems <span style={{ color: 'var(--danger)' }}>*</span></label>
-              <div style={{
-                border: `1px solid ${errors.systems ? 'var(--danger)' : 'var(--border)'}`,
-                borderRadius: 'var(--radius-sm)',
-                background: 'var(--surface)',
-                overflow: 'hidden',
-              }}>
+              <label style={ms.label}>
+                Source / CRM Systems <span style={{ color: 'var(--danger)' }}>*</span>
+              </label>
+              <div
+                style={{
+                  border: errors.systems ? '1px solid var(--danger)' : '1px solid var(--border)',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'var(--surface)',
+                  overflow: 'hidden',
+                }}
+              >
                 {systemOptions.map((sys, idx) => {
                   const checked = selectedSystems.includes(sys);
                   return (
@@ -147,49 +232,33 @@ function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
                         padding: '9px 12px',
                         cursor: 'pointer',
                         borderTop: idx > 0 ? '1px solid var(--border-light)' : 'none',
-                        background: checked ? 'var(--primary-subtle, #EEF2FF)' : 'transparent',
-                        transition: '0.15s',
+                        background: checked ? 'var(--primary-light)' : 'transparent',
                         userSelect: 'none',
-                        position: 'relative',
                       }}
                     >
                       <input
                         type="checkbox"
                         checked={checked}
                         onChange={() => toggleSystem(sys)}
-                        style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+                        style={{ cursor: 'pointer' }}
                       />
-                      <span
-                        style={{
-                          width: 16, height: 16, borderRadius: 4, flexShrink: 0,
-                          border: `1.5px solid ${checked ? 'var(--primary)' : 'var(--border)'}`,
-                          background: checked ? 'var(--primary)' : 'var(--surface)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          transition: 'background 0.15s, border-color 0.15s',
-                        }}
-                        aria-hidden="true"
-                      >
-                        {checked && <Check size={11} color="white" strokeWidth={3} />}
-                      </span>
-                      <Globe size={14} style={{ color: checked ? 'var(--primary)' : 'var(--text-muted)', flexShrink: 0 }} />
-                      <span style={{ fontSize: 13.5, color: 'var(--text-primary)', fontWeight: checked ? 600 : 400 }}>
+                      <span style={{ fontSize: 13.5, color: 'var(--text-primary)' }}>
                         {sys}
                       </span>
                     </label>
                   );
                 })}
               </div>
-              {errors.systems && <p role="alert" style={ms.fieldError}>{errors.systems}</p>}
+              {errors.systems && <p style={ms.fieldError}>{errors.systems}</p>}
             </div>
           </div>
 
           <div style={ms.footer}>
-            <button type="button" onClick={onClose} style={ms.cancelBtn} disabled={submitting}>Cancel</button>
+            <button type="button" onClick={onClose} style={{ ...ms.submitBtn, background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)' }} disabled={submitting}>
+              Cancel
+            </button>
             <button type="submit" style={ms.submitBtn} disabled={submitting}>
-              {submitting
-                ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</>
-                : 'Save Changes'
-              }
+              Save Changes
             </button>
           </div>
         </form>
@@ -198,103 +267,91 @@ function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
   );
 }
 
-// --- Action Menu Component with Collision Detection ---
-function ActionMenu({ anchorEl, onEdit, onClose }) {
-  const [coords, setCoords] = useState({ top: 0, right: 0, openUp: false });
+// ─── Delete Confirm Modal ────────────────────────────────────────────
+function DeleteConfirmModal({ tenant, onClose, onConfirm, isLoading }) {
+  return (
+    <div style={ms.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={ms.modal} role="dialog" aria-modal="true">
+        <div style={ms.header}>
+          <div>
+            <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>
+              Delete {tenant?.name}?
+            </h2>
+            <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+              This action cannot be undone.
+            </p>
+          </div>
+          <button onClick={onClose} style={ms.closeBtn}>
+            <X size={18} />
+          </button>
+        </div>
 
-  useEffect(() => {
-    if (!anchorEl) return;
-    const rect = anchorEl.getBoundingClientRect();
-    const menuHeight = 85;
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const openUp = spaceBelow < (menuHeight + 20);
+        <div style={{ padding: '24px' }}>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 0 }}>
+            All data associated with this tenant will be permanently deleted.
+          </p>
+        </div>
 
-    setCoords({
-      top: openUp ? rect.top - menuHeight - 8 : rect.bottom + 4,
-      right: window.innerWidth - rect.right,
-      openUp
-    });
-  }, [anchorEl]);
-
-  if (!anchorEl) return null;
-
-  return createPortal(
-    <>
-      <div style={{ position: 'fixed', inset: 0, zIndex: 9998 }} onClick={onClose} />
-      <div style={{
-        position: 'fixed',
-        top: coords.top,
-        right: coords.right,
-        zIndex: 9999,
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-sm)',
-        boxShadow: 'var(--shadow-lg)',
-        minWidth: 140,
-        overflow: 'hidden',
-        animation: 'fadeInScale 0.1s ease-out'
-      }}>
-        <style>{`
-          @keyframes fadeInScale {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
-          }
-        `}</style>
-        <button
-          onClick={() => { onEdit(); onClose(); }}
-          style={{ width: '100%', padding: '9px 14px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'inherit' }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-        >
-          Edit
-        </button>
-        <button
-          onClick={e => { e.preventDefault(); onClose(); }}
-          style={{ width: '100%', padding: '9px 14px', border: 'none', borderTop: '1px solid var(--border-light)', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: 'var(--danger)', fontFamily: 'inherit' }}
-          onMouseEnter={e => e.currentTarget.style.background = '#FEF2F2'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-        >
-          Delete
-        </button>
+        <div style={ms.footer}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              ...ms.submitBtn,
+              background: 'transparent',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border)',
+            }}
+            disabled={isLoading}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            style={{ ...ms.submitBtn, background: 'var(--danger)' }}
+            disabled={isLoading}
+          >
+            Delete
+          </button>
+        </div>
       </div>
-    </>,
-    document.body
+    </div>
   );
 }
 
-// --- Main Page Component ---
+// ─── Main Page Component ─────────────────────────────────────────────
 export default function SuperAdminTenants() {
   const [tenants, setTenants] = useState([]);
   const [allSystems, setAllSystems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [openMenuId, setOpenMenuId] = useState(null);
-  const [menuAnchor, setMenuAnchor] = useState(null);
+  const [sortField, setSortField] = useState('');
+  const [sortDir, setSortDir] = useState('asc');
+  const [page, setPage] = useState(1);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [editingTenant, setEditingTenant] = useState(null);
+  const [deletingTenant, setDeletingTenant] = useState(null);
 
-  // --- Pagination State ---
-  const [currentPage, setCurrentPage] = useState(1);
-  const recordsPerPage = 10;
-
+  // ─── Fetch systems on mount ─────────────────────────────────────────
   useEffect(() => {
-    superAdminService.getSourceSystems()
-      .then(data => setAllSystems(Array.isArray(data) ? data : []))
+    superAdminService
+      .getSourceSystems()
+      .then((data) => setAllSystems(Array.isArray(data) ? data : []))
       .catch(() => setAllSystems([]));
   }, []);
 
+  // ─── Fetch tenants ──────────────────────────────────────────────────
   const fetchTenants = useCallback(async (signal) => {
     setLoading(true);
     setError('');
     try {
       const data = await superAdminService.getTenants();
       if (signal?.aborted) return;
-      setTenants(Array.isArray(data) ? data : (data?.items ?? []));
+      setTenants(Array.isArray(data) ? data : data?.items ?? []);
     } catch (err) {
-      if (signal?.aborted) return;
-      setError('Could not load tenants. Please try again.');
+      if (!signal?.aborted) setError('Could not load tenants. Please try again.');
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
@@ -306,74 +363,277 @@ export default function SuperAdminTenants() {
     return () => controller.abort();
   }, [fetchTenants]);
 
-  // Reset page when search or filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, statusFilter]);
+  // ─── Filter & sort ──────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    return tenants.filter((t) => {
+      if (search) {
+        const q = search.toLowerCase();
+        return (
+          t.name?.toLowerCase().includes(q) ||
+          t.email?.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [tenants, search]);
 
-  const filtered = tenants.filter(t => {
-    const status = t.is_active ? 'Active' : 'Inactive';
-    if (statusFilter && status !== statusFilter) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return (
-        t.name.toLowerCase().includes(q) ||
-        (t.email || t.contact_email || '').toLowerCase().includes(q)
-      );
+  const sorted = useMemo(() => {
+    if (!sortField) return filtered;
+    return [...filtered].sort((a, b) => {
+      const av = String(a[sortField] ?? '').toLowerCase();
+      const bv = String(b[sortField] ?? '').toLowerCase();
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filtered, sortField, sortDir]);
+
+  // ─── Handlers ───────────────────────────────────────────────────────
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir('asc');
     }
-    return true;
-  });
-
-  // --- Pagination Logic ---
-  const totalPages = Math.ceil(filtered.length / recordsPerPage);
-  const currentRecords = filtered.slice(
-    (currentPage - 1) * recordsPerPage,
-    currentPage * recordsPerPage
-  );
+  };
 
   const handleAddTenant = (result) => {
-    const t = {
-      ...(result.tenant ?? result),
-      source_systems: result.source_systems ?? []
-    };
-    setTenants(prev => [t, ...prev]);
-    setShowModal(false);
+    fetchTenants(new AbortController().signal);
+    setShowAddModal(false);
   };
 
-  const handleSaveEdit = (updated) => {
-    setTenants(prev => prev.map(t =>
-      t.id === updated.id
-        ? { ...t, name: updated.name, email: updated.email, contact_email: updated.email, source_systems: updated.source_systems }
-        : t
-    ));
+  const handleSaveEdit = async (updated) => {
+    try {
+      await superAdminService.updateTenant(updated.id, {
+        name: updated.name,
+        email: updated.email,
+        source_systems: updated.source_systems,
+      });
+      setTenants((prev) =>
+        prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t))
+      );
+      setEditingTenant(null);
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    }
   };
 
+  const handleDeleteConfirm = async () => {
+    if (!deletingTenant) return;
+    try {
+      await superAdminService.deleteTenant(deletingTenant.id);
+      setTenants((prev) => prev.filter((t) => t.id !== deletingTenant.id));
+      setDeletingTenant(null);
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    }
+  };
+
+  // ─── Format date helper ─────────────────────────────────────────────
   const formatDate = (iso) => {
     if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(iso).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
   };
 
-  const hasActiveFilters = !!statusFilter;
+  // ─── Columns ─────────────────────────────────────────────────────────
+  const columns = [
+    {
+      key: 'name',
+      label: 'Tenant',
+      sortable: true,
+      width: '25%',
+      render: (value, row) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 8,
+              background: 'var(--primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <Building2 size={17} color="white" />
+          </div>
+          <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>
+            {value}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'email',
+      label: 'Contact Email',
+      sortable: true,
+      width: '30%',
+      render: (value, row) => (
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+          {value || row.contact_email || '—'}
+        </div>
+      ),
+    },
+    {
+      key: 'is_active',
+      label: 'Status',
+      sortable: true,
+      width: '15%',
+      render: (value, row) => {
+        const isActive = row.is_active ?? true;
+        const status = isActive ? 'Active' : 'Inactive';
+        const bgColor = isActive ? '#DCFCE7' : '#F3F4F6';
+        const textColor = isActive ? '#166534' : '#6B7280';
+        return (
+          <span
+            style={{
+              display: 'inline-block',
+              padding: '4px 10px',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: 12.5,
+              fontWeight: 600,
+              background: bgColor,
+              color: textColor,
+            }}
+          >
+            {status}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'created_at',
+      label: 'Created',
+      sortable: true,
+      width: '15%',
+      render: (value, row) => (
+        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+          {formatDate(value || row.created_at)}
+        </span>
+      ),
+    },
+    {
+      key: 'id',
+      label: 'Actions',
+      width: 60,
+      align: 'center',
+      render: (value, row) => (
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'center' }}>
+          <button
+            onClick={() => setEditingTenant(row)}
+            title="Edit tenant"
+            style={{
+              padding: 6,
+              border: 'none',
+              background: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-muted)',
+              transition: 'color 0.2s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+          >
+            <Edit2 size={14} />
+          </button>
+          <button
+            onClick={() => setDeletingTenant(row)}
+            title="Delete tenant"
+            style={{
+              padding: 6,
+              border: 'none',
+              background: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-muted)',
+              transition: 'color 0.2s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      ),
+    },
+  ];
 
-  const clearFilters = () => {
-    setStatusFilter('');
-  };
-
+  // ─── Render ──────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 100 }}>
-      {/* GLOBAL STYLES FOR SPIN AND BREADCRUMB */}
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .breadcrumb-link {
-          color: var(--text-muted);
-          text-decoration: none;
-          transition: color 0.2s;
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <div>
+          <h1>Tenants</h1>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+            Manage all organizations on the platform
+          </p>
+        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          style={{
+            padding: '9px 16px',
+            fontSize: 13,
+            fontWeight: 600,
+            background: 'var(--primary)',
+            color: 'white',
+            border: 'none',
+            borderRadius: 'var(--radius-sm)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <Plus size={14} /> Add Tenant
+        </button>
+      </div>
+
+      {/* DataTable — PHASE 6: Unified pagination now internal to DataTable */}
+      <DataTable
+        columns={columns}
+        data={sorted}
+        pageSize={PAGE_SIZE.SMALL}
+        currentPage={page}
+        onPageChange={setPage}
+        loading={loading}
+        error={error || null}
+        onRetry={() => fetchTenants(new AbortController().signal)}
+        searchValue={search}
+        onSearchChange={(val) => {
+          setSearch(val);
+          setPage(1);
+        }}
+        filters={{}}
+        onFilterChange={() => {}}
+        filterOptions={[]}
+        sortField={sortField}
+        sortDir={sortDir}
+        onSort={handleSort}
+        searchPlaceholder="Search by name or email…"
+        emptyMessage={
+          search ? 'No tenants match your search.' : 'No tenants found.'
         }
-        .breadcrumb-link:hover {
-          color: var(--primary);
-          text-decoration: underline;
-        }
-      `}</style>
+      />
+
+      {/* Modals */}
+      {showAddModal && (
+        <AddTenantModal
+          onClose={() => setShowAddModal(false)}
+          onSuccess={handleAddTenant}
+          allSystems={allSystems}
+        />
+      )}
 
       {editingTenant && (
         <EditTenantModal
@@ -384,254 +644,14 @@ export default function SuperAdminTenants() {
         />
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          {/* LINKED BREADCRUMB */}
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>
-            <Link to="/superadmin/dashboard" className="breadcrumb-link">
-              Dashboard
-            </Link>
-            <span style={{ margin: '0 6px' }}>›</span>
-            <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>Tenants</span>
-          </div>
-          <h2 style={{ fontSize: 20, fontWeight: 700 }}>Tenants</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, marginTop: 2 }}>Manage all tenant organizations</p>
-        </div>
-        <button onClick={() => setShowModal(true)} className="btn btn-primary"
-          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px', fontSize: 14 }}>
-          <Plus size={16} /> Add Tenant
-        </button>
-      </div>
-
-      {/* Filter Toolbar */}
-      <div className="filter-toolbar">
-        {/* Search Row */}
-        <div className="filter-search-row">
-          <Search size={15} className="filter-search-icon" />
-          <input
-            className="filter-search-input"
-            placeholder="Search by name or email…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-
-        {/* Dropdowns Row */}
-        <div className="filter-dropdowns-row">
-          {/* Status Filter */}
-          <div className="filter-select-wrap">
-            <select
-              className={`filter-select${statusFilter ? ' active' : ''}`}
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-            >
-              <option value="">Status: All</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-            <ChevronDown size={13} className="filter-chevron" />
-          </div>
-
-          {/* Clear Filters */}
-          {hasActiveFilters && (
-            <button className="filter-clear-btn" onClick={clearFilters}>
-              Clear Filters
-            </button>
-          )}
-
-          {/* Refresh Button */}
-          <button
-            onClick={() => fetchTenants()}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '8px 12px',
-              border: '1.5px solid var(--border-dark)',
-              borderRadius: 'var(--radius-sm)',
-              background: 'transparent',
-              fontSize: 12.5,
-              fontWeight: 500,
-              cursor: 'pointer',
-              color: 'var(--text-secondary)',
-              fontFamily: 'inherit',
-              transition: 'all 0.15s',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            <RefreshCw size={14} /> Refresh
-          </button>
-        </div>
-      </div>
-
-      {error && (
-        <div style={{ padding: '12px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 'var(--radius-sm)', fontSize: 13, color: '#DC2626', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          {error}
-          <button onClick={() => fetchTenants()} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626', fontSize: 13, fontFamily: 'inherit', textDecoration: 'underline' }}>Retry</button>
-        </div>
+      {deletingTenant && (
+        <DeleteConfirmModal
+          tenant={deletingTenant}
+          onClose={() => setDeletingTenant(null)}
+          onConfirm={handleDeleteConfirm}
+          isLoading={false}
+        />
       )}
-
-      <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
-        <div className="table-wrap">
-          <table style={{ overflow: 'visible' }}>
-            <thead>
-              <tr>
-                <th>TENANT</th>
-                <th>CONTACT EMAIL</th>
-                <th>STATUS</th>
-                <th>CREATED</th>
-                <th>ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px 0' }}><Loader2 size={20} style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }} /></td></tr>
-              ) : currentRecords.length === 0 ? (
-                <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
-                  {search || statusFilter ? 'No tenants match your filters.' : 'No tenants found.'}
-                </td></tr>
-              ) : currentRecords.map((t, i) => (
-                <tr key={t.id} className="animate-in" style={{ animationDelay: `${i * 0.03}s` }}>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 9, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Building2 size={17} color="white" />
-                      </div>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>{t.name}</div>
-                    </div>
-                  </td>
-                  <td>{t.email || t.contact_email || '—'}</td>
-                  <td>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 99, fontSize: 12, fontWeight: 600, background: t.is_active ? '#ECFDF5' : '#FEF2F2', color: t.is_active ? '#059669' : '#DC2626' }}>
-                      {t.is_active && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#059669' }} />}
-                      {t.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td style={{ color: 'var(--text-secondary)', fontSize: 13.5 }}>{formatDate(t.created_at)}</td>
-                  <td>
-                    <button className="btn btn-ghost" style={{ padding: '5px 8px' }}
-                      onClick={(e) => { setOpenMenuId(openMenuId === t.id ? null : t.id); setMenuAnchor(e.currentTarget); }}>
-                      <MoreVertical size={16} />
-                    </button>
-                    {openMenuId === t.id && (
-                      <ActionMenu
-                        anchorEl={menuAnchor}
-                        onEdit={() => setEditingTenant(t)}
-                        onClose={() => setOpenMenuId(null)}
-                      />
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* --- Pagination Navigation --- */}
-        {!loading && totalPages > 1 && (
-          <div style={{
-            padding: '16px 24px',
-            borderTop: '1px solid var(--border-light)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: 'var(--surface)'
-          }}>
-            <span style={{
-              fontSize: 13,
-              color: 'var(--text-secondary)',
-              fontWeight: '400 !important'
-            }}>
-              Showing {(currentPage - 1) * recordsPerPage + 1} to {Math.min(currentPage * recordsPerPage, filtered.length)} of {filtered.length} tenants
-            </span>
-
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: 6,
-                  border: '1px solid var(--border)',
-                  background: 'white',
-                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                  opacity: currentPage === 1 ? 0.5 : 1,
-                  display: 'flex', alignItems: 'center', gap: 4, fontSize: 13
-                }}
-              >
-                <ChevronLeft size={16} /> Previous
-              </button>
-
-              <div style={{ display: 'flex', gap: 4 }}>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 6,
-                      border: 'none',
-                      fontSize: 13,
-                      fontWeight: currentPage === page ? 600 : 400,
-                      background: currentPage === page ? 'var(--primary)' : 'transparent',
-                      color: currentPage === page ? 'white' : 'var(--text-primary)',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {page}
-                  </button>
-                ))}
-              </div>
-
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: 6,
-                  border: '1px solid var(--border)',
-                  background: 'white',
-                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                  opacity: currentPage === totalPages ? 0.5 : 1,
-                  display: 'flex', alignItems: 'center', gap: 4, fontSize: 13
-                }}
-              >
-                Next <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Footer count when single page */}
-        {!loading && totalPages <= 1 && (
-          <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', fontSize: 13, color: 'var(--text-secondary)' }}>
-            Showing {filtered.length} of {tenants.length} tenants
-          </div>
-        )}
-      </div>
-
-      <AddTenantModal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        onSubmit={handleAddTenant}
-      />
     </div>
   );
 }
-
-const ms = {
-  overlay: { position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 },
-  modal: { background: 'var(--surface)', borderRadius: 'var(--radius)', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', width: '100%', maxWidth: 480, border: '1px solid var(--border)' },
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: '1px solid var(--border)' },
-  iconBox: { width: 38, height: 38, borderRadius: 10, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  closeBtn: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' },
-  inputIcon: { position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' },
-  input: { width: '100%', padding: '9px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--surface)', fontSize: 13.5, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' },
-  label: { display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 },
-  fieldError: { fontSize: 11.5, color: 'var(--danger)', marginTop: 4 },
-  footer: { display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '16px 24px', borderTop: '1px solid var(--border)' },
-  cancelBtn: { padding: '9px 18px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--surface)', cursor: 'pointer', fontFamily: 'inherit' },
-  submitBtn: { padding: '9px 20px', borderRadius: 'var(--radius-sm)', background: 'var(--primary)', color: 'white', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, border: 'none', fontFamily: 'inherit' },
-  errorBanner: { marginBottom: 16, padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', borderRadius: 'var(--radius-sm)', fontSize: 13 },
-};
