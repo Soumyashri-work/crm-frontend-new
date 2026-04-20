@@ -92,14 +92,14 @@ export default function Sidebar({ role, isAdmin, onCollapsedChange }) {
       flexDirection:   'column',
       transition:      'width var(--transition-slow, 0.3s ease)',
       overflow:        'visible', // ✅ MUST be visible so the button can hang over the edge
-      zIndex:          1000,
+      zIndex:          'var(--z-sidebar, 999)',
     }}>
 
       {/* ── Brand ─────────────────────────────────────────────────────────── */}
       <div style={{
         display:        'flex',
         alignItems:     'center',
-        gap:            10,
+        gap:            'var(--space-md, 8px)',
         padding:        collapsed ? '18px 0' : '18px 24px',
         justifyContent: collapsed ? 'center' : 'flex-start',
         borderBottom:   '1px solid var(--border)',
@@ -111,7 +111,7 @@ export default function Sidebar({ role, isAdmin, onCollapsedChange }) {
         <div style={{
           width:           36,
           height:          36,
-          borderRadius:    10,
+          borderRadius:    'var(--radius, 10px)',
           background:      'var(--primary)',
           display:         'flex',
           alignItems:      'center',
@@ -136,10 +136,10 @@ export default function Sidebar({ role, isAdmin, onCollapsedChange }) {
       {/* ── Nav links ─────────────────────────────────────────────────────── */}
       <nav style={{
         flex:          1,
-        padding:       '12px 10px',
+        padding:       'var(--space-md, 12px) var(--space-sm, 10px)',
         display:       'flex',
         flexDirection: 'column',
-        gap:           2,
+        gap:           'var(--space-xs, 2px)',
         overflowX:     'hidden', // ✅ hides text while width transitions
         overflowY:     'auto',
         minHeight:     0,
@@ -152,7 +152,7 @@ export default function Sidebar({ role, isAdmin, onCollapsedChange }) {
             style={({ isActive }) => ({
               display:        'flex',
               alignItems:     'center',
-              gap:            10,
+              gap:            'var(--space-md, 10px)',
               padding:        collapsed ? '10px 0' : '10px 12px',
               justifyContent: collapsed ? 'center' : 'flex-start',
               borderRadius:   'var(--radius-sm)',
@@ -183,7 +183,7 @@ export default function Sidebar({ role, isAdmin, onCollapsedChange }) {
         style={{
           position: 'absolute',
           right: -14,
-          top: 'calc(var(--navbar-height, 60px) + 24px)', // Adjust positioning as needed
+          top: 'calc(var(--navbar-height, 60px) + 24px)',
           width: 28,
           height: 28,
           borderRadius: '50%',
@@ -193,23 +193,23 @@ export default function Sidebar({ role, isAdmin, onCollapsedChange }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 200,
+          zIndex: 'var(--z-fixed, 200)',
           color: 'var(--text-secondary)',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
-          transition: 'background 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s',
+          boxShadow: 'var(--shadow-sm)',
+          transition: 'all var(--transition)',
           padding: 0,
         }}
         onMouseEnter={e => {
           e.currentTarget.style.background = 'var(--primary)';
           e.currentTarget.style.color = 'white';
           e.currentTarget.style.borderColor = 'var(--primary)';
-          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.18)';
+          e.currentTarget.style.boxShadow = 'var(--shadow-md)';
         }}
         onMouseLeave={e => {
           e.currentTarget.style.background = 'var(--surface)';
           e.currentTarget.style.color = 'var(--text-secondary)';
           e.currentTarget.style.borderColor = 'var(--border)';
-          e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.12)';
+          e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
         }}
       >
         {collapsed

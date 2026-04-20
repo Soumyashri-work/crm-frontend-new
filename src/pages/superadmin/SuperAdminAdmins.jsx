@@ -8,6 +8,7 @@
  * ✅ Sort arrows added for Admin (name), Tenant, and Created columns
  * ✅ Status column: no sort arrows
  * ✅ Alignment: Actions column right-aligned to match Tenants page
+ * ✅ DELETE FUNCTIONALITY: Trash2 button now opens ConfirmDeleteModal
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -20,6 +21,7 @@ import {
 import { User, Mail } from 'lucide-react';
 import { getInitials, getAvatarColor } from '../../utils/helpers';
 import AddAdminModal from '../../components/superadmin/AddAdminModal';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import { superAdminService } from '../../services/superAdminService';
 import { StatusBadge } from './SuperAdminTenants';
 
@@ -222,6 +224,7 @@ export default function SuperAdminAdmins() {
   const [statusFilter, setStatusFilter] = useState('');
   const [showModal, setShowModal]     = useState(false);
   const [editingAdmin, setEditingAdmin] = useState(null);
+  const [deletingAdmin, setDeletingAdmin] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [setupLinkData, setSetupLinkData] = useState(null);
   // Sort state
@@ -306,6 +309,17 @@ export default function SuperAdminAdmins() {
     setAdmins(prev => prev.map(a => a.id === updated.id ? { ...a, ...updated } : a));
   };
 
+  const handleDeleteConfirm = async () => {
+    if (!deletingAdmin) return;
+    try {
+      await superAdminService.deleteAdmin(deletingAdmin.id);
+      setAdmins((prev) => prev.filter((a) => a.id !== deletingAdmin.id));
+      setDeletingAdmin(null);
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    }
+  };
+
   const formatDate = (iso) => {
     if (!iso) return '—';
     return new Date(iso).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
@@ -328,6 +342,16 @@ export default function SuperAdminAdmins() {
 
       {setupLinkData && (
         <PasswordSetupLinkModal setupLink={setupLinkData.link} adminName={setupLinkData.adminName} onClose={() => setSetupLinkData(null)} />
+      )}
+
+      {deletingAdmin && (
+        <ConfirmDeleteModal
+          agent={deletingAdmin}
+          isOpen={!!deletingAdmin}
+          onClose={() => setDeletingAdmin(null)}
+          onConfirm={handleDeleteConfirm}
+          isDeleting={false}
+        />
       )}
 
       {/* Page header */}
@@ -448,7 +472,7 @@ export default function SuperAdminAdmins() {
                       <button
                         type="button"
                         title="Delete admin"
-                        onClick={() => {}} // Removed logic: Nothing happens
+                        onClick={() => setDeletingAdmin(a)}
                         style={{ padding:6, border:'none', background:'none', cursor:'pointer', color:'var(--text-muted)', transition:'color 0.2s' }}
                         onMouseEnter={e => e.currentTarget.style.color = '#EF4444'}
                         onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}

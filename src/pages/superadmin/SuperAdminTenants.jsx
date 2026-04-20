@@ -7,6 +7,7 @@
  *     shown checked + blue-highlighted (identical to Add Tenant modal)
  *  ✅ Status column: sortable:false — no sort arrows
  *  ✅ Contact Email column: sortable:true + comparator reads email||contact_email (functional)
+ *  ✅ DELETE FUNCTIONALITY: Trash2 button now opens ConfirmDeleteModal
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -398,7 +399,7 @@ export default function SuperAdminTenants() {
             <Edit2 size={14} />
           </button>
           <button
-            onClick={() => {}} // Removed logic: Nothing happens
+            onClick={() => setDeletingTenant(row)}
             title="Delete tenant"
             style={{ padding:6, border:'none', background:'none', cursor:'pointer', color:'var(--text-muted)', transition:'color 0.2s' }}
             onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}
