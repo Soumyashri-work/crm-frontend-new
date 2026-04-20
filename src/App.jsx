@@ -8,7 +8,7 @@
  *
  * All existing routes, layouts, and imports are UNCHANGED.
  */
-
+ 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
@@ -18,18 +18,18 @@ import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard.jsx';
 import SuperAdminTenants from './pages/superadmin/SuperAdminTenants.jsx';
 import SuperAdminAdmins from './pages/superadmin/SuperAdminAdmins.jsx';
 import SuperAdminSettings from './pages/superadmin/SuperAdminSettings.jsx';
-
+ 
 // Auth pages
 import Login from './pages/auth/Login';
 import AuthCallback from './pages/auth/AuthCallback';
-
+ 
 // NEW — Invite page (Flow 1B + Flow 2B)
 import InvitePage from './pages/invite/InvitePage';
-
+ 
 // Layouts
 import AdminLayout from './layouts/AdminLayout';
 import AgentLayout from './layouts/AgentLayout';
-
+ 
 // Admin pages
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminTickets from './pages/admin/Tickets';
@@ -37,12 +37,12 @@ import TicketDetails from './pages/admin/TicketDetails';
 import Customers from './pages/admin/Customers';
 import Settings from './pages/admin/Settings';
 import Agents from './pages/admin/Agents';
-
+ 
 // Agent pages
 import AgentDashboard from './pages/agent/Dashboard';
 import MyTickets from './pages/agent/MyTickets';
 import AgentProfile from './pages/agent/Profile';
-
+ 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -52,7 +52,7 @@ const queryClient = new QueryClient({
     },
   },
 });
-
+ 
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -62,10 +62,10 @@ export default function App() {
             {/* Public */}
             <Route path="/login"         element={<Login />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
-
+ 
             {/* NEW — Invite flow (public — user is not logged in yet) */}
             <Route path="/invite" element={<InvitePage />} />
-
+ 
             {/* Admin routes */}
             <Route path="/admin" element={
               <ProtectedRoute adminOnly>
@@ -80,7 +80,7 @@ export default function App() {
               <Route path="agents"              element={<Agents />} />
               <Route path="settings"            element={<Settings />} />
             </Route>
-
+ 
             {/* Agent routes */}
             <Route path="/agent" element={
               <ProtectedRoute>
@@ -93,7 +93,7 @@ export default function App() {
               <Route path="tickets/:id" element={<TicketDetails />} />
               <Route path="profile"     element={<AgentProfile />} />
             </Route>
-
+ 
             {/* Super Admin routes */}
             <Route path="/superadmin" element={
               <ProtectedRoute adminOnly>
@@ -106,7 +106,7 @@ export default function App() {
               <Route path="admins"    element={<SuperAdminAdmins />} />
               <Route path="settings"  element={<SuperAdminSettings />} />
             </Route>
-
+ 
             {/* Fallbacks */}
             <Route path="/"  element={<Navigate to="/login" replace />} />
             <Route path="*"  element={<Navigate to="/login" replace />} />
@@ -116,3 +116,4 @@ export default function App() {
     </QueryClientProvider>
   );
 }
+ 

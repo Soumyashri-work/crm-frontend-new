@@ -1,17 +1,81 @@
 /**
- * src/pages/superadmin/SuperAdminTenants.jsx — REFACTORED (PHASE 6)
+ * src/pages/superadmin/SuperAdminTenants.jsx
  *
- * Uses DataTable component for search, sort, filter, pagination
- * Maintains edit/delete functionality
- * Pagination logic now internal to DataTable component
+ * Changes:
+ *  ✅ Breadcrumb "Dashboard" is plain (not blue) — navigates on click
+ *  ✅ EditTenantModal highlights CRMs that were selected when the tenant was created
+ *  ✅ Status filter label reads "All Status" (not "All Statuses")
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Building2, Plus, Edit2, Trash2, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Building2, Plus, Edit2, Trash2, X, ChevronRight } from 'lucide-react';
 import { DataTable } from '../../components/DataTable';
 import AddTenantModal from '../../components/superadmin/AddTenantModal';
 import { superAdminService } from '../../services/superAdminService';
 import { PAGE_SIZE } from '../../constants/pagination';
+import { getInitials, getAvatarColor } from '../../utils/helpers';
+
+// ─── Shared status badge (consistent across all superadmin pages) ─────
+export function StatusBadge({ status }) {
+  const map = {
+    Active:   { bg: '#ECFDF5', color: '#065F46', dot: '#16a34a' },
+    Inactive: { bg: '#F3F4F6', color: '#4B5563', dot: '#9CA3AF' },
+    Pending:  { bg: '#FEF3C7', color: '#92400E', dot: '#D97706' },
+  };
+  const s = map[status] || map.Inactive;
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '4px 10px',
+        borderRadius: 99,
+        fontSize: 12,
+        fontWeight: 600,
+        background: s.bg,
+        color: s.color,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <span
+        style={{
+          width: 7,
+          height: 7,
+          borderRadius: '50%',
+          background: s.dot,
+          flexShrink: 0,
+          display: 'inline-block',
+        }}
+      />
+      {status}
+    </span>
+  );
+}
+
+// ─── Circular Tenant Avatar ──────────────────────────────────────────
+export function TenantAvatar({ name, size = 36 }) {
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        background: getAvatarColor(name || ''),
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        color: 'white',
+        fontSize: size * 0.33,
+        fontWeight: 700,
+      }}
+    >
+      {getInitials(name || '?')}
+    </div>
+  );
+}
 
 // ─── Modal styles ────────────────────────────────────────────────────
 const ms = {
@@ -44,7 +108,7 @@ const ms = {
   iconBox: {
     width: 38,
     height: 38,
-    borderRadius: 10,
+    borderRadius: '50%',
     background: 'var(--primary)',
     display: 'flex',
     alignItems: 'center',
@@ -93,16 +157,32 @@ const ms = {
 };
 
 // ─── Edit Tenant Modal ───────────────────────────────────────────────
+/**
+ * Shows the edit form for a tenant.
+ *
+ * "Initially chosen" CRMs:
+ *   When this modal opens, `tenant.source_systems` contains the CRMs that
+ *   were selected at creation time (they are what's persisted on the server).
+ *   We store those as `initialSystems` so we can visually highlight them
+ *   throughout the editing session — the admin always knows which ones were
+ *   the original selection.
+ */
 function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
   const [form, setForm] = useState({
     name: tenant?.name || '',
     email: tenant?.email || tenant?.contact_email || '',
   });
-  const [selectedSystems, setSelectedSystems] = useState(
-    (tenant?.source_systems || [])
+
+  // CRMs that were saved on the tenant when it was first created
+  const initialSystems = useMemo(() => {
+    return (tenant?.source_systems || [])
       .map((s) => (typeof s === 'string' ? s : s.system_name || ''))
-      .filter(Boolean)
-  );
+      .filter(Boolean);
+  }, [tenant]);
+
+  // Currently selected CRMs (starts from the saved list, editable)
+  const [selectedSystems, setSelectedSystems] = useState(initialSystems);
+
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState('');
@@ -119,10 +199,7 @@ function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const errs = validate();
-    if (Object.keys(errs).length) {
-      setErrors(errs);
-      return;
-    }
+    if (Object.keys(errs).length) { setErrors(errs); return; }
     setSubmitting(true);
     setApiError('');
     try {
@@ -184,7 +261,7 @@ function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
                 value={form.name}
                 onChange={(e) => {
                   setForm((f) => ({ ...f, name: e.target.value }));
-                  if (errors.name) setErrors((e) => ({ ...e, name: '' }));
+                  if (errors.name) setErrors((er) => ({ ...er, name: '' }));
                 }}
                 autoFocus
               />
@@ -202,16 +279,24 @@ function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
                 value={form.email}
                 onChange={(e) => {
                   setForm((f) => ({ ...f, email: e.target.value }));
-                  if (errors.email) setErrors((e) => ({ ...e, email: '' }));
+                  if (errors.email) setErrors((er) => ({ ...er, email: '' }));
                 }}
               />
               {errors.email && <p style={ms.fieldError}>{errors.email}</p>}
             </div>
 
             <div style={{ marginBottom: 18 }}>
-              <label style={ms.label}>
-                Source / CRM Systems <span style={{ color: 'var(--danger)' }}>*</span>
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ ...ms.label, marginBottom: 0 }}>
+                  Source / CRM Systems <span style={{ color: 'var(--danger)' }}>*</span>
+                </label>
+                {/* Legend: what the dot means */}
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', display: 'inline-block' }} />
+                  Originally selected
+                </span>
+              </div>
+
               <div
                 style={{
                   border: errors.systems ? '1px solid var(--danger)' : '1px solid var(--border)',
@@ -222,6 +307,8 @@ function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
               >
                 {systemOptions.map((sys, idx) => {
                   const checked = selectedSystems.includes(sys);
+                  const wasOriginal = initialSystems.includes(sys);
+
                   return (
                     <label
                       key={sys}
@@ -232,8 +319,10 @@ function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
                         padding: '9px 12px',
                         cursor: 'pointer',
                         borderTop: idx > 0 ? '1px solid var(--border-light)' : 'none',
+                        // Currently checked → primary-light highlight
                         background: checked ? 'var(--primary-light)' : 'transparent',
                         userSelect: 'none',
+                        position: 'relative',
                       }}
                     >
                       <input
@@ -242,9 +331,27 @@ function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
                         onChange={() => toggleSystem(sys)}
                         style={{ cursor: 'pointer' }}
                       />
-                      <span style={{ fontSize: 13.5, color: 'var(--text-primary)' }}>
+                      <span style={{ fontSize: 13.5, color: 'var(--text-primary)', flex: 1 }}>
                         {sys}
                       </span>
+                      {/* Badge shown when this CRM was part of the original selection */}
+                      {wasOriginal && (
+                        <span
+                          title="This CRM was selected when the tenant was created"
+                          style={{
+                            fontSize: 10.5,
+                            fontWeight: 700,
+                            padding: '2px 7px',
+                            borderRadius: 99,
+                            background: 'var(--primary)',
+                            color: 'white',
+                            flexShrink: 0,
+                            letterSpacing: 0.2,
+                          }}
+                        >
+                          Original
+                        </span>
+                      )}
                     </label>
                   );
                 })}
@@ -254,11 +361,16 @@ function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
           </div>
 
           <div style={ms.footer}>
-            <button type="button" onClick={onClose} style={{ ...ms.submitBtn, background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)' }} disabled={submitting}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{ ...ms.submitBtn, background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+              disabled={submitting}
+            >
               Cancel
             </button>
             <button type="submit" style={ms.submitBtn} disabled={submitting}>
-              Save Changes
+              {submitting ? 'Saving…' : 'Save Changes'}
             </button>
           </div>
         </form>
@@ -296,12 +408,7 @@ function DeleteConfirmModal({ tenant, onClose, onConfirm, isLoading }) {
           <button
             type="button"
             onClick={onClose}
-            style={{
-              ...ms.submitBtn,
-              background: 'transparent',
-              color: 'var(--text-secondary)',
-              border: '1px solid var(--border)',
-            }}
+            style={{ ...ms.submitBtn, background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
             disabled={isLoading}
           >
             Cancel
@@ -322,11 +429,13 @@ function DeleteConfirmModal({ tenant, onClose, onConfirm, isLoading }) {
 
 // ─── Main Page Component ─────────────────────────────────────────────
 export default function SuperAdminTenants() {
+  const navigate = useNavigate();
   const [tenants, setTenants] = useState([]);
   const [allSystems, setAllSystems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [sortField, setSortField] = useState('');
   const [sortDir, setSortDir] = useState('asc');
   const [page, setPage] = useState(1);
@@ -334,7 +443,7 @@ export default function SuperAdminTenants() {
   const [editingTenant, setEditingTenant] = useState(null);
   const [deletingTenant, setDeletingTenant] = useState(null);
 
-  // ─── Fetch systems on mount ─────────────────────────────────────────
+  // ─── Fetch systems ──────────────────────────────────────────────────
   useEffect(() => {
     superAdminService
       .getSourceSystems()
@@ -368,14 +477,20 @@ export default function SuperAdminTenants() {
     return tenants.filter((t) => {
       if (search) {
         const q = search.toLowerCase();
-        return (
-          t.name?.toLowerCase().includes(q) ||
-          t.email?.toLowerCase().includes(q)
-        );
+        if (
+          !t.name?.toLowerCase().includes(q) &&
+          !t.email?.toLowerCase().includes(q) &&
+          !t.contact_email?.toLowerCase().includes(q)
+        ) return false;
+      }
+      if (statusFilter) {
+        const isActive = t.is_active ?? true;
+        const tenantStatus = isActive ? 'active' : 'inactive';
+        if (tenantStatus !== statusFilter) return false;
       }
       return true;
     });
-  }, [tenants, search]);
+  }, [tenants, search, statusFilter]);
 
   const sorted = useMemo(() => {
     if (!sortField) return filtered;
@@ -430,7 +545,6 @@ export default function SuperAdminTenants() {
     }
   };
 
-  // ─── Format date helper ─────────────────────────────────────────────
   const formatDate = (iso) => {
     if (!iso) return '—';
     return new Date(iso).toLocaleDateString('en-US', {
@@ -446,25 +560,19 @@ export default function SuperAdminTenants() {
       key: 'name',
       label: 'Tenant',
       sortable: true,
-      width: '25%',
+      width: '28%',
       render: (value, row) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 8,
-              background: 'var(--primary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <Building2 size={17} color="white" />
-          </div>
-          <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>
-            {value}
+          <TenantAvatar name={value} size={36} />
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>
+              {value}
+            </div>
+            {row.slug && (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                {row.slug}
+              </div>
+            )}
           </div>
         </div>
       ),
@@ -473,7 +581,7 @@ export default function SuperAdminTenants() {
       key: 'email',
       label: 'Contact Email',
       sortable: true,
-      width: '30%',
+      width: '28%',
       render: (value, row) => (
         <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
           {value || row.contact_email || '—'}
@@ -487,24 +595,7 @@ export default function SuperAdminTenants() {
       width: '15%',
       render: (value, row) => {
         const isActive = row.is_active ?? true;
-        const status = isActive ? 'Active' : 'Inactive';
-        const bgColor = isActive ? '#DCFCE7' : '#F3F4F6';
-        const textColor = isActive ? '#166534' : '#6B7280';
-        return (
-          <span
-            style={{
-              display: 'inline-block',
-              padding: '4px 10px',
-              borderRadius: 'var(--radius-sm)',
-              fontSize: 12.5,
-              fontWeight: 600,
-              background: bgColor,
-              color: textColor,
-            }}
-          >
-            {status}
-          </span>
-        );
+        return <StatusBadge status={isActive ? 'Active' : 'Inactive'} />;
       },
     },
     {
@@ -521,21 +612,14 @@ export default function SuperAdminTenants() {
     {
       key: 'id',
       label: 'Actions',
-      width: 60,
+      width: 80,
       align: 'center',
       render: (value, row) => (
         <div style={{ display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'center' }}>
           <button
             onClick={() => setEditingTenant(row)}
             title="Edit tenant"
-            style={{
-              padding: 6,
-              border: 'none',
-              background: 'none',
-              cursor: 'pointer',
-              color: 'var(--text-muted)',
-              transition: 'color 0.2s',
-            }}
+            style={{ padding: 6, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', transition: 'color 0.2s' }}
             onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary)')}
             onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
           >
@@ -544,14 +628,7 @@ export default function SuperAdminTenants() {
           <button
             onClick={() => setDeletingTenant(row)}
             title="Delete tenant"
-            style={{
-              padding: 6,
-              border: 'none',
-              background: 'none',
-              cursor: 'pointer',
-              color: 'var(--text-muted)',
-              transition: 'color 0.2s',
-            }}
+            style={{ padding: 6, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', transition: 'color 0.2s' }}
             onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}
             onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
           >
@@ -562,19 +639,45 @@ export default function SuperAdminTenants() {
     },
   ];
 
+  // ─── Filter options for status dropdown — label fixed to "All Status" ─
+  const filterOptions = [
+    {
+      key: 'status',
+      label: 'All Status',
+      options: [
+        { value: 'active',   label: 'Active' },
+        { value: 'inactive', label: 'Inactive' },
+      ],
+    },
+  ];
+
+  const hasActiveFilters = !!search || !!statusFilter;
+
   // ─── Render ──────────────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Breadcrumb — "Dashboard" is plain text (not blue), navigates on click */}
+      <nav style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>
+        <span
+          onClick={() => navigate('/superadmin/dashboard')}
+          style={{
+            cursor: 'pointer',
+            color: 'var(--text-muted)',
+            fontWeight: 500,
+          }}
+          onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+          onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+        >
+          Dashboard
+        </span>
+        <ChevronRight size={14} />
+        <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Tenants</span>
+      </nav>
+
       {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h1>Tenants</h1>
+          <h1 style={{ margin: 0 }}>Tenants</h1>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
             Manage all organizations on the platform
           </p>
@@ -599,7 +702,7 @@ export default function SuperAdminTenants() {
         </button>
       </div>
 
-      {/* DataTable — PHASE 6: Unified pagination now internal to DataTable */}
+      {/* DataTable with status filter */}
       <DataTable
         columns={columns}
         data={sorted}
@@ -610,28 +713,27 @@ export default function SuperAdminTenants() {
         error={error || null}
         onRetry={() => fetchTenants(new AbortController().signal)}
         searchValue={search}
-        onSearchChange={(val) => {
-          setSearch(val);
-          setPage(1);
+        onSearchChange={(val) => { setSearch(val); setPage(1); }}
+        filters={{ status: statusFilter }}
+        onFilterChange={(key, val) => {
+          if (key === 'status') { setStatusFilter(val); setPage(1); }
         }}
-        filters={{}}
-        onFilterChange={() => {}}
-        filterOptions={[]}
+        filterOptions={filterOptions}
         sortField={sortField}
         sortDir={sortDir}
         onSort={handleSort}
         searchPlaceholder="Search by name or email…"
         emptyMessage={
-          search ? 'No tenants match your search.' : 'No tenants found.'
+          hasActiveFilters ? 'No tenants match your filters.' : 'No tenants found.'
         }
       />
 
       {/* Modals */}
       {showAddModal && (
         <AddTenantModal
+          isOpen={showAddModal}
           onClose={() => setShowAddModal(false)}
-          onSuccess={handleAddTenant}
-          allSystems={allSystems}
+          onSubmit={handleAddTenant}
         />
       )}
 

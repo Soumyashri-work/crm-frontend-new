@@ -148,4 +148,9 @@ export const superAdminService = {
     const res = await api.get('/super-admin/users', { params });
     return unwrap(res);
   },
+  // In superAdminService.js — add this method:
+getTenantSourceSystems(tenantId) {
+  // Calls GET /api/v1/tenants/{tenantId}/source-systems
+  return this.request(`/api/v1/tenants/${tenantId}/source-systems`);
+}
 };
