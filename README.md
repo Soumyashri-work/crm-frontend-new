@@ -93,6 +93,7 @@ src/
 npm run dev          # Start Vite dev server (http://localhost:5173)
 npm run build        # Build for production
 npm run preview      # Preview production build
+
 ```
 
 ## Key Features
