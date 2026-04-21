@@ -95,7 +95,7 @@ export default function Customers() {
           >
             {getInitials(row.name)}
           </div>
-          <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+          <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
             {row.name}
           </div>
         </div>

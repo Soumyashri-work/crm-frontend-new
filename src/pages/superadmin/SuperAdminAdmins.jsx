@@ -373,7 +373,7 @@ export default function SuperAdminAdmins() {
           <h1>Admins</h1>
           <p style={{ color:'var(--text-secondary)', fontSize:13.5, marginTop:4 }}>Manage admin users across all tenants</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn btn-primary" style={{ display:'flex', alignItems:'center', gap:7, padding:'10px 18px', fontSize:14 }}>
+        <button onClick={() => setShowModal(true)} className="btn btn-primary" style={{ alignItems:'center', gap:7, padding:'10px 18px', fontSize:14, width:'fit-content', flexShrink:0 }}>
           <Plus size={16} /> Add Admin
         </button>
       </div>

@@ -355,7 +355,7 @@ export default function Agents() {
           >
             {getInitials(row.name)}
           </div>
-          <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+          <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
             {row.name || '—'}
           </span>
         </div>
@@ -695,34 +695,45 @@ export default function Agents() {
         }
       />
 
-      {/* Modals */}
+{/* ── Edit Modal ── */}
       {editingAgent && (
         <EditAgentModal
+          isOpen={!!editingAgent}
           agent={editingAgent}
           onClose={() => setEditingAgent(null)}
           onSave={handleEditSave}
         />
       )}
 
+      {/* ── Delete Modal ── */}
       {deletingAgent && (
         <ConfirmDeleteModal
-          title={`Delete ${deletingAgent.name}?`}
-          message="This agent will be removed from the system. This action cannot be undone."
+          isOpen={!!deletingAgent}
+          agent={deletingAgent}
+          onClose={() => setDeletingAgent(null)}
           onConfirm={handleDeleteConfirm}
-          onCancel={() => setDeletingAgent(null)}
-          isLoading={deleteMutation.isPending}
+          isDeleting={deleteMutation.isPending}
         />
       )}
-
-      {inviteModalOpen && (
-        <InviteAgentModal
-          agent={inviteTargetAgent}
-          onClose={() => {
-            setInviteModalOpen(false);
-            setInviteTargetAgent(null);
-          }}
-          onSuccess={handleInviteAgentSuccess}
-        />
+      {inviteTargetAgent && (
+      <InviteAgentModal
+        isOpen={inviteModalOpen}
+        agentId={inviteTargetAgent?.id || null}
+        initialData={
+          inviteTargetAgent
+            ? {
+                first_name: inviteTargetAgent.first_name,
+                last_name: inviteTargetAgent.last_name,
+                email: inviteTargetAgent.email,
+              }
+            : null
+        }
+        onClose={() => {
+          setInviteModalOpen(false);
+          setInviteTargetAgent(null);
+        }}
+        onSuccess={handleInviteAgentSuccess}
+      />
       )}
     </div>
   );
