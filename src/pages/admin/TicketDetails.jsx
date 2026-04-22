@@ -177,13 +177,15 @@ function CrmPopup({ crm }) {
 // ─── Detail Row ───────────────────────────────────────────────────────────────
 function DetailRow({ icon: Icon, label, children }) {
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '116px minmax(0, 1fr)',
-      alignItems: 'center',
-      gap: 8,
-      padding: '10px 0',
-    }}>
+    <div 
+      className="detail-row-container"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '116px minmax(0, 1fr)',
+        alignItems: 'center',
+        gap: 8,
+        padding: '10px 0',
+      }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6, fontSize: 11,
         color: 'var(--text-muted)', textTransform: 'uppercase',

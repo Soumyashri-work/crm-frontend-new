@@ -1052,6 +1052,250 @@ tr:hover td { background: #F6F9FF; }
 }
 
 /* ── Medium Screens (821px - 1024px) - Prevent navbar overlap ─────────── */
+/* ── COMPREHENSIVE TABLET OPTIMIZATION (769px - 1024px) ────────────────── */
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* ── Root typography ── */
+  html { font-size: 14.5px; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 17px; }
+  h3 { font-size: 14px; }
+
+  /* ── Page layout ── */
+  .page-area { 
+    padding: 16px 14px;
+    overflow-x: hidden;
+  }
+  
+  .page-content { 
+    gap: 16px;
+    max-width: 100%;
+  }
+
+  /* ── Grids: Responsive columns ── */
+  .widget-grid { 
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  .charts-grid { 
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .detail-grid { 
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .sa-recent-grid { 
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  /* ── Cards ── */
+  .card { 
+    padding: 16px;
+    border-radius: var(--radius);
+  }
+
+  /* ── Ticket detail page responsive ── */
+  .ticket-details-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+    align-items: start !important;
+  }
+
+  .ticket-detail-sidebar {
+    width: 100% !important;
+  }
+
+  /* ── Detail row on tablets: responsive label width ── */
+  .detail-row-container {
+    display: grid;
+    grid-template-columns: 100px minmax(0, 1fr) !important;
+    gap: 12px !important;
+    align-items: center;
+    padding: 10px 0;
+  }
+
+  /* ── Tables: Optimize for tablet ── */
+  .table-wrap { 
+    overflow-x: auto; 
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -14px;
+    padding: 0 14px;
+    border-radius: var(--radius-sm);
+  }
+
+  table { 
+    min-width: 580px;
+    border-collapse: collapse;
+  }
+
+  th { 
+    padding: 11px 14px; 
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    text-transform: uppercase;
+  }
+
+  td { 
+    padding: 11px 14px; 
+    font-size: 13px;
+  }
+
+  /* ── Action buttons row ── */
+  .row-actions { 
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .icon-action-btn {
+    width: 32px;
+    height: 32px;
+    padding: 6px;
+  }
+
+  /* ── Buttons ── */
+  .btn { 
+    padding: 8px 14px; 
+    font-size: 13px; 
+    gap: 7px;
+    white-space: nowrap;
+  }
+
+  .btn svg { 
+    width: 14px; 
+    height: 14px; 
+  }
+
+  /* ── Badges ── */
+  .badge { 
+    padding: 3px 9px; 
+    font-size: 11.5px;
+    display: inline-block;
+  }
+
+  /* ── Filter toolbar - tablet optimized ── */
+  .filter-toolbar {
+    padding: 14px;
+    gap: 12px;
+    flex-direction: column;
+  }
+
+  .filter-search-row {
+    width: 100%;
+  }
+
+  .filter-search-input {
+    font-size: 14px;
+    padding: 11px 12px 11px 38px;
+    height: 38px;
+  }
+
+  .filter-dropdowns-row { 
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    align-items: center;
+  }
+
+  .filter-select-wrap { 
+    width: 100%;
+  }
+  
+  .filter-select {
+    min-width: unset; 
+    width: 100%;
+    font-size: 13px;
+    padding: 10px 30px 10px 12px;
+    height: 38px;
+  }
+
+  .filter-clear-btn {
+    grid-column: 1 / -1;
+    width: 100%;
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+
+  /* ── Data table enhancements ── */
+  .DataTable {
+    overflow-x: auto;
+  }
+
+  .DataTable thead th {
+    padding: 11px 12px;
+    font-size: 11px;
+  }
+
+  .DataTable tbody td {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  /* ── Form layouts ── */
+  .form-group {
+    gap: 6px;
+  }
+
+  .form-label { 
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .form-input {
+    padding: 10px 12px;
+    font-size: 14px;
+    height: 38px;
+  }
+
+  .form-group-item:last-of-type {
+    margin-bottom: 0;
+  }
+
+  /* ── Modal adjustments ── */
+  .modal-overlay { 
+    padding: 16px;
+  }
+
+  .modal-content { 
+    max-width: 90vw;
+    max-height: 90vh;
+    border-radius: var(--radius);
+  }
+
+  .modal-header {
+    padding: 18px 20px;
+  }
+
+  .modal-body {
+    padding: 20px;
+  }
+
+  .modal-footer {
+    padding: 14px 20px;
+    gap: 12px;
+  }
+
+  /* ── Textarea sizing for comments ── */
+  textarea.form-input {
+    font-size: 14px;
+    padding: 12px;
+    min-height: 70px;
+  }
+
+  /* ── Ensure text doesn't overflow ── */
+  table td,
+  .card {
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+}
+
+/* ── Medium Screens (821px - 1024px) - Prevent navbar overlap ─────────── */
 @media (min-width: 821px) and (max-width: 1024px) {
   header {
     padding: 0 12px !important;

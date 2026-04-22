@@ -1,39 +1,115 @@
 /**
- * ProvisionCredentialsForm.jsx
+ * ProvisionCredentialsForm.jsx  — DEMO / MOCK MODE
  *
- * CRM Credentials provisioning form for the Unified CRM Ticket Dashboard.
- * Self-contained component with inline CSS (no Tailwind).
+ * Unified CRM Ticket Dashboard · Credential Provisioning Form
+ * ──────────────────────────────────────────────────────────────────────────────
+ * Changes from v1
+ *  • MOCK_CRM_CONFIGS  — hardcoded schema driving all CRM/auth options
+ *  • CRM select filters available auth types per CRM (schema-driven)
+ *  • auth_types is now a multi-select via styled checkboxes (array, not string)
+ *  • Multiple selected auth types stack their field groups simultaneously
+ *  • onSubmit does console.log(payload) + triggers success UI (no fetch)
  *
- * ── Dependencies ────────────────────────────────────────────────────────
- *   npm install react-hook-form zod @hookform/resolvers
- *
- * ── Usage: Modal (recommended) ─────────────────────────────────────────
- *   const [open, setOpen] = useState(false);
- *   {open && (
- *     <ProvisionCredentialsForm
- *       modal={true}
- *       onClose={() => setOpen(false)}
- *       onSuccess={(data) => console.log('Integration ID:', data.integration_id)}
- *     />
- *   )}
- *
- * ── Props ───────────────────────────────────────────────────────────────
- *   modal     boolean   Wrap in overlay/modal (default: true)
- *   onClose   fn        Called when user dismisses modal
- *   onSuccess fn(data)  Called with API response on success
- *   apiBase   string    Prefix before /api/v1/integrations/ (default: "")
+ * Dependencies: react-hook-form  zod  @hookform/resolvers
  */
 
-import { useState, useEffect } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useState, useEffect, useCallback } from "react";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MOCK BACKEND SCHEMA
+// Replace / extend this array to match your real backend's capabilities.
+// Each CRM defines:
+//   supportedAuthTypes  – which auth methods the CRM accepts
+//   defaultBaseUrl      – pre-filled placeholder for the Base URL field
+//   description         – short blurb shown in the CRM selector
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MOCK_CRM_CONFIGS = [
+  {
+    value: "zammad",
+    label: "Zammad",
+    description: "Open-source helpdesk & ticketing",
+    defaultBaseUrl: "https://support.yourcompany.com",
+    supportedAuthTypes: ["api_token", "basic_auth", "hmac"],
+  },
+  {
+    value: "espocrm",
+    label: "EspoCRM",
+    description: "Self-hosted CRM platform",
+    defaultBaseUrl: "https://crm.yourcompany.com",
+    supportedAuthTypes: ["api_key", "basic_auth", "hmac", "oauth2"],
+  },
+  {
+    value: "salesforce",
+    label: "Salesforce",
+    description: "Enterprise cloud CRM",
+    defaultBaseUrl: "https://yourorg.my.salesforce.com",
+    supportedAuthTypes: ["oauth2", "bearer_token"],
+  },
+  {
+    value: "hubspot",
+    label: "HubSpot",
+    description: "Inbound marketing & CRM suite",
+    defaultBaseUrl: "https://api.hubapi.com",
+    supportedAuthTypes: ["api_key", "oauth2", "bearer_token"],
+  },
+  {
+    value: "zoho",
+    label: "Zoho CRM",
+    description: "Multi-channel CRM platform",
+    defaultBaseUrl: "https://www.zohoapis.com/crm/v3",
+    supportedAuthTypes: ["oauth2", "access_token"],
+  },
+  {
+    value: "freshdesk",
+    label: "Freshdesk",
+    description: "Cloud-based customer support",
+    defaultBaseUrl: "https://yoursubdomain.freshdesk.com",
+    supportedAuthTypes: ["api_key", "basic_auth"],
+  },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTH TYPE METADATA  (label + icon letter for badges)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const AUTH_META = {
+  api_token:    { label: "API Token",               icon: "T" },
+  bearer_token: { label: "Bearer Token",            icon: "B" },
+  access_token: { label: "Access Token",            icon: "A" },
+  api_key:      { label: "API Key",                 icon: "K" },
+  basic_auth:   { label: "Basic Auth",              icon: "U" },
+  oauth2:       { label: "OAuth 2.0",               icon: "O" },
+  hmac:         { label: "HMAC / Webhook",          icon: "H" },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEFAULT CREDENTIAL OBJECTS  (one per auth type)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CRED_DEFAULTS = {
+  api_token:    { auth_type: "api_token",    token: "" },
+  bearer_token: { auth_type: "bearer_token", token: "" },
+  access_token: { auth_type: "access_token", token: "" },
+  api_key:      { auth_type: "api_key",      token: "" },
+  basic_auth:   { auth_type: "basic_auth",   username: "", password: "" },
+  oauth2: {
+    auth_type: "oauth2",
+    access_token: "", refresh_token: "",
+    token_type: "Bearer", expires_at: "",
+    client_id: "", client_secret: "",
+  },
+  hmac: { auth_type: "hmac", api_token: "", webhook_secret: "", per_event_secrets: [] },
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ZOD SCHEMAS
 // ─────────────────────────────────────────────────────────────────────────────
 
-const apiTokenSchema = z.object({
+const tokenLikeSchema = z.object({
   auth_type: z.enum(["api_token", "bearer_token", "access_token", "api_key"]),
   token: z.string().min(1, "Token is required"),
 });
@@ -63,635 +139,414 @@ const hmacSchema = z
     api_token: z.string().optional(),
     webhook_secret: z.string().optional(),
     per_event_secrets: z
-      .array(
-        z.object({
-          event: z.string().min(1, "Event key required"),
-          secret: z.string().min(1, "Secret required"),
-        })
-      )
+      .array(z.object({
+        event: z.string().min(1, "Event key required"),
+        secret: z.string().min(1, "Secret required"),
+      }))
       .optional(),
   })
   .refine(
-    (d) =>
-      d.api_token ||
-      d.webhook_secret ||
-      (d.per_event_secrets && d.per_event_secrets.length > 0),
-    {
-      message:
-        "At least one of api_token, webhook_secret, or per_event_secrets is required",
-      path: ["api_token"],
-    }
+    (d) => d.api_token || d.webhook_secret || (d.per_event_secrets?.length ?? 0) > 0,
+    { message: "At least one of api_token, webhook_secret, or per_event_secrets is required", path: ["api_token"] }
   );
 
-const credentialsUnion = z.discriminatedUnion("auth_type", [
-  apiTokenSchema,
+// Per-auth credential schema (used inside the array)
+const singleCredentialSchema = z.discriminatedUnion("auth_type", [
+  tokenLikeSchema,
   basicAuthSchema,
   oauth2Schema,
   hmacSchema,
 ]);
 
 const formSchema = z.object({
-  crm_type: z.string().min(1, "CRM type is required"),
-  base_url: z
-    .string()
-    .min(1, "Base URL is required")
-    .url("Must be a valid URL (include https://)"),
-  auth_type: z.enum([
-    "api_token",
-    "bearer_token",
-    "access_token",
-    "api_key",
-    "basic_auth",
-    "oauth2",
-    "hmac",
-  ]),
-  credentials: credentialsUnion,
+  crm_type:    z.string().min(1, "CRM type is required"),
+  base_url:    z.string().min(1, "Base URL is required").url("Must be a valid URL (include https://)"),
+  auth_types:  z.array(z.string()).min(1, "Select at least one auth method"),
+  // credentials is a record keyed by auth_type string
+  credentials: z.record(singleCredentialSchema),
   extra_metadata: z.record(z.any()).optional(),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CONSTANTS
-// ─────────────────────────────────────────────────────────────────────────────
-
-const CRM_OPTIONS = [
-  { value: "zammad", label: "Zammad" },
-  { value: "espocrm", label: "EspoCRM" },
-  { value: "salesforce", label: "Salesforce" },
-  { value: "hubspot", label: "HubSpot" },
-  { value: "zoho", label: "Zoho CRM" },
-  { value: "freshdesk", label: "Freshdesk" },
-];
-
-const AUTH_OPTIONS = [
-  { value: "api_token", label: "API Token" },
-  { value: "bearer_token", label: "Bearer Token" },
-  { value: "access_token", label: "Access Token" },
-  { value: "api_key", label: "API Key" },
-  { value: "basic_auth", label: "Basic Auth (Username / Password)" },
-  { value: "oauth2", label: "OAuth 2.0" },
-  { value: "hmac", label: "HMAC / Webhook Secret" },
-];
-
-const AUTH_LABELS = {
-  api_token: "API Token",
-  bearer_token: "Bearer Token",
-  access_token: "Access Token",
-  api_key: "API Key",
-  basic_auth: "Basic Auth",
-  oauth2: "OAuth 2.0",
-  hmac: "HMAC / Webhook",
-};
-
-const CRED_DEFAULTS = {
-  api_token: { auth_type: "api_token", token: "" },
-  bearer_token: { auth_type: "bearer_token", token: "" },
-  access_token: { auth_type: "access_token", token: "" },
-  api_key: { auth_type: "api_key", token: "" },
-  basic_auth: { auth_type: "basic_auth", username: "", password: "" },
-  oauth2: {
-    auth_type: "oauth2",
-    access_token: "",
-    refresh_token: "",
-    token_type: "Bearer",
-    expires_at: "",
-    client_id: "",
-    client_secret: "",
-  },
-  hmac: {
-    auth_type: "hmac",
-    api_token: "",
-    webhook_secret: "",
-    per_event_secrets: [],
-  },
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// INLINE CSS (Responsive, matches dashboard design system)
+// INLINE CSS  (design system preserved + new checkbox / stacked panel styles)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
 
 .pcf {
-  --p:        #2563EB;
-  --ph:       #1D4ED8;
-  --plt:      #EFF6FF;
-  --pring:    rgba(37,99,235,.12);
-  --ok:       #10B981;
-  --oklt:     #ECFDF5;
-  --err:      #EF4444;
-  --errlt:    #FEF2F2;
-  --t1:       #060D1F;
-  --t2:       #2D3748;
-  --tm:       #64748B;
-  --bd:       #C8D3DF;
-  --bg:       #F1F5F9;
-  --card:     #FFFFFF;
+  --p:        #4f6ef7;
+  --ph:       #3a5be0;
+  --plt:      #eef1fe;
+  --pring:    rgba(79,110,247,.18);
+  --ok:       #22c55e;
+  --oklt:     #f0fdf4;
+  --err:      #ef4444;
+  --errlt:    #fef2f2;
+  --warn:     #f59e0b;
+  --warnlt:   #fffbeb;
+  --t1:       #111827;
+  --t2:       #6b7280;
+  --tm:       #9ca3af;
+  --bd:       #e5e7eb;
+  --bg:       #f9fafb;
+  --card:     #ffffff;
   --rsm:      6px;
   --rmd:      10px;
   --rlg:      14px;
   --ring:     0 0 0 3px var(--pring);
-  --tr:       150ms cubic-bezier(0.4,0,0.2,1);
-  --shadow:   0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
-  
-  font-family: 'Sora', system-ui, -apple-system, sans-serif;
+  --tr:       150ms cubic-bezier(.4,0,.2,1);
+  --shadow:   0 20px 60px rgba(0,0,0,.18), 0 4px 24px rgba(0,0,0,.09);
+  font-family: 'DM Sans', 'Segoe UI', system-ui, sans-serif;
   color: var(--t1);
 }
 .pcf *, .pcf *::before, .pcf *::after { box-sizing: border-box; }
 
-/* overlay */
+/* ── overlay ── */
 .pcf-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(6,13,31,0.4);
-  backdrop-filter: blur(2px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-  animation: pcf-fade 0.18s ease;
+  position: fixed; inset: 0;
+  background: rgba(15,18,35,.48);
+  backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; padding: 20px;
+  animation: pcf-fade .18s ease;
 }
 
-/* panel */
+/* ── panel ── */
 .pcf-panel {
   background: var(--card);
   border-radius: var(--rlg);
-  width: 100%;
-  max-width: 640px;
-  display: flex;
-  flex-direction: column;
-  max-height: 92vh;
-  overflow: hidden;
+  width: 100%; max-width: 660px;
+  display: flex; flex-direction: column;
 }
-
 .pcf-panel--modal {
   box-shadow: var(--shadow);
-  animation: pcf-up 0.22s ease;
+  max-height: 92vh;
+  animation: pcf-up .22s ease;
+}
+.pcf-panel--card {
+  border: 1px solid var(--bd);
+  box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.04);
+  margin: 0 auto;
 }
 
-/* header */
+/* ── header ── */
 .pcf-hdr {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.25rem 1.75rem;
-  border-bottom: 1px solid var(--bd);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 26px 18px; border-bottom: 1px solid var(--bd);
   flex-shrink: 0;
 }
-
-.pcf-hdr-l {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
+.pcf-hdr-l { display: flex; align-items: center; gap: 12px; }
 .pcf-ico {
-  width: 2.375rem;
-  height: 2.375rem;
-  border-radius: var(--rmd);
-  background: var(--plt);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  width: 38px; height: 38px; border-radius: var(--rmd);
+  background: var(--plt); display: flex; align-items: center; justify-content: center;
 }
-
-.pcf-ico svg {
-  width: 1.25rem;
-  height: 1.25rem;
-  color: var(--p);
-}
-
-.pcf-ttl {
-  font-size: 0.9375rem;
-  font-weight: 700;
-  margin: 0;
-  letter-spacing: -0.015em;
-  line-height: 1.4;
-}
-
-.pcf-sub {
-  font-size: 0.75rem;
-  color: var(--t2);
-  margin: 0.125rem 0 0;
-}
-
+.pcf-ico svg { width: 20px; height: 20px; color: var(--p); }
+.pcf-ttl { font-size: 15px; font-weight: 700; margin: 0; letter-spacing: -.02em; }
+.pcf-sub { font-size: 12px; color: var(--t2); margin: 2px 0 0; }
 .pcf-close {
-  width: 1.875rem;
-  height: 1.875rem;
-  border-radius: var(--rsm);
-  border: 1px solid var(--bd);
-  background: transparent;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--t2);
-  transition: all var(--tr);
-  flex-shrink: 0;
+  width: 30px; height: 30px; border-radius: var(--rsm);
+  border: 1px solid var(--bd); background: transparent;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: var(--t2); transition: all var(--tr); flex-shrink: 0;
 }
+.pcf-close:hover { background: var(--bg); color: var(--t1); }
 
-.pcf-close:hover {
-  background: var(--bg);
-  color: var(--t1);
-}
+/* ── body ── */
+.pcf-body { overflow-y: auto; padding: 22px 26px; flex: 1; }
 
-/* body */
-.pcf-body {
-  overflow-y: auto;
-  padding: 1.375rem 1.75rem;
-  flex: 1;
-}
-
-.pcf-body::-webkit-scrollbar {
-  width: 6px;
-}
-
-.pcf-body::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.pcf-body::-webkit-scrollbar-thumb {
-  background: var(--bd);
-  border-radius: 3px;
-}
-
-/* section */
-.pcf-sec {
-  margin-bottom: 1.375rem;
-}
-
+/* ── section ── */
+.pcf-sec { margin-bottom: 22px; }
 .pcf-sec-lbl {
-  font-size: 0.65625rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--tm);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0 0 0.875rem;
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--tm);
+  display: flex; align-items: center; gap: 8px; margin: 0 0 14px;
 }
+.pcf-sec-lbl::after { content:''; flex:1; height:1px; background:var(--bd); }
 
-.pcf-sec-lbl::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--bd);
-}
+/* ── grid ── */
+.pcf-g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.pcf-full { grid-column: 1 / -1; }
 
-/* grid */
-.pcf-g2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.875rem;
-}
-
-.pcf-full {
-  grid-column: 1 / -1;
-}
-
-/* field */
-.pcf-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.pcf-lbl {
-  font-size: 0.75rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 0.3125rem;
-}
-
-.pcf-req {
-  color: var(--err);
-  font-size: 0.625rem;
-}
-
+/* ── field ── */
+.pcf-field { display: flex; flex-direction: column; gap: 4px; }
+.pcf-lbl { font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+.pcf-req { color: var(--err); font-size: 10px; }
 .pcf-opt {
-  font-size: 0.625rem;
-  font-weight: 500;
-  color: var(--tm);
-  background: var(--bg);
-  border: 1px solid var(--bd);
-  border-radius: 4px;
-  padding: 0.0625rem 0.3125rem;
+  font-size: 10px; font-weight: 500; color: var(--tm);
+  background: var(--bg); border: 1px solid var(--bd);
+  border-radius: 4px; padding: 1px 5px;
 }
+.pcf-hint { font-size: 11px; color: var(--tm); }
+.pcf-errmsg { font-size: 11px; color: var(--err); display: flex; align-items: center; gap: 4px; }
 
-.pcf-hint {
-  font-size: 0.6875rem;
-  color: var(--tm);
+/* ── CRM selector card grid ── */
+.pcf-crm-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
 }
-
-.pcf-errmsg {
-  font-size: 0.6875rem;
-  color: var(--err);
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-/* inputs */
-.pcf-input,
-.pcf-select {
-  height: 2.375rem;
-  padding: 0 0.6875rem;
-  border: 1px solid var(--bd);
-  border-radius: var(--rsm);
+.pcf-crm-card {
+  border: 1.5px solid var(--bd);
+  border-radius: var(--rmd);
+  padding: 11px 12px;
+  cursor: pointer;
+  transition: all var(--tr);
   background: var(--card);
-  color: var(--t1);
-  font-size: 0.8125rem;
-  font-family: inherit;
+  text-align: left;
+  display: flex; flex-direction: column; gap: 2px;
+  position: relative;
   outline: none;
-  width: 100%;
-  transition: border-color var(--tr), box-shadow var(--tr);
-  -webkit-appearance: none;
-  appearance: none;
 }
-
-.pcf-input:focus,
-.pcf-select:focus {
+.pcf-crm-card:hover { border-color: var(--p); background: var(--plt); }
+.pcf-crm-card--active {
   border-color: var(--p);
+  background: var(--plt);
   box-shadow: var(--ring);
 }
-
-.pcf-input.has-err,
-.pcf-select.has-err {
-  border-color: var(--err);
-  box-shadow: 0 0 0 3px rgba(239,68,68,0.1);
+.pcf-crm-card-name { font-size: 12.5px; font-weight: 700; color: var(--t1); }
+.pcf-crm-card-desc { font-size: 10.5px; color: var(--t2); line-height: 1.35; }
+.pcf-crm-check {
+  position: absolute; top: 7px; right: 7px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--p); display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity var(--tr);
 }
+.pcf-crm-card--active .pcf-crm-check { opacity: 1; }
+.pcf-crm-check svg { width: 9px; height: 9px; color: #fff; }
 
+/* ── inputs ── */
+.pcf-input, .pcf-select {
+  height: 38px; padding: 0 11px;
+  border: 1px solid var(--bd); border-radius: var(--rsm);
+  background: var(--card); color: var(--t1);
+  font-size: 13px; font-family: inherit;
+  outline: none; width: 100%;
+  transition: border-color var(--tr), box-shadow var(--tr);
+  -webkit-appearance: none; appearance: none;
+}
+.pcf-input:focus, .pcf-select:focus { border-color: var(--p); box-shadow: var(--ring); }
+.pcf-input.has-err, .pcf-select.has-err {
+  border-color: var(--err); box-shadow: 0 0 0 3px rgba(239,68,68,.1);
+}
 .pcf-select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2364748B' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.625rem center;
-  background-size: 1rem;
-  padding-right: 1.875rem;
-  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; background-size: 16px;
+  padding-right: 30px; cursor: pointer;
 }
-
 .pcf-secret {
-  font-family: 'JetBrains Mono', 'Courier New', monospace;
-  font-size: 0.78125rem;
-  letter-spacing: 0.05em;
+  font-family: 'JetBrains Mono','Fira Code',monospace;
+  font-size: 12.5px; letter-spacing: .04em;
 }
+.pcf-secret::placeholder { font-family: inherit; font-size: 13px; letter-spacing: 0; }
 
-.pcf-secret::placeholder {
-  font-family: inherit;
-  font-size: 0.8125rem;
-  letter-spacing: 0;
-}
-
-/* cred box */
-.pcf-cred-box {
-  background: var(--bg);
-  border: 1px solid var(--bd);
-  border-radius: var(--rmd);
-  padding: 1.125rem;
-  animation: pcf-fade 0.2s ease;
-}
-
-.pcf-cred-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 0.875rem;
-}
-
-/* auth badge */
-.pcf-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3125rem;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: var(--p);
-  background: var(--plt);
-  border: 1px solid rgba(37,99,235,0.2);
-  border-radius: 20px;
-  padding: 0.1875rem 0.625rem;
-  margin-bottom: 0.875rem;
-}
-
-/* HMAC kv rows */
-.pcf-kv-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.pcf-kv-row {
+/* ── auth type checkbox grid ── */
+.pcf-auth-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1.875rem;
-  gap: 0.4375rem;
-  align-items: center;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px;
 }
-
-.pcf-kv-del {
-  width: 1.875rem;
-  height: 1.875rem;
-  border-radius: var(--rsm);
-  border: 1px solid var(--bd);
-  background: transparent;
-  color: var(--err);
-  font-size: 1.125rem;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--tr);
-  flex-shrink: 0;
-}
-
-.pcf-kv-del:hover {
-  background: var(--errlt);
-  border-color: var(--err);
-}
-
-.pcf-add-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  border-radius: var(--rsm);
-  border: 1px dashed var(--p);
-  background: var(--plt);
-  color: var(--p);
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--tr);
-  font-family: inherit;
-  width: 100%;
-}
-
-.pcf-add-row:hover {
-  background: rgba(37,99,235,0.08);
-}
-
-/* alerts */
-.pcf-alert {
+.pcf-auth-cb {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--bd);
   border-radius: var(--rmd);
-  padding: 0.875rem 1rem;
-  font-size: 0.8125rem;
-  line-height: 1.6;
-  display: flex;
-  align-items: flex-start;
-  gap: 0.625rem;
-  margin-bottom: 1.125rem;
+  cursor: pointer;
+  transition: all var(--tr);
+  user-select: none;
+  background: var(--card);
+}
+.pcf-auth-cb:hover { border-color: var(--p); background: var(--plt); }
+.pcf-auth-cb--checked {
+  border-color: var(--p);
+  background: var(--plt);
+}
+/* hide native checkbox */
+.pcf-auth-cb input[type="checkbox"] { display: none; }
+/* custom checkbox box */
+.pcf-cb-box {
+  width: 17px; height: 17px; flex-shrink: 0;
+  border: 1.5px solid var(--bd);
+  border-radius: 4px;
+  background: var(--card);
+  display: flex; align-items: center; justify-content: center;
+  transition: all var(--tr);
+}
+.pcf-auth-cb--checked .pcf-cb-box {
+  background: var(--p); border-color: var(--p);
+}
+.pcf-cb-box svg { width: 10px; height: 10px; color: #fff; opacity: 0; transition: opacity var(--tr); }
+.pcf-auth-cb--checked .pcf-cb-box svg { opacity: 1; }
+/* icon letter */
+.pcf-cb-icon {
+  width: 26px; height: 26px; border-radius: var(--rsm);
+  background: var(--bg); border: 1px solid var(--bd);
+  font-size: 11px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--t2); flex-shrink: 0;
+  transition: all var(--tr);
+}
+.pcf-auth-cb--checked .pcf-cb-icon {
+  background: rgba(79,110,247,.12); border-color: rgba(79,110,247,.25); color: var(--p);
+}
+.pcf-cb-label { font-size: 12.5px; font-weight: 600; color: var(--t1); flex: 1; }
+.pcf-auth-none {
+  font-size: 12px; color: var(--tm); font-style: italic;
+  padding: 12px; text-align: center;
+  border: 1px dashed var(--bd); border-radius: var(--rmd);
 }
 
-.pcf-alert--ok {
-  background: var(--oklt);
-  border: 1px solid rgba(16,185,129,0.25);
-  color: #065F46;
+/* ── stacked credential panels ── */
+.pcf-cred-stack-outer {
+  display: flex; flex-direction: column; gap: 12px;
 }
-
-.pcf-alert--err {
-  background: var(--errlt);
-  border: 1px solid rgba(239,68,68,0.25);
-  color: #7F1D1D;
+.pcf-cred-panel {
+  border: 1.5px solid var(--bd);
+  border-radius: var(--rmd);
+  overflow: hidden;
+  animation: pcf-fade .22s ease;
 }
-
-.pcf-alert-ico {
-  flex-shrink: 0;
-  font-size: 0.9375rem;
-  margin-top: 0.125rem;
-  font-weight: 700;
+.pcf-cred-panel-hdr {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--bd);
 }
+.pcf-cred-panel-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--p); flex-shrink: 0;
+}
+.pcf-cred-panel-title { font-size: 12px; font-weight: 700; color: var(--t1); flex: 1; }
+.pcf-cred-panel-badge {
+  font-size: 10px; font-weight: 700;
+  color: var(--p); background: var(--plt);
+  border: 1px solid rgba(79,110,247,.2);
+  border-radius: 20px; padding: 2px 8px; letter-spacing: .02em;
+}
+.pcf-cred-panel-body { padding: 16px 14px; display: flex; flex-direction: column; gap: 14px; }
 
+/* ── HMAC kv rows ── */
+.pcf-kv-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.pcf-kv-row { display: grid; grid-template-columns: 1fr 1fr 30px; gap: 7px; align-items: center; }
+.pcf-kv-del {
+  width: 30px; height: 30px; border-radius: var(--rsm);
+  border: 1px solid var(--bd); background: transparent;
+  color: var(--err); font-size: 18px; line-height: 1;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all var(--tr);
+}
+.pcf-kv-del:hover { background: var(--errlt); border-color: var(--err); }
+.pcf-add-row {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: var(--rsm);
+  border: 1px dashed var(--p); background: var(--plt);
+  color: var(--p); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all var(--tr); font-family: inherit;
+}
+.pcf-add-row:hover { background: rgba(79,110,247,.14); }
+
+/* ── empty state ── */
+.pcf-cred-empty {
+  text-align: center; padding: 28px 20px;
+  border: 1.5px dashed var(--bd); border-radius: var(--rmd);
+  color: var(--tm); font-size: 13px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.pcf-cred-empty-icon {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--bg); border: 1px solid var(--bd);
+  display: flex; align-items: center; justify-content: center;
+}
+.pcf-cred-empty-icon svg { width: 16px; height: 16px; color: var(--tm); }
+
+/* ── alerts ── */
+.pcf-alert {
+  border-radius: var(--rmd); padding: 14px 16px;
+  font-size: 13px; line-height: 1.55;
+  display: flex; align-items: flex-start; gap: 10px; margin-bottom: 18px;
+}
+.pcf-alert--ok  { background: var(--oklt);  border: 1px solid rgba(34,197,94,.25);  color: #166534; }
+.pcf-alert--err { background: var(--errlt); border: 1px solid rgba(239,68,68,.25);  color: #991b1b; }
+.pcf-alert-ico { flex-shrink: 0; font-size: 15px; margin-top: 2px; }
 .pcf-id-pill {
   display: inline-block;
-  font-family: 'JetBrains Mono', 'Courier New', monospace;
-  font-size: 0.6875rem;
-  background: rgba(16,185,129,0.12);
-  border: 1px solid rgba(16,185,129,0.3);
-  border-radius: 4px;
-  padding: 0.125rem 0.375rem;
-  margin-top: 0.25rem;
+  font-family: 'JetBrains Mono','Fira Code',monospace;
+  font-size: 11px; background: rgba(34,197,94,.12);
+  border: 1px solid rgba(34,197,94,.3); border-radius: 4px; padding: 2px 6px; margin-top: 4px;
+}
+/* success payload pre */
+.pcf-payload-pre {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  background: rgba(34,197,94,.06);
+  border: 1px solid rgba(34,197,94,.18);
+  border-radius: var(--rsm);
+  font-family: 'JetBrains Mono','Fira Code',monospace;
+  font-size: 10.5px;
+  color: #166534;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 160px;
+  overflow-y: auto;
 }
 
-/* footer */
+/* ── footer ── */
 .pcf-ftr {
-  padding: 0.875rem 1.75rem 1.25rem;
+  padding: 14px 26px 20px;
   border-top: 1px solid var(--bd);
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.625rem;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
   flex-shrink: 0;
 }
-
+.pcf-ftr-right { display: flex; align-items: center; gap: 10px; }
+.pcf-ftr-hint { font-size: 11px; color: var(--tm); }
 .pcf-btn-cancel {
-  height: 2.375rem;
-  padding: 0 1.125rem;
-  border-radius: var(--rsm);
-  border: 1px solid var(--bd);
-  background: transparent;
-  color: var(--t2);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all var(--tr);
+  height: 38px; padding: 0 18px; border-radius: var(--rsm);
+  border: 1px solid var(--bd); background: transparent;
+  color: var(--t2); font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all var(--tr);
 }
-
-.pcf-btn-cancel:hover {
-  background: var(--bg);
-  color: var(--t1);
-}
-
+.pcf-btn-cancel:hover { background: var(--bg); color: var(--t1); }
 .pcf-btn-submit {
-  height: 2.375rem;
-  padding: 0 1.375rem;
-  border-radius: var(--rsm);
-  border: none;
-  background: var(--p);
-  color: #fff;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: inherit;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: all var(--tr);
-  letter-spacing: -0.01em;
+  height: 38px; padding: 0 22px; border-radius: var(--rsm);
+  border: none; background: var(--p);
+  color: #fff; font-size: 13px; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+  display: flex; align-items: center; gap: 8px;
+  transition: all var(--tr); letter-spacing: -.01em;
 }
-
 .pcf-btn-submit:hover:not(:disabled) {
   background: var(--ph);
-  transform: translateY(-0.0625rem);
-  box-shadow: 0 4px 12px rgba(37,99,235,0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(79,110,247,.38);
 }
-
-.pcf-btn-submit:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
+.pcf-btn-submit:disabled { opacity: .6; cursor: not-allowed; }
 .pcf-spinner {
-  width: 0.875rem;
-  height: 0.875rem;
-  border: 2px solid rgba(255,255,255,0.3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: pcf-spin 0.7s linear infinite;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,.35); border-top-color: #fff;
+  border-radius: 50%; animation: pcf-spin .7s linear infinite;
 }
 
-/* keyframes */
-@keyframes pcf-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* ── keyframes ── */
+@keyframes pcf-fade { from{opacity:0} to{opacity:1} }
+@keyframes pcf-up   { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+@keyframes pcf-spin { to{transform:rotate(360deg)} }
+
+/* ── responsive ── */
+@media(max-width:620px){
+  .pcf-panel--modal { max-height:100vh; border-radius:0; }
+  .pcf-hdr,.pcf-body,.pcf-ftr { padding-left:16px; padding-right:16px; }
+  .pcf-g2 { grid-template-columns:1fr; }
+  .pcf-crm-grid { grid-template-columns: repeat(2,1fr); }
+  .pcf-auth-grid { grid-template-columns: 1fr; }
+  .pcf-kv-row { grid-template-columns: 1fr 1fr 30px; }
 }
-
-@keyframes pcf-up {
-  from {
-    opacity: 0;
-    transform: translateY(1.125rem);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes pcf-spin {
-  to { transform: rotate(360deg); }
-}
-
-/* responsive */
-@media (max-width: 37.5rem) {
-  .pcf-panel {
-    border-radius: 0;
-    max-height: 100vh;
-  }
-
-  .pcf-g2 {
-    grid-template-columns: 1fr;
-  }
-
-  .pcf-hdr,
-  .pcf-body,
-  .pcf-ftr {
-    padding-left: 1rem;
-    padding-right: 1rem;
-  }
-
-  .pcf-hdr {
-    padding-top: 1rem;
-    padding-bottom: 1rem;
-  }
+@media(max-width:380px){
+  .pcf-crm-grid { grid-template-columns: 1fr; }
 }
 `;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HELPERS
+// SMALL REUSABLE COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ErrMsg({ msg }) {
@@ -700,26 +555,23 @@ function ErrMsg({ msg }) {
     <span className="pcf-errmsg">
       <svg width="11" height="11" fill="none" viewBox="0 0 16 16">
         <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
-        <path
-          d="M8 5v3.5M8 11h.01"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
+        <path d="M8 5v3.5M8 11h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
       {msg}
     </span>
   );
 }
 
-function Field({ label, required, optional, hint, error, children }) {
+function Field({ label, required, optional, hint, error, children, style }) {
   return (
-    <div className="pcf-field">
-      <label className="pcf-lbl">
-        {label}
-        {required && <span className="pcf-req">*</span>}
-        {optional && <span className="pcf-opt">optional</span>}
-      </label>
+    <div className="pcf-field" style={style}>
+      {label && (
+        <label className="pcf-lbl">
+          {label}
+          {required && <span className="pcf-req">*</span>}
+          {optional && <span className="pcf-opt">optional</span>}
+        </label>
+      )}
       {children}
       {hint && !error && <span className="pcf-hint">{hint}</span>}
       <ErrMsg msg={error} />
@@ -727,94 +579,78 @@ function Field({ label, required, optional, hint, error, children }) {
   );
 }
 
+const CheckIcon = () => (
+  <svg fill="none" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="2">
+    <path d="M1.5 5l2.5 2.5 4.5-4.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
-// CREDENTIAL FIELD GROUPS
+// CREDENTIAL FIELD GROUPS  (one component per auth type)
+// Each receives a `prefix` like "credentials.api_token" for namespaced fields.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function TokenFields({ register, errors, authType }) {
+function TokenFields({ register, errors, authType, prefix }) {
   const labels = {
-    api_token: "API Token",
-    bearer_token: "Bearer Token",
-    access_token: "Access Token",
-    api_key: "API Key",
+    api_token: "API Token", bearer_token: "Bearer Token",
+    access_token: "Access Token", api_key: "API Key",
   };
+  const err = errors?.credentials?.[authType]?.token?.message;
   return (
-    <Field
-      label={labels[authType] ?? "Token"}
-      required
-      error={errors?.credentials?.token?.message}
-    >
+    <Field label={labels[authType] ?? "Token"} required error={err}>
       <input
-        {...register("credentials.token")}
+        {...register(`${prefix}.token`)}
         type="password"
         autoComplete="new-password"
         placeholder="••••••••••••••••••••"
-        className={`pcf-input pcf-secret${
-          errors?.credentials?.token ? " has-err" : ""
-        }`}
+        className={`pcf-input pcf-secret${err ? " has-err" : ""}`}
       />
     </Field>
   );
 }
 
-function BasicFields({ register, errors }) {
+function BasicFields({ register, errors, authType, prefix }) {
+  const errs = errors?.credentials?.[authType];
   return (
     <div className="pcf-g2">
-      <Field
-        label="Username"
-        required
-        error={errors?.credentials?.username?.message}
-      >
+      <Field label="Username" required error={errs?.username?.message}>
         <input
-          {...register("credentials.username")}
+          {...register(`${prefix}.username`)}
           type="text"
           placeholder="admin_user"
-          className={`pcf-input${
-            errors?.credentials?.username ? " has-err" : ""
-          }`}
+          className={`pcf-input${errs?.username ? " has-err" : ""}`}
         />
       </Field>
-      <Field
-        label="Password"
-        required
-        error={errors?.credentials?.password?.message}
-      >
+      <Field label="Password" required error={errs?.password?.message}>
         <input
-          {...register("credentials.password")}
+          {...register(`${prefix}.password`)}
           type="password"
           autoComplete="new-password"
           placeholder="••••••••"
-          className={`pcf-input pcf-secret${
-            errors?.credentials?.password ? " has-err" : ""
-          }`}
+          className={`pcf-input pcf-secret${errs?.password ? " has-err" : ""}`}
         />
       </Field>
     </div>
   );
 }
 
-function OAuth2Fields({ register, errors }) {
+function OAuth2Fields({ register, errors, authType, prefix }) {
+  const errs = errors?.credentials?.[authType];
   return (
-    <div className="pcf-cred-stack">
-      <Field
-        label="Access Token"
-        required
-        error={errors?.credentials?.access_token?.message}
-      >
+    <>
+      <Field label="Access Token" required error={errs?.access_token?.message}>
         <input
-          {...register("credentials.access_token")}
+          {...register(`${prefix}.access_token`)}
           type="password"
           autoComplete="new-password"
           placeholder="••••••••••••••••••••"
-          className={`pcf-input pcf-secret${
-            errors?.credentials?.access_token ? " has-err" : ""
-          }`}
+          className={`pcf-input pcf-secret${errs?.access_token ? " has-err" : ""}`}
         />
       </Field>
       <div className="pcf-g2">
         <Field label="Refresh Token" optional>
           <input
-            {...register("credentials.refresh_token")}
+            {...register(`${prefix}.refresh_token`)}
             type="password"
             autoComplete="new-password"
             placeholder="••••••••••••••••"
@@ -822,24 +658,14 @@ function OAuth2Fields({ register, errors }) {
           />
         </Field>
         <Field label="Token Type" optional hint='Default: "Bearer"'>
-          <input
-            {...register("credentials.token_type")}
-            type="text"
-            placeholder="Bearer"
-            className="pcf-input"
-          />
+          <input {...register(`${prefix}.token_type`)} type="text" placeholder="Bearer" className="pcf-input" />
         </Field>
         <Field label="Client ID" optional>
-          <input
-            {...register("credentials.client_id")}
-            type="text"
-            placeholder="client_id"
-            className="pcf-input"
-          />
+          <input {...register(`${prefix}.client_id`)} type="text" placeholder="client_id" className="pcf-input" />
         </Field>
         <Field label="Client Secret" optional>
           <input
-            {...register("credentials.client_secret")}
+            {...register(`${prefix}.client_secret`)}
             type="password"
             autoComplete="new-password"
             placeholder="••••••••"
@@ -847,51 +673,33 @@ function OAuth2Fields({ register, errors }) {
           />
         </Field>
       </div>
-      <Field
-        label="Expires At"
-        optional
-        hint="Unix timestamp — leave blank for non-expiring tokens"
-        error={errors?.credentials?.expires_at?.message}
-      >
-        <input
-          {...register("credentials.expires_at")}
-          type="number"
-          placeholder="1893456000"
-          className="pcf-input"
-        />
+      <Field label="Expires At" optional hint="Unix timestamp — leave blank for non-expiring tokens" error={errs?.expires_at?.message}>
+        <input {...register(`${prefix}.expires_at`)} type="number" placeholder="1893456000" className="pcf-input" />
       </Field>
-    </div>
+    </>
   );
 }
 
-function HmacFields({ register, control, errors }) {
+function HmacFields({ register, control, errors, authType, prefix }) {
   const { fields, append, remove } = useFieldArray({
     control,
-    name: "credentials.per_event_secrets",
+    name: `${prefix}.per_event_secrets`,
   });
+  const errs = errors?.credentials?.[authType];
   return (
-    <div className="pcf-cred-stack">
-      <Field
-        label="API Token"
-        optional
-        hint="For outbound CRM API calls"
-        error={errors?.credentials?.api_token?.message}
-      >
+    <>
+      <Field label="API Token" optional hint="For outbound CRM API calls" error={errs?.api_token?.message}>
         <input
-          {...register("credentials.api_token")}
+          {...register(`${prefix}.api_token`)}
           type="password"
           autoComplete="new-password"
           placeholder="••••••••••••••••"
           className="pcf-input pcf-secret"
         />
       </Field>
-      <Field
-        label="Webhook Secret"
-        optional
-        hint="Shared secret for all inbound webhook events"
-      >
+      <Field label="Webhook Secret" optional hint="Shared secret for all inbound webhook events">
         <input
-          {...register("credentials.webhook_secret")}
+          {...register(`${prefix}.webhook_secret`)}
           type="password"
           autoComplete="new-password"
           placeholder="••••••••••••••••"
@@ -899,117 +707,153 @@ function HmacFields({ register, control, errors }) {
         />
       </Field>
       <div className="pcf-field">
-        <label className="pcf-lbl">
-          Per-Event Secrets <span className="pcf-opt">optional</span>
-        </label>
-        <span className="pcf-hint" style={{ marginBottom: "0.375rem" }}>
-          Map event names → individual webhook secrets (EspoCRM-style)
-        </span>
+        <label className="pcf-lbl">Per-Event Secrets <span className="pcf-opt">optional</span></label>
+        <span className="pcf-hint" style={{ marginBottom: 6 }}>Map event names → individual webhook secrets</span>
         {fields.length > 0 && (
           <div className="pcf-kv-list">
             {fields.map((f, i) => (
               <div key={f.id} className="pcf-kv-row">
                 <input
-                  {...register(`credentials.per_event_secrets.${i}.event`)}
+                  {...register(`${prefix}.per_event_secrets.${i}.event`)}
                   type="text"
                   placeholder="Case.create"
-                  className={`pcf-input${
-                    errors?.credentials?.per_event_secrets?.[i]?.event
-                      ? " has-err"
-                      : ""
-                  }`}
+                  className="pcf-input"
                 />
                 <input
-                  {...register(
-                    `credentials.per_event_secrets.${i}.secret`
-                  )}
+                  {...register(`${prefix}.per_event_secrets.${i}.secret`)}
                   type="password"
                   autoComplete="new-password"
                   placeholder="secret"
-                  className={`pcf-input pcf-secret${
-                    errors?.credentials?.per_event_secrets?.[i]?.secret
-                      ? " has-err"
-                      : ""
-                  }`}
+                  className="pcf-input pcf-secret"
                 />
-                <button
-                  type="button"
-                  className="pcf-kv-del"
-                  onClick={() => remove(i)}
-                  aria-label={`Remove row ${i + 1}`}
-                >
-                  ×
-                </button>
+                <button type="button" className="pcf-kv-del" onClick={() => remove(i)} aria-label="Remove">×</button>
               </div>
             ))}
           </div>
         )}
-        <button
-          type="button"
-          className="pcf-add-row"
-          onClick={() => append({ event: "", secret: "" })}
-        >
+        <button type="button" className="pcf-add-row" onClick={() => append({ event: "", secret: "" })}>
           <svg width="11" height="11" fill="none" viewBox="0 0 14 14">
-            <path
-              d="M7 1v12M1 7h12"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-            />
+            <path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
           </svg>
           Add Event Secret
         </button>
+      </div>
+    </>
+  );
+}
+
+// Renders one credential panel for a given authType
+function CredentialPanel({ authType, register, control, errors, index }) {
+  const meta   = AUTH_META[authType] ?? { label: authType, icon: "?" };
+  const prefix = `credentials.${authType}`;
+  const isTokenLike = ["api_token", "bearer_token", "access_token", "api_key"].includes(authType);
+
+  return (
+    <div className="pcf-cred-panel">
+      <div className="pcf-cred-panel-hdr">
+        <div className="pcf-cred-panel-dot" />
+        <span className="pcf-cred-panel-title">{meta.label} Credentials</span>
+        <span className="pcf-cred-panel-badge">#{index + 1}</span>
+      </div>
+      <div className="pcf-cred-panel-body">
+        {isTokenLike && (
+          <TokenFields register={register} errors={errors} authType={authType} prefix={prefix} />
+        )}
+        {authType === "basic_auth" && (
+          <BasicFields register={register} errors={errors} authType={authType} prefix={prefix} />
+        )}
+        {authType === "oauth2" && (
+          <OAuth2Fields register={register} errors={errors} authType={authType} prefix={prefix} />
+        )}
+        {authType === "hmac" && (
+          <HmacFields register={register} control={control} errors={errors} authType={authType} prefix={prefix} />
+        )}
       </div>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MAIN EXPORT
+// MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ProvisionCredentialsForm({
   onSuccess,
   onClose,
   modal = true,
-  apiBase = "",
 }) {
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(null);
-  const [apiErr, setApiErr] = useState(null);
+  const [success, setSuccess]       = useState(null);   // mock payload shown on success
+  const [apiErr, setApiErr]         = useState(null);
 
+  // ── form setup ────────────────────────────────────────────────────────────
   const {
     register,
     handleSubmit,
     control,
     watch,
+    setValue,
     reset,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      crm_type: "",
-      base_url: "",
-      auth_type: "api_token",
-      credentials: CRED_DEFAULTS.api_token,
+      crm_type:    "",
+      base_url:    "",
+      auth_types:  [],
+      credentials: {},
       extra_metadata: {},
     },
   });
 
-  const authType = watch("auth_type");
+  const crmType   = watch("crm_type");
+  const authTypes = watch("auth_types");   // string[]
 
-  // When auth_type changes, reset the credential sub-object to avoid stale fields
+  // Derive the selected CRM config object
+  const selectedCrm = MOCK_CRM_CONFIGS.find((c) => c.value === crmType) ?? null;
+
+  // When CRM changes → reset auth_types to [] and pre-fill base_url
   useEffect(() => {
-    reset(
-      (prev) => ({
-        ...prev,
-        auth_type: authType,
-        credentials: CRED_DEFAULTS[authType] ?? CRED_DEFAULTS.api_token,
-      }),
-      { keepValues: false }
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authType]);
+    setValue("auth_types",  []);
+    setValue("credentials", {});
+    setValue("base_url", selectedCrm?.defaultBaseUrl ?? "");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [crmType]);
+
+  // When auth_types changes → add default credential objects for newly added types,
+  // and remove objects for deselected types
+  useEffect(() => {
+    const current = authTypes ?? [];
+    setValue("credentials", (prev) => {
+      const next = {};
+      current.forEach((at) => {
+        // keep existing values; initialise if new
+        next[at] = prev?.[at] ?? CRED_DEFAULTS[at] ?? {};
+      });
+      return next;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(authTypes)]);
+
+  // Toggle a single auth type in the array
+  const toggleAuthType = useCallback((value) => {
+    const current = authTypes ?? [];
+    const next = current.includes(value)
+      ? current.filter((v) => v !== value)
+      : [...current, value];
+    setValue("auth_types", next, { shouldValidate: true });
+
+    // Sync credentials object immediately
+    setValue("credentials", (() => {
+      const creds = {};
+      next.forEach((at) => {
+        const existing = watch(`credentials.${at}`);
+        creds[at] = existing || CRED_DEFAULTS[at] || {};
+      });
+      return creds;
+    })());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authTypes]);
 
   const handleClose = () => {
     reset();
@@ -1018,267 +862,269 @@ export default function ProvisionCredentialsForm({
     onClose?.();
   };
 
-  const onSubmit = async (data) => {
+  // ── MOCK SUBMIT ──────────────────────────────────────────────────────────
+  const onSubmit = (data) => {
     setSubmitting(true);
     setApiErr(null);
     setSuccess(null);
 
-    // Build credentials: strip empty optional values; flatten kv array → object for hmac
-    const creds = { ...data.credentials };
-    if (creds.auth_type === "hmac" && Array.isArray(creds.per_event_secrets)) {
-      const kvObj = {};
-      creds.per_event_secrets.forEach(({ event, secret }) => {
-        if (event) kvObj[event] = secret;
-      });
-      creds.per_event_secrets = kvObj;
-    }
-    Object.keys(creds).forEach((k) => {
-      if (creds[k] === "" || creds[k] == null) delete creds[k];
+    // Build final credentials object: strip empty optional values; flatten HMAC kv array
+    const finalCreds = {};
+    (data.auth_types ?? []).forEach((at) => {
+      const raw = { ...(data.credentials?.[at] ?? {}) };
+
+      if (at === "hmac" && Array.isArray(raw.per_event_secrets)) {
+        const kvObj = {};
+        raw.per_event_secrets.forEach(({ event, secret }) => { if (event) kvObj[event] = secret; });
+        raw.per_event_secrets = kvObj;
+      }
+      // Remove blank optional fields so payload is clean
+      Object.keys(raw).forEach((k) => { if (raw[k] === "" || raw[k] == null) delete raw[k]; });
+
+      finalCreds[at] = raw;
     });
 
     const payload = {
-      crm_type: data.crm_type,
-      base_url: data.base_url,
-      credentials: creds,
+      crm_type:      data.crm_type,
+      base_url:      data.base_url,
+      auth_types:    data.auth_types,
+      credentials:   finalCreds,
       extra_metadata: data.extra_metadata ?? {},
     };
 
-    try {
-      const res = await fetch(`${apiBase}/api/v1/integrations/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json().catch(() => ({}));
+    // ── MOCK: no fetch, just log + show success ──
+    console.log("📦 [MOCK] Provision payload:", JSON.stringify(payload, null, 2));
 
-      if (!res.ok) {
-        const detail = json?.detail ?? json?.message ?? `HTTP ${res.status}`;
-        setApiErr(
-          typeof detail === "string" ? detail : JSON.stringify(detail, null, 2)
-        );
-        return;
-      }
-
-      setSuccess(json);
-      onSuccess?.(json);
-    } catch (err) {
-      setApiErr(err?.message ?? "Network error — please try again.");
-    } finally {
+    // Simulate a short network delay for realism
+    setTimeout(() => {
+      const mockResponse = {
+        integration_id: `int_${Math.random().toString(36).slice(2, 10)}`,
+        crm_type:   payload.crm_type,
+        auth_types: payload.auth_types,
+        base_url:   payload.base_url,
+        is_active:  true,
+        created_at: new Date().toISOString(),
+        _mock_payload: payload,
+      };
+      setSuccess(mockResponse);
       setSubmitting(false);
-    }
+      onSuccess?.(mockResponse);
+    }, 700);
   };
 
-  const isTokenLike = [
-    "api_token",
-    "bearer_token",
-    "access_token",
-    "api_key",
-  ].includes(authType);
+  // ─────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────────────────
 
   const content = (
     <>
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="pcf-hdr">
         <div className="pcf-hdr-l">
           <div className="pcf-ico">
-            <svg
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth="1.8"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-              />
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+              <path strokeLinecap="round" strokeLinejoin="round"
+                d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
             </svg>
           </div>
           <div>
             <h2 className="pcf-ttl">Provision CRM Integration</h2>
-            <p className="pcf-sub">
-              Configure credentials for a new CRM connection
-            </p>
+            <p className="pcf-sub"></p>
           </div>
         </div>
         {modal && (
-          <button
-            className="pcf-close"
-            type="button"
-            onClick={handleClose}
-            aria-label="Close"
-          >
+          <button className="pcf-close" type="button" onClick={handleClose} aria-label="Close">
             <svg width="13" height="13" fill="none" viewBox="0 0 16 16">
-              <path
-                d="M2 2l12 12M14 2L2 14"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
+              <path d="M2 2l12 12M14 2L2 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
           </button>
         )}
       </div>
 
-      {/* Body */}
+      {/* ── Body ── */}
       <div className="pcf-body">
+
+        {/* Success banner */}
         {success && (
           <div className="pcf-alert pcf-alert--ok">
             <span className="pcf-alert-ico">✓</span>
-            <div>
-              <strong>Integration provisioned successfully!</strong>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <strong>Integration provisioned! (mock)</strong>
               <br />
-              Integration ID:&nbsp;
-              <span className="pcf-id-pill">{success.integration_id}</span>
-              <br />
-              <span style={{ fontSize: "0.6875rem", display: "block", marginTop: "0.25rem" }}>
-                {success.crm_type} · {success.auth_type} · {success.base_url}
-              </span>
+              ID: <span className="pcf-id-pill">{success.integration_id}</span>
+              {" "}·{" "}{success.crm_type}
+              {" "}·{" "}{success.auth_types?.join(", ")}
+              <pre className="pcf-payload-pre">
+                {JSON.stringify(success._mock_payload, null, 2)}
+              </pre>
             </div>
           </div>
         )}
 
+        {/* Error banner */}
         {apiErr && (
           <div className="pcf-alert pcf-alert--err">
             <span className="pcf-alert-ico">!</span>
-            <div>
-              <strong>Provisioning failed</strong>
-              <br />
-              {apiErr}
-            </div>
+            <div><strong>Error</strong><br />{apiErr}</div>
           </div>
         )}
 
         <form id="pcf-form" onSubmit={handleSubmit(onSubmit)} noValidate>
-          {/* ─ Integration Details ─ */}
+
+          {/* ── Step 1: Select CRM ── */}
           <div className="pcf-sec">
-            <p className="pcf-sec-lbl">Integration Details</p>
-            <div className="pcf-g2">
-              <Field
-                label="CRM Type"
-                required
-                error={errors.crm_type?.message}
-              >
-                <select
-                  {...register("crm_type")}
-                  className={`pcf-select${errors.crm_type ? " has-err" : ""}`}
+            <p className="pcf-sec-lbl">1 · Select CRM</p>
+            <div className="pcf-crm-grid">
+              {MOCK_CRM_CONFIGS.map((crm) => (
+                <button
+                  key={crm.value}
+                  type="button"
+                  className={`pcf-crm-card${crmType === crm.value ? " pcf-crm-card--active" : ""}`}
+                  onClick={() => setValue("crm_type", crm.value, { shouldValidate: true })}
                 >
-                  <option value="">Select CRM…</option>
-                  {CRM_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field
-                label="Auth Type"
-                required
-                error={errors.auth_type?.message}
-              >
-                <select
-                  {...register("auth_type")}
-                  className={`pcf-select${errors.auth_type ? " has-err" : ""}`}
-                >
-                  {AUTH_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <div className="pcf-full">
-                <Field
-                  label="Base URL"
-                  required
-                  hint="Tenant-specific CRM instance URL"
-                  error={errors.base_url?.message}
-                >
-                  <input
-                    {...register("base_url")}
-                    type="url"
-                    placeholder="https://crm.yourcompany.com"
-                    className={`pcf-input${errors.base_url ? " has-err" : ""}`}
-                  />
-                </Field>
-              </div>
+                  <span className="pcf-crm-card-name">{crm.label}</span>
+                  <span className="pcf-crm-card-desc">{crm.description}</span>
+                  <span className="pcf-crm-check">
+                    <CheckIcon />
+                  </span>
+                </button>
+              ))}
             </div>
+            <ErrMsg msg={errors.crm_type?.message} />
           </div>
 
-          {/* ─ Credentials ─ */}
-          <div className="pcf-sec">
-            <p className="pcf-sec-lbl">Credentials</p>
-            <div className="pcf-cred-box">
-              <div className="pcf-badge">
-                <svg width="11" height="11" fill="none" viewBox="0 0 16 16">
-                  <path
-                    d="M8 1a4 4 0 014 4v1h1a1 1 0 011 1v7a1 1 0 01-1 1H3a1 1 0 01-1-1V7a1 1 0 011-1h1V5a4 4 0 014-4z"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                  />
-                </svg>
-                {AUTH_LABELS[authType] ?? authType}
-              </div>
-
-              {isTokenLike && (
-                <TokenFields
-                  register={register}
-                  errors={errors}
-                  authType={authType}
+          {/* ── Step 2: Base URL (only after CRM chosen) ── */}
+          {crmType && (
+            <div className="pcf-sec">
+              <p className="pcf-sec-lbl">2 · Instance URL</p>
+              <Field
+                label="Base URL"
+                required
+                hint={`Tenant-specific ${selectedCrm?.label ?? ""} instance URL`}
+                error={errors.base_url?.message}
+              >
+                <input
+                  {...register("base_url")}
+                  type="url"
+                  placeholder={selectedCrm?.defaultBaseUrl ?? "https://crm.yourcompany.com"}
+                  className={`pcf-input${errors.base_url ? " has-err" : ""}`}
                 />
-              )}
-              {authType === "basic_auth" && (
-                <BasicFields register={register} errors={errors} />
-              )}
-              {authType === "oauth2" && (
-                <OAuth2Fields register={register} errors={errors} />
-              )}
-              {authType === "hmac" && (
-                <HmacFields register={register} control={control} errors={errors} />
+              </Field>
+            </div>
+          )}
+
+          {/* ── Step 3: Auth types (filtered by CRM) ── */}
+          {crmType && (
+            <div className="pcf-sec">
+              <p className="pcf-sec-lbl">3 · Auth Methods</p>
+              {selectedCrm ? (
+                <>
+                  <div className="pcf-auth-grid">
+                    {selectedCrm.supportedAuthTypes.map((at) => {
+                      const meta    = AUTH_META[at] ?? { label: at, icon: "?" };
+                      const checked = (authTypes ?? []).includes(at);
+                      return (
+                        <label
+                          key={at}
+                          className={`pcf-auth-cb${checked ? " pcf-auth-cb--checked" : ""}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleAuthType(at)}
+                          />
+                          <div className="pcf-cb-box"><CheckIcon /></div>
+                          <span className="pcf-cb-icon">{meta.icon}</span>
+                          <span className="pcf-cb-label">{meta.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <ErrMsg msg={errors.auth_types?.message} />
+                  {(authTypes ?? []).length > 1 && (
+                    <p style={{ fontSize: 11, color: "var(--t2)", marginTop: 8, marginBottom: 0 }}>
+                      ✦ {authTypes.length} auth methods selected — credential fields are stacked below.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <div className="pcf-auth-none">Select a CRM first to see available auth methods.</div>
               )}
             </div>
-          </div>
+          )}
+
+          {/* ── Step 4: Stacked credential panels ── */}
+          {(authTypes ?? []).length > 0 && (
+            <div className="pcf-sec">
+              <p className="pcf-sec-lbl">4 · Credentials</p>
+              <div className="pcf-cred-stack-outer">
+                {authTypes.map((at, idx) => (
+                  <CredentialPanel
+                    key={at}
+                    authType={at}
+                    index={idx}
+                    register={register}
+                    control={control}
+                    errors={errors}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Prompt when no auth selected yet */}
+          {crmType && (authTypes ?? []).length === 0 && (
+            <div className="pcf-sec">
+              <p className="pcf-sec-lbl">4 · Credentials</p>
+              <div className="pcf-cred-empty">
+                <div className="pcf-cred-empty-icon">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round"
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+                <span>Select at least one auth method above to see credential fields.</span>
+              </div>
+            </div>
+          )}
+
         </form>
       </div>
 
-      {/* Footer */}
+      {/* ── Footer ── */}
       <div className="pcf-ftr">
-        {modal && (
-          <button
-            className="pcf-btn-cancel"
-            type="button"
-            onClick={handleClose}
-          >
-            Cancel
-          </button>
-        )}
-        <button
-          className="pcf-btn-submit"
-          type="button"
-          disabled={submitting}
-          onClick={handleSubmit(onSubmit)}
-        >
-          {submitting ? (
-            <>
-              <span className="pcf-spinner" />
-              Provisioning…
-            </>
-          ) : (
-            <>
-              <svg width="13" height="13" fill="none" viewBox="0 0 14 14">
-                <path
-                  d="M7 1v12M1 7h12"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                />
-              </svg>
-              Provision Integration
-            </>
+        <span className="pcf-ftr-hint">
+          {success
+            ? "✓ Payload logged to console"
+            : "Provide necessary details and click the button to provision."}
+        </span>
+        <div className="pcf-ftr-right">
+          {modal && (
+            <button className="pcf-btn-cancel" type="button" onClick={handleClose}>
+              Cancel
+            </button>
           )}
-        </button>
+          <button
+            className="pcf-btn-submit"
+            type="button"
+            disabled={submitting || !crmType || (authTypes ?? []).length === 0}
+            onClick={handleSubmit(onSubmit)}
+          >
+            {submitting ? (
+              <>
+                <span className="pcf-spinner" />
+                Provisioning…
+              </>
+            ) : (
+              <>
+                <svg width="13" height="13" fill="none" viewBox="0 0 14 14">
+                  <path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                </svg>
+                Provision Integration
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </>
   );
@@ -1297,7 +1143,7 @@ export default function ProvisionCredentialsForm({
           <div className="pcf-panel pcf-panel--modal">{content}</div>
         </div>
       ) : (
-        <div className="pcf-panel">{content}</div>
+        <div className="pcf-panel pcf-panel--card">{content}</div>
       )}
     </div>
   );
