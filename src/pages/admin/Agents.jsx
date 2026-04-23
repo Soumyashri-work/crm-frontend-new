@@ -1,9 +1,11 @@
 /**
- * src/pages/admin/Agents.jsx — REFACTORED (PHASE 6)
- *
- * Uses DataTable component for search, sort, filter, pagination + checkboxes
- * Maintains all invite/update/delete mutations
- * Pagination logic now internal to DataTable component
+ * src/pages/admin/Agents.jsx — Updated with refactored InviteAgentModal
+ * 
+ * Changes:
+ * - Invite modal now works for both:
+ *   1. New agents (via "+ Add Agent" button, no pre-filled data)
+ *   2. Existing agents (via "Invite" action button, pre-filled data)
+ * - Fixed modal state management to handle both modes
  */
 
 import { useState, useEffect, useMemo } from 'react';
@@ -76,6 +78,7 @@ export default function Agents() {
   const [editingAgent, setEditingAgent] = useState(null);
   const [deletingAgent, setDeletingAgent] = useState(null);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [inviteModalMode, setInviteModalMode] = useState('new'); // 'new' or 'existing'
   const [inviteTargetAgent, setInviteTargetAgent] = useState(null);
 
   // ─── Fetch source systems for filter ─────────────────────────────────
@@ -261,20 +264,37 @@ export default function Agents() {
     });
   };
 
-  const handleInvite = (a) => {
-    const [first_name = '', ...rest] = (a.name ?? '').split(' ');
+  // ─── Open invite modal for new agent (from "+ Add Agent" button) ──────
+  const handleAddAgentClick = () => {
+    setInviteModalMode('new');
+    setInviteTargetAgent(null);
+    setInviteModalOpen(true);
+  };
+
+  // ─── Open invite modal for existing agent (from "Invite" action button) 
+  const handleInviteExistingAgent = (agent) => {
+    const [first_name = '', ...rest] = (agent.name ?? '').split(' ');
+    setInviteModalMode('existing');
     setInviteTargetAgent({
-      id: a.id,
+      id: agent.id,
       first_name,
       last_name: rest.join(' '),
-      email: a.email ?? '',
+      email: agent.email ?? '',
     });
     setInviteModalOpen(true);
   };
 
-  const handleInviteAgentSuccess = async () => {
-    setBanner({ type: 'success', message: 'Invite sent to agent.' });
+  // ─── Close invite modal ──────────────────────────────────────────────
+  const handleInviteModalClose = () => {
+    setInviteModalOpen(false);
+    setInviteModalMode('new');
     setInviteTargetAgent(null);
+  };
+
+  // ─── Handle successful invite ────────────────────────────────────────
+  const handleInviteSuccess = async () => {
+    setBanner({ type: 'success', message: 'Invite sent to agent.' });
+    handleInviteModalClose();
     await invalidateAgents();
   };
 
@@ -284,7 +304,7 @@ export default function Agents() {
     if (status === 'not_invited') {
       return (
         <button
-          onClick={() => handleInvite(a)}
+          onClick={() => handleInviteExistingAgent(a)}
           disabled={inviteMutation.isPending}
           style={{
             padding: '6px 12px',
@@ -543,7 +563,7 @@ export default function Agents() {
             />
           )}
           <button
-            onClick={() => setInviteModalOpen(true)}
+            onClick={handleAddAgentClick}
             style={{
               padding: '9px 16px',
               fontSize: 13,
@@ -661,7 +681,7 @@ export default function Agents() {
         </div>
       )}
 
-      {/* DataTable — PHASE 6: Unified pagination now internal to DataTable */}
+      {/* DataTable */}
       <DataTable
         columns={columns}
         data={sorted}
@@ -695,7 +715,7 @@ export default function Agents() {
         }
       />
 
-{/* ── Edit Modal ── */}
+      {/* Edit Modal */}
       {editingAgent && (
         <EditAgentModal
           isOpen={!!editingAgent}
@@ -705,7 +725,7 @@ export default function Agents() {
         />
       )}
 
-      {/* ── Delete Modal ── */}
+      {/* Delete Modal */}
       {deletingAgent && (
         <ConfirmDeleteModal
           isOpen={!!deletingAgent}
@@ -715,12 +735,13 @@ export default function Agents() {
           isDeleting={deleteMutation.isPending}
         />
       )}
-      {inviteTargetAgent && (
+
+      {/* Invite Modal (for both new and existing agents) */}
       <InviteAgentModal
         isOpen={inviteModalOpen}
-        agentId={inviteTargetAgent?.id || null}
+        agentId={inviteModalMode === 'existing' ? inviteTargetAgent?.id : null}
         initialData={
-          inviteTargetAgent
+          inviteModalMode === 'existing' && inviteTargetAgent
             ? {
                 first_name: inviteTargetAgent.first_name,
                 last_name: inviteTargetAgent.last_name,
@@ -728,13 +749,9 @@ export default function Agents() {
               }
             : null
         }
-        onClose={() => {
-          setInviteModalOpen(false);
-          setInviteTargetAgent(null);
-        }}
-        onSuccess={handleInviteAgentSuccess}
+        onClose={handleInviteModalClose}
+        onSuccess={handleInviteSuccess}
       />
-      )}
     </div>
   );
 }
