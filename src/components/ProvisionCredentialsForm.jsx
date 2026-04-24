@@ -23,6 +23,8 @@ import {
   transformFormToPayload,
 } from '../services/integrationService';
 
+import './ProvisionCredentialsForm.css';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MOCK BACKEND SCHEMA  (drives the UI only)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -57,6 +59,7 @@ const MOCK_CRM_CONFIGS = [
       ],
     },
     webhookInstructions: [
+      'Webhook setup',
       'Go to Admin → System → Webhooks.',
       'Click "Add Webhook".',
       'Enter a name for this webhook (e.g., "Dashboard Ingest").',
@@ -64,7 +67,7 @@ const MOCK_CRM_CONFIGS = [
       'Generate a random secret token, save it securely, and paste it into our dashboard in the Webhook Secret field.',
       'Set SSL Verification to "yes".',
       'Click Submit to create the webhook.',
-      '',
+      'Trigger setup',
       'Next, set up a Trigger to connect the webhook to events:',
       'Go to Admin → System → Triggers.',
       'Click "Add Trigger".',
@@ -223,364 +226,6 @@ function makeCrmEntry(crmValue) {
     per_event_secrets:  [],
   };
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CSS  (unchanged from v6)
-// ─────────────────────────────────────────────────────────────────────────────
-
-const CSS = `
- @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
- 
- .pcf {
-   --p:      #4f6ef7;
-   --ph:     #3a5be0;
-   --plt:    #eef1fe;
-   --pring:  rgba(79,110,247,.18);
-   --ok:     #16a34a;
-   --oklt:   #f0fdf4;
-   --err:    #dc2626;
-   --errlt:  #fef2f2;
-   --warn:   #ea580c;
-   --warnlt: #fff7ed;
-   --t1:     #0f172a;
-   --t2:     #475569;
-   --tm:     #64748b;
-   --bd:     #cbd5e1;
-   --bg:     #f8fafc;
-   --card:   #ffffff;
-   --rsm:    6px;
-   --rmd:    10px;
-   --rlg:    14px;
-   --ring:   0 0 0 3px var(--pring);
-   --tr:     150ms cubic-bezier(.4,0,.2,1);
-   --shadow: 0 20px 60px rgba(0,0,0,.18), 0 4px 24px rgba(0,0,0,.09);
-   font-family: 'DM Sans','Segoe UI',system-ui,sans-serif;
-   color: var(--t1);
- }
- .pcf *, .pcf *::before, .pcf *::after { box-sizing: border-box; }
- 
- .pcf-breadcrumb {
-   padding: 12px 26px; background: var(--bg); border-bottom: 1px solid var(--bd);
-   font-size: 11px; color: var(--tm); letter-spacing: .05em; text-transform: uppercase;
-   font-weight: 600;
- }
- .pcf-breadcrumb a { color: var(--p); text-decoration: none; transition: color var(--tr); }
- .pcf-breadcrumb a:hover { color: var(--ph); }
- .pcf-breadcrumb-sep { margin: 0 8px; color: var(--bd); }
- 
- .pcf-overlay {
-   position: fixed; inset: 0;
-   background: rgba(15,18,35,.5);
-   backdrop-filter: blur(3px);
-   display: flex; align-items: flex-start; justify-content: center;
-   z-index: 1000; padding: 24px 16px;
-   overflow-y: auto;
-   animation: pcf-fade .18s ease;
- }
- 
- .pcf-panel {
-   background: var(--card);
-   border-radius: var(--rlg);
-   width: 100%; max-width: 800px;
-   display: flex; flex-direction: column;
-   margin: auto;
- }
- .pcf-panel--modal {
-   box-shadow: var(--shadow);
-   animation: pcf-up .22s ease;
- }
- .pcf-panel--card {
-   border: 1px solid var(--bd);
-   box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.04);
-   margin: 0 auto;
- }
- 
- .pcf-hdr {
-   display: flex; align-items: center; justify-content: space-between;
-   padding: 24px 26px; border-bottom: 1px solid var(--bd);
-   flex-shrink: 0;
- }
- .pcf-hdr-l { display: flex; align-items: center; gap: 14px; }
- .pcf-hdr-back {
-   width: 36px; height: 36px; border-radius: var(--rsm);
-   border: 1.5px solid var(--bd); background: transparent;
-   cursor: pointer; display: flex; align-items: center; justify-content: center;
-   color: var(--t2); transition: all var(--tr); flex-shrink: 0;
-   font-size: 16px;
- }
- .pcf-hdr-back:hover { background: var(--bg); color: var(--t1); border-color: var(--t2); }
- .pcf-ico {
-   width: 42px; height: 42px; border-radius: var(--rmd);
-   background: var(--plt); display: flex; align-items: center; justify-content: center;
-   flex-shrink: 0;
- }
- .pcf-ico svg { width: 22px; height: 22px; color: var(--p); }
- .pcf-ttl { font-size: 18px; font-weight: 800; margin: 0; letter-spacing: -.02em; color: var(--t1); }
- .pcf-sub { font-size: 12px; color: var(--tm); margin: 3px 0 0; font-weight: 500; }
- .pcf-close {
-   width: 32px; height: 32px; border-radius: var(--rsm);
-   border: 1.5px solid var(--bd); background: transparent;
-   cursor: pointer; display: flex; align-items: center; justify-content: center;
-   color: var(--t2); transition: all var(--tr); flex-shrink: 0;
- }
- .pcf-close:hover { background: var(--bg); color: var(--t1); border-color: var(--t2); }
- 
- .pcf-body { padding: 24px 26px; flex: 1; overflow-y: auto; }
- 
- .pcf-sec { margin-bottom: 28px; }
- .pcf-sec-lbl {
-   font-size: 11px; font-weight: 800; text-transform: uppercase;
-   letter-spacing: .1em; color: var(--t1);
-   display: flex; align-items: center; gap: 10px; margin: 0 0 16px;
- }
- .pcf-sec-lbl::after { content:''; flex:1; height:1px; background:var(--bd); }
- 
- .pcf-g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
- .pcf-full { grid-column: 1 / -1; }
- 
- .pcf-field { display: flex; flex-direction: column; gap: 6px; }
- .pcf-lbl { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; color: var(--t1); }
- .pcf-req { color: var(--err); font-size: 10px; font-weight: 700; }
- .pcf-opt {
-   font-size: 10px; font-weight: 600; color: var(--tm);
-   background: var(--bg); border: 1px solid var(--bd);
-   border-radius: 4px; padding: 2px 6px;
- }
- .pcf-hint { font-size: 12px; color: var(--tm); line-height: 1.4; }
- .pcf-errmsg { font-size: 12px; color: var(--err); display: flex; align-items: center; gap: 5px; font-weight: 500; }
- 
- .pcf-input, .pcf-select {
-   height: 40px; padding: 0 12px;
-   border: 1.5px solid var(--bd); border-radius: var(--rsm);
-   background: var(--card); color: var(--t1);
-   font-size: 13px; font-family: inherit; font-weight: 500;
-   outline: none; width: 100%;
-   transition: border-color var(--tr), box-shadow var(--tr), background var(--tr);
-   -webkit-appearance: none; appearance: none;
- }
- .pcf-input:focus, .pcf-select:focus { border-color: var(--p); box-shadow: var(--ring); background: #fafbff; }
- .pcf-input.has-err { border-color: var(--err); box-shadow: 0 0 0 3px rgba(220,38,38,.1); }
- .pcf-secret {
-   font-family: 'JetBrains Mono','Fira Code',monospace;
-   font-size: 12px; letter-spacing: .05em;
- }
- .pcf-secret::placeholder { font-family: inherit; font-size: 13px; letter-spacing: 0; }
- 
- .pcf-copyable-wrapper { display: flex; gap: 8px; align-items: center; }
- .pcf-copyable-input {
-   flex: 1;
-   font-family: 'JetBrains Mono','Fira Code',monospace;
-   font-size: 12px; letter-spacing: .03em;
-   background: rgba(79,110,247,.04);
- }
- .pcf-copyable-input:focus { background: #fafbff; }
- .pcf-copy-btn {
-   height: 40px; padding: 0 14px; border-radius: var(--rsm);
-   border: 1.5px solid var(--bd); background: var(--card);
-   color: var(--t2); font-size: 12px; font-weight: 700;
-   cursor: pointer; font-family: inherit; transition: all var(--tr);
-   display: flex; align-items: center; gap: 6px;
-   white-space: nowrap; flex-shrink: 0;
- }
- .pcf-copy-btn:hover:not(.pcf-copy-btn--copied) { background: var(--bg); color: var(--t1); border-color: var(--t2); }
- .pcf-copy-btn--copied { background: rgba(22,163,74,.1); border-color: rgba(22,163,74,.3); color: #15803d; }
- .pcf-copy-btn svg { flex-shrink: 0; }
- 
- .pcf-crm-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
- .pcf-crm-card {
-   border: 2px solid var(--bd); border-radius: var(--rmd); padding: 14px;
-   cursor: pointer; transition: all var(--tr); background: var(--card); text-align: left;
-   display: flex; align-items: flex-start; gap: 12px; position: relative; outline: none;
- }
- .pcf-crm-card:hover { border-color: var(--p); background: rgba(79,110,247,.03); }
- .pcf-crm-card--active { border-color: var(--p); background: var(--plt); box-shadow: var(--ring); }
- .pcf-crm-card-body { flex: 1; }
- .pcf-crm-card-name { font-size: 14px; font-weight: 700; color: var(--t1); display: block; }
- .pcf-crm-card-desc { font-size: 12px; color: var(--t2); margin-top: 4px; display: block; }
- .pcf-crm-card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
- .pcf-crm-tag {
-   font-size: 10px; font-weight: 700; text-transform: uppercase;
-   letter-spacing: .06em; color: var(--t2);
-   background: var(--bg); border: 1px solid var(--bd); border-radius: 4px; padding: 2px 6px;
- }
- 
- .pcf-cfg-form { display: flex; flex-direction: column; gap: 18px; }
- 
- .pcf-radio-group { display: flex; flex-direction: column; gap: 8px; }
- .pcf-radio-item {
-   display: flex; align-items: center; gap: 12px; padding: 11px 14px;
-   border: 1.5px solid var(--bd); border-radius: var(--rmd);
-   cursor: pointer; transition: all var(--tr); background: var(--card); user-select: none;
- }
- .pcf-radio-item:hover { border-color: var(--p); background: rgba(79,110,247,.03); }
- .pcf-radio-item--selected { border-color: var(--p); background: var(--plt); }
- .pcf-radio-item input[type="radio"] { display: none; }
- .pcf-radio-dot {
-   width: 18px; height: 18px; flex-shrink: 0; border: 2px solid var(--bd); border-radius: 50%;
-   background: var(--card); display: flex; align-items: center; justify-content: center;
-   transition: all var(--tr);
- }
- .pcf-radio-item--selected .pcf-radio-dot { border-color: var(--p); background: var(--p); }
- .pcf-radio-dot-inner { width: 8px; height: 8px; border-radius: 50%; background: #fff; opacity: 0; transition: opacity var(--tr); }
- .pcf-radio-item--selected .pcf-radio-dot-inner { opacity: 1; }
- .pcf-radio-icon {
-   width: 28px; height: 28px; border-radius: var(--rsm);
-   background: var(--bg); border: 1.5px solid var(--bd);
-   font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center;
-   color: var(--t2); flex-shrink: 0; transition: all var(--tr);
- }
- .pcf-radio-item--selected .pcf-radio-icon { background: rgba(79,110,247,.12); border-color: rgba(79,110,247,.35); color: var(--p); }
- .pcf-radio-label { font-size: 13px; font-weight: 600; color: var(--t1); }
- 
- .pcf-cred-sub {
-   background: var(--bg); border: 1.5px solid var(--bd); border-radius: var(--rmd);
-   padding: 16px; display: flex; flex-direction: column; gap: 14px; animation: pcf-fade .2s ease;
- }
- 
- .pcf-help {
-   border: 1px solid rgba(79,110,247,.25); border-radius: var(--rmd);
-   background: linear-gradient(135deg, rgba(79,110,247,.06) 0%, rgba(79,110,247,.03) 100%);
-   overflow: hidden; transition: box-shadow var(--tr); animation: pcf-fade .2s ease;
- }
- .pcf-help:focus-within { box-shadow: var(--ring); }
- .pcf-help-trigger {
-   width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 14px;
-   background: transparent; border: none; cursor: pointer; font-family: inherit; text-align: left;
-   transition: background var(--tr);
- }
- .pcf-help-trigger:hover { background: rgba(79,110,247,.08); }
- .pcf-help-ico {
-   width: 24px; height: 24px; border-radius: 50%;
-   background: var(--plt); border: 1px solid rgba(79,110,247,.3);
-   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
- }
- .pcf-help-ico svg { width: 13px; height: 13px; color: var(--p); }
- .pcf-help-title { font-size: 12px; font-weight: 700; color: var(--p); flex: 1; }
- .pcf-help-chevron { width: 16px; height: 16px; color: var(--p); flex-shrink: 0; transition: transform var(--tr); }
- .pcf-help-chevron--open { transform: rotate(180deg); }
- .pcf-help-body { padding: 0 14px 14px 14px; animation: pcf-fade .18s ease; }
- .pcf-help-steps {
-   list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px;
-   border-top: 1px solid rgba(79,110,247,.15); padding-top: 11px;
- }
- .pcf-help-step { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; line-height: 1.5; color: var(--t2); }
- .pcf-help-step-num {
-   width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
-   background: var(--plt); border: 1.5px solid rgba(79,110,247,.3);
-   font-size: 10px; font-weight: 800; color: var(--p);
-   display: flex; align-items: center; justify-content: center; margin-top: 1px;
- }
- .pcf-help-step-text { flex: 1; }
- .pcf-help-step-text code {
-   font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 11px;
-   background: rgba(79,110,247,.1); border: 1px solid rgba(79,110,247,.2);
-   border-radius: 3px; padding: 1px 5px;
- }
- 
- .pcf-wh-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
- .pcf-wh-toggle-info { flex: 1; }
- .pcf-wh-toggle-title { font-size: 13px; font-weight: 700; color: var(--t1); display: block; }
- .pcf-wh-toggle-desc  { font-size: 12px; color: var(--t2); display: block; margin-top: 2px; }
- .pcf-toggle-wrap { flex-shrink: 0; }
- .pcf-toggle { position: relative; display: inline-flex; width: 40px; height: 24px; cursor: pointer; }
- .pcf-toggle input { display: none; }
- .pcf-toggle-track { width: 40px; height: 24px; border-radius: 12px; background: var(--bd); transition: background var(--tr); display: block; border: 1px solid var(--bd); }
- .pcf-toggle input:checked + .pcf-toggle-track { background: var(--p); border-color: var(--p); }
- .pcf-toggle-thumb { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.2); transition: transform var(--tr); }
- .pcf-toggle input:checked ~ .pcf-toggle-thumb { transform: translateX(16px); }
- 
- .pcf-wh-box {
-   background: rgba(234,88,12,.08); border: 1.5px solid rgba(234,88,12,.25);
-   border-radius: var(--rmd); padding: 16px; display: flex; flex-direction: column; gap: 12px;
-   animation: pcf-fade .2s ease;
- }
- .pcf-wh-box-title {
-   font-size: 12px; font-weight: 700; text-transform: uppercase;
-   letter-spacing: .06em; color: var(--warn); display: flex; align-items: center; gap: 7px; margin: 0 0 2px;
- }
- .pcf-kv-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
- .pcf-kv-row  { display: grid; grid-template-columns: 1fr 1fr 32px; gap: 8px; align-items: center; }
- .pcf-kv-del {
-   width: 32px; height: 32px; border-radius: var(--rsm);
-   border: 1.5px solid var(--bd); background: transparent;
-   color: var(--err); font-size: 18px; line-height: 1;
-   cursor: pointer; display: flex; align-items: center; justify-content: center;
-   transition: all var(--tr); font-weight: 600;
- }
- .pcf-kv-del:hover { background: var(--errlt); border-color: var(--err); }
- .pcf-add-row {
-   display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: var(--rsm);
-   border: 1.5px dashed rgba(234,88,12,.4); background: rgba(234,88,12,.06);
-   color: var(--warn); font-size: 12px; font-weight: 700;
-   cursor: pointer; transition: all var(--tr); font-family: inherit;
- }
- .pcf-add-row:hover { background: rgba(234,88,12,.12); border-color: rgba(234,88,12,.6); }
- 
- .pcf-alert {
-   border-radius: var(--rmd); padding: 14px 16px; font-size: 13px; line-height: 1.55;
-   display: flex; align-items: flex-start; gap: 11px; margin-bottom: 14px; animation: pcf-fade .18s ease;
- }
- .pcf-alert--ok   { background: var(--oklt);   border: 1.5px solid rgba(22,163,74,.3);  color: #15803d; }
- .pcf-alert--err  { background: var(--errlt);  border: 1.5px solid rgba(220,38,38,.3);  color: #991b1b; }
- .pcf-alert--warn { background: var(--warnlt); border: 1.5px solid rgba(234,88,12,.3);  color: #9a3412; }
- .pcf-alert-ico   { flex-shrink: 0; font-size: 16px; margin-top: 1px; font-weight: 700; }
- .pcf-failed-checks {
-   margin: 8px 0 0; padding: 0; list-style: none;
-   display: flex; flex-direction: column; gap: 4px;
- }
- .pcf-failed-check-item {
-   font-size: 11px; display: flex; align-items: flex-start; gap: 6px; opacity: 0.9;
- }
- .pcf-failed-check-item::before {
-   content: '✗'; flex-shrink: 0; font-weight: 700; margin-top: 1px;
- }
- 
- .pcf-cfg-footer {
-   padding: 14px 26px; border-top: 1px solid var(--bd); background: var(--bg);
-   display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0;
- }
- 
- .pcf-btn-cancel {
-   height: 38px; padding: 0 18px; border-radius: var(--rsm);
-   border: 1.5px solid var(--bd); background: var(--card);
-   color: var(--t2); font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
-   transition: all var(--tr);
- }
- .pcf-btn-cancel:hover { background: var(--bg); color: var(--t1); border-color: var(--t2); }
- .pcf-btn-submit {
-   height: 38px; padding: 0 20px; border-radius: var(--rsm);
-   border: none; background: var(--p); color: #fff;
-   font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
-   display: flex; align-items: center; gap: 8px;
-   transition: all var(--tr); letter-spacing: -.01em;
- }
- .pcf-btn-submit:hover:not(:disabled) { background: var(--ph); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(79,110,247,.38); }
- .pcf-btn-submit:disabled { opacity: .6; cursor: not-allowed; }
- .pcf-spinner {
-   width: 14px; height: 14px; border: 2.5px solid rgba(255,255,255,.3); border-top-color: #fff;
-   border-radius: 50%; animation: pcf-spin .7s linear infinite;
- }
- 
- .pcf-ftr {
-   padding: 14px 26px 18px; border-top: 1px solid var(--bd);
-   display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-shrink: 0; background: var(--bg);
- }
- 
- @keyframes pcf-fade { from{opacity:0} to{opacity:1} }
- @keyframes pcf-up   { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
- @keyframes pcf-spin { to{transform:rotate(360deg)} }
- 
- @media(max-width:680px){
-   .pcf-panel--modal { border-radius: var(--rlg); }
-   .pcf-hdr, .pcf-body, .pcf-ftr, .pcf-cfg-footer { padding-left:16px; padding-right:16px; }
-   .pcf-g2  { grid-template-columns: 1fr; }
-   .pcf-crm-grid { grid-template-columns: 1fr; }
-   .pcf-kv-row   { grid-template-columns: 1fr 1fr 32px; }
-   .pcf-copyable-wrapper { flex-direction: column; }
-   .pcf-copy-btn { width: 100%; justify-content: center; }
-   .pcf-ttl { font-size: 16px; }
- }
- `;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UTILITY COMPONENTS
@@ -788,7 +433,7 @@ function OAuth2CredFields({ register, errors }) {
       </Field>
       <div className="pcf-g2">
         <Field label="Refresh Token" optional>
-          <input {...register('cred_refresh_token')} type="password" autoComplete="new-password" placeholder="••••••••••••••••" className="pcf-input pcf-secret" />
+          <input {...register('cred_refresh_token')} type="password" autoComplete="new-password" placeholder="••••••••••••••" className="pcf-input pcf-secret" />
         </Field>
         <Field label="Token Type" optional hint='Default: "Bearer"'>
           <input {...register('cred_token_type')} type="text" placeholder="Bearer" className="pcf-input" />
@@ -1301,7 +946,6 @@ export default function ProvisionCredentialsForm({ onSuccess, onClose, modal = t
 
   return (
     <div className="pcf">
-      <style>{CSS}</style>
       {modal ? (
         <div
           className="pcf-overlay"

@@ -217,36 +217,7 @@ export default function AddTenantModal({ isOpen, onClose, onSubmit }) {
           )}
         </div>
 
-        {/* Source / CRM Systems */}
-        <div className="modal-form-group">
-          <label className="modal-form-label">
-            Source / CRM Systems
-            <span style={{ color: '#DC2626' }}>*</span>
-          </label>
-          <SourceSystemMultiSelect
-            loading={loadingSystems}
-            error={systemsError}
-            systems={sourceSystems}
-            selected={form.source_system_ids}
-            onToggle={toggleSystem}
-            hasFieldError={!!errors.source_system_ids}
-            onRetry={() => fetchSourceSystems()}
-          />
-          {errors.source_system_ids && (
-            <div className="modal-form-error" role="alert">
-              {errors.source_system_ids}
-            </div>
-          )}
-          {!errors.source_system_ids &&
-            !loadingSystems &&
-            !systemsError &&
-            sourceSystems.length > 0 && (
-              <div className="modal-form-hint">
-                {form.source_system_ids.length} of {sourceSystems.length}{' '}
-                selected
-              </div>
-            )}
-        </div>
+
       </form>
 
       <div className="modal-footer">
