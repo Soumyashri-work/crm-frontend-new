@@ -10,8 +10,8 @@
  *   2. User sets password and clicks Join Now
  *   3. POST /invitations/accept { token, password }
  *      → backend marks token used, sets password in Keycloak, creates DashboardUser
- *   4. Show ProvisionCredentialsForm modal → provision CRM integration
- *   5. On success → redirect to /login
+ *   4. On success → redirect to /login
+ *      (CRM provisioning is done later via Settings → Integrations)
  *
  * Token is NEVER reusable after accept — backend marks it immediately.
  */
@@ -19,7 +19,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Ticket, Eye, EyeOff } from 'lucide-react';
-import ProvisionCredentialsForm from '../../components/ProvisionCredentialsForm';
 
 const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
@@ -28,16 +27,15 @@ export default function InvitePage() {
   const navigate  = useNavigate();
   const token     = params.get('token');
 
-  const [invite,            setInvite]            = useState(null);
-  const [password,          setPassword]          = useState('');
-  const [confirm,           setConfirm]           = useState('');
-  const [showPw,            setShowPw]            = useState(false);
-  const [showCf,            setShowCf]            = useState(false);
-  const [error,             setError]             = useState('');
-  const [success,           setSuccess]           = useState(false);
-  const [loading,           setLoading]           = useState(false);
-  const [validating,        setValidating]        = useState(true);
-  const [showProvisionForm, setShowProvisionForm] = useState(false);
+  const [invite,     setInvite]     = useState(null);
+  const [password,   setPassword]   = useState('');
+  const [confirm,    setConfirm]    = useState('');
+  const [showPw,     setShowPw]     = useState(false);
+  const [showCf,     setShowCf]     = useState(false);
+  const [error,      setError]      = useState('');
+  const [success,    setSuccess]    = useState(false);
+  const [loading,    setLoading]    = useState(false);
+  const [validating, setValidating] = useState(true);
 
   // ── Step 1: validate token on mount ─────────────────────────────────────
   useEffect(() => {
@@ -79,25 +77,13 @@ export default function InvitePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to activate account.');
       setSuccess(true);
-      setShowProvisionForm(true);
+      // Auto-redirect to login after 2.5 s so the user can read the success message
+      setTimeout(() => navigate('/login'), 2500);
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  };
-
-  // ── Provision form handlers ──────────────────────────────────────────────
-  const handleProvisionSuccess = (data) => {
-    console.log('New integration provisioned:', data.integration_id);
-    // Auto-navigate to login after successful provisioning
-    navigate('/login');
-  };
-
-  const handleProvisionClose = () => {
-    setShowProvisionForm(false);
-    // Redirect to login if user dismisses without provisioning
-    navigate('/login');
   };
 
   // ── Render states ────────────────────────────────────────────────────────
@@ -125,7 +111,7 @@ export default function InvitePage() {
     );
   }
 
-  if (success && !showProvisionForm) {
+  if (success) {
     return (
       <Screen>
         <div style={s.card}>
@@ -135,106 +121,97 @@ export default function InvitePage() {
             You've joined <strong style={{ color: 'var(--primary)' }}>{invite?.tenant_name}</strong>{' '}
             as <strong>{invite?.role}</strong>.
           </p>
-          <p style={{ ...s.sub, marginTop: 8 }}>You can now sign in with your email and password.</p>
-          <button style={s.btn} onClick={() => navigate('/login')}>
-            Go to Login →
-          </button>
+          <p style={{ ...s.sub, marginTop: 8 }}>
+            You can now sign in. To connect CRM integrations, go to{' '}
+            <strong>Settings → Integrations</strong> after logging in.
+          </p>
+          <p style={{ ...s.sub, marginTop: 8, color: 'var(--text-muted)', fontSize: 12 }}>
+            Redirecting to login…
+          </p>
         </div>
       </Screen>
     );
   }
 
   return (
-    <>
-      <Screen>
-        <div style={s.card}>
-          {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-            <div style={{
-              width: 44, height: 44, borderRadius: 12, background: 'var(--primary)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Ticket size={22} color="white" />
-            </div>
-            <div>
-              <div style={s.badge}>{invite?.role?.toUpperCase()}</div>
-            </div>
+    <Screen>
+      <div style={s.card}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 12, background: 'var(--primary)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Ticket size={22} color="white" />
           </div>
-
-          <h1 style={s.title}>Join {invite?.tenant_name}</h1>
-          <p style={s.sub}>
-            You're being added as <strong>{invite?.role}</strong> to{' '}
-            <strong>{invite?.tenant_name}</strong>.
-          </p>
-          <p style={s.email}>📧 {invite?.email}</p>
-
-          <div style={s.divider} />
-
-          {/* Password fields */}
-          <label style={s.label}>Set your password</label>
-          <div style={{ position: 'relative', marginBottom: 12 }}>
-            <input
-              type={showPw ? 'text' : 'password'}
-              style={s.input}
-              placeholder="Minimum 8 characters"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPw((v) => !v)}
-              style={s.eyeBtn}
-            >
-              {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
-            </button>
+          <div>
+            <div style={s.badge}>{invite?.role?.toUpperCase()}</div>
           </div>
-
-          <label style={s.label}>Confirm password</label>
-          <div style={{ position: 'relative', marginBottom: 4 }}>
-            <input
-              type={showCf ? 'text' : 'password'}
-              style={s.input}
-              placeholder="Repeat your password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-            />
-            <button
-              type="button"
-              onClick={() => setShowCf((v) => !v)}
-              style={s.eyeBtn}
-            >
-              {showCf ? <EyeOff size={15} /> : <Eye size={15} />}
-            </button>
-          </div>
-
-          {error && <p style={s.error}>{error}</p>}
-
-          <button
-            style={{ ...s.btn, marginTop: 20, opacity: loading ? 0.7 : 1 }}
-            onClick={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? 'Activating...' : 'Join Now →'}
-          </button>
-
-          <p style={s.hint}>
-            This invite link is valid for 24 hours and can only be used once.
-          </p>
         </div>
-      </Screen>
 
-      {/* Provision Credentials Form Modal */}
-      {showProvisionForm && (
-        <ProvisionCredentialsForm
-          modal={true}
-          onClose={handleProvisionClose}
-          onSuccess={handleProvisionSuccess}
-          apiBase=""
-        />
-      )}
-    </>
+        <h1 style={s.title}>Join {invite?.tenant_name}</h1>
+        <p style={s.sub}>
+          You're being added as <strong>{invite?.role}</strong> to{' '}
+          <strong>{invite?.tenant_name}</strong>.
+        </p>
+        <p style={s.email}>📧 {invite?.email}</p>
+
+        <div style={s.divider} />
+
+        {/* Password fields */}
+        <label style={s.label}>Set your password</label>
+        <div style={{ position: 'relative', marginBottom: 12 }}>
+          <input
+            type={showPw ? 'text' : 'password'}
+            style={s.input}
+            placeholder="Minimum 8 characters"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPw((v) => !v)}
+            style={s.eyeBtn}
+          >
+            {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
+          </button>
+        </div>
+
+        <label style={s.label}>Confirm password</label>
+        <div style={{ position: 'relative', marginBottom: 4 }}>
+          <input
+            type={showCf ? 'text' : 'password'}
+            style={s.input}
+            placeholder="Repeat your password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+          />
+          <button
+            type="button"
+            onClick={() => setShowCf((v) => !v)}
+            style={s.eyeBtn}
+          >
+            {showCf ? <EyeOff size={15} /> : <Eye size={15} />}
+          </button>
+        </div>
+
+        {error && <p style={s.error}>{error}</p>}
+
+        <button
+          style={{ ...s.btn, marginTop: 20, opacity: loading ? 0.7 : 1 }}
+          onClick={handleSubmit}
+          disabled={loading}
+        >
+          {loading ? 'Activating...' : 'Join Now →'}
+        </button>
+
+        <p style={s.hint}>
+          This invite link is valid for 24 hours and can only be used once.
+        </p>
+      </div>
+    </Screen>
   );
 }
 

@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { Settings as SettingsIcon, Shield, User } from 'lucide-react';
+import { Settings as SettingsIcon, Shield, User, Plug } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getInitials, getAvatarColor } from '../../utils/helpers';
+import ProvisionCredentialsForm from '../../components/ProvisionCredentialsForm';
 
 const tabs = [
-  { id: 'general', label: 'General',            icon: SettingsIcon },
-  { id: 'roles',   label: 'Roles & Permissions', icon: Shield },
-  { id: 'profile', label: 'Profile',             icon: User },
+  { id: 'general',      label: 'General',            icon: SettingsIcon },
+  { id: 'roles',        label: 'Roles & Permissions', icon: Shield },
+  { id: 'profile',      label: 'Profile',             icon: User },
+  { id: 'integrations', label: 'Integrations',        icon: Plug },
 ];
 
 const ADMIN_PERMS = ['View all tickets', 'Manage agents', 'Manage accounts', 'System settings', 'Delete data'];
@@ -128,7 +130,6 @@ function ProfileTab() {
   const [pwSaved, setPwSaved] = useState(false);
 
   // TODO: replace with real API call (e.g. PUT /auth/me or PUT /admins/me)
-  // when the endpoint is available.
   const saveProfile = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -246,6 +247,54 @@ function ProfileTab() {
 }
 
 // ---------------------------------------------------------------------------
+// Integrations Tab — embeds ProvisionCredentialsForm as an inline card (non-modal)
+// ---------------------------------------------------------------------------
+function IntegrationsTab() {
+  const [provisionedCount, setProvisionedCount] = useState(0);
+
+  const handleProvisionSuccess = (data) => {
+    console.log('Integration provisioned:', data.integration_id);
+    setProvisionedCount((c) => c + 1);
+  };
+
+  return (
+    <div style={{ maxWidth: 860 }}>
+      {/* Section header */}
+      <div style={{ marginBottom: 20 }}>
+        <h3 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 6px' }}>CRM Integrations</h3>
+        <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.6 }}>
+          Connect your CRM systems to start ingesting tickets and data.
+          Each integration requires credentials and optional webhook configuration.
+        </p>
+        {provisionedCount > 0 && (
+          <div style={{
+            marginTop: 12,
+            display: 'inline-flex', alignItems: 'center', gap: 7,
+            background: '#f0fdf4', border: '1px solid #bbf7d0',
+            borderRadius: 8, padding: '6px 12px',
+            fontSize: 13, color: '#15803d', fontWeight: 500,
+          }}>
+            <span>✓</span>
+            {provisionedCount} integration{provisionedCount > 1 ? 's' : ''} provisioned this session
+          </div>
+        )}
+      </div>
+
+      {/*
+        ProvisionCredentialsForm rendered as an inline card (modal=false).
+        onClose is a no-op here since there's nothing to close in an inline context.
+        onSuccess updates the session counter above.
+      */}
+      <ProvisionCredentialsForm
+        modal={false}
+        onClose={() => {}}
+        onSuccess={handleProvisionSuccess}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Settings (shell)
 // ---------------------------------------------------------------------------
 export default function Settings() {
@@ -288,9 +337,10 @@ export default function Settings() {
       </div>
 
       <div style={{ paddingTop: 4 }}>
-        {activeTab === 'general' && <GeneralTab />}
-        {activeTab === 'roles'   && <RolesTab />}
-        {activeTab === 'profile' && <ProfileTab />}
+        {activeTab === 'general'      && <GeneralTab />}
+        {activeTab === 'roles'        && <RolesTab />}
+        {activeTab === 'profile'      && <ProfileTab />}
+        {activeTab === 'integrations' && <IntegrationsTab />}
       </div>
     </div>
   );
