@@ -16,7 +16,7 @@
  * Dependencies: react-hook-form  zod  @hookform/resolvers/zod  @tanstack/react-query
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -24,6 +24,9 @@ import { z } from 'zod';
 import {
   useCrmConfigs,
   useProvisionIntegration,
+  useUpdateCredentials,
+  useDeprovisionIntegration,
+  useIntegrationStatus,
   useTestConnection,
   transformFormToPayload,
 } from '../services/integrationService';
@@ -479,7 +482,8 @@ function PageSelectCrm({ crmConfigs, crmStatuses, isLoadingConfigs, configsError
           {!isLoadingConfigs && !configsError && crmConfigs?.length > 0 && (
             <div className="pcf-crm-grid">
               {crmConfigs.map((crm) => {
-                const status = crmStatuses?.[crm.crm_key];
+                const statusEntry = crmStatuses?.[crm.crm_key];
+                const status = statusEntry?.status ?? statusEntry; // compat: plain string or new object
                 const cardClass = ['pcf-crm-card',
                   status === 'success' ? 'pcf-crm-card--success' : '',
                   status === 'error'   ? 'pcf-crm-card--error'   : '',
@@ -537,7 +541,7 @@ function PageSelectCrm({ crmConfigs, crmStatuses, isLoadingConfigs, configsError
 // PAGE 2: CONFIGURATION FORM
 // ─────────────────────────────────────────────────────────────────────────────
 
-function PageConfigureCrm({ activeCrm, crmConfigs, onBack, onSuccess, onClose, modal }) {
+function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSuccess, onError, onClearStatus, onClose, modal }) {
   const crmConfig = crmConfigs?.find((c) => c.crm_key === activeCrm);
 
   // ── Gatekeeper state ──────────────────────────────────────────────────────
@@ -547,6 +551,14 @@ function PageConfigureCrm({ activeCrm, crmConfigs, onBack, onSuccess, onClose, m
   const [fieldsLocked,  setFieldsLocked]  = useState(false);
   const [successData,   setSuccessData]   = useState(null);
 
+  // ── Read-only / locked state — true when an existing integration is loaded ─
+  const [isLocked, setIsLocked] = useState(!!integrationId);
+
+  // ── Fetch existing integration status (only when integrationId is present) ─
+  const { data: statusData } = useIntegrationStatus(integrationId, {
+    enabled: !!integrationId,
+  });
+
   // ── Mutations ─────────────────────────────────────────────────────────────
   const provisionMutation = useProvisionIntegration({
     onSuccess: (responseData) => {
@@ -554,13 +566,34 @@ function PageConfigureCrm({ activeCrm, crmConfigs, onBack, onSuccess, onClose, m
       setTimeout(() => { onSuccess?.(responseData); onBack(); }, 1500);
     },
   });
+
+  const updateMutation = useUpdateCredentials({
+    onSuccess: (responseData) => {
+      setSuccessData(responseData);
+      setTimeout(() => { onSuccess?.(responseData); onBack(); }, 1500);
+    },
+  });
+
+  const deprovisionMutation = useDeprovisionIntegration({
+    onSuccess: () => {
+      onClearStatus?.(activeCrm);
+      onBack();
+    },
+    onError: (err) => {
+      console.error('Deprovision failed:', err.message);
+    },
+  });
+
   const testMutation = useTestConnection();
 
-  const isSubmitting = provisionMutation.isPending;
+  // Derive error/loading state — prefer update over provision when integrationId exists
+  const activeSaveMutation = integrationId ? updateMutation : provisionMutation;
+  const isSubmitting = activeSaveMutation.isPending;
+  const isDeprovisioning = deprovisionMutation.isPending;
   const isTesting    = testMutation.isPending;
-  const apiError     = provisionMutation.error?.message    ?? null;
-  const failedChecks = provisionMutation.error?.failedChecks ?? null;
-  const errorStatus  = provisionMutation.error?.status     ?? null;
+  const apiError     = activeSaveMutation.error?.message    ?? null;
+  const failedChecks = activeSaveMutation.error?.failedChecks ?? null;
+  const errorStatus  = activeSaveMutation.error?.status     ?? null;
 
   // ── Form ──────────────────────────────────────────────────────────────────
   const { register, handleSubmit, control, watch, setValue, reset, formState: { errors } } = useForm({
@@ -570,6 +603,17 @@ function PageConfigureCrm({ activeCrm, crmConfigs, onBack, onSuccess, onClose, m
 
   const authType = watch('auth_type');
   const enableWh = watch('enable_webhooks');
+
+  // ── Pre-fill from status data when viewing an existing integration ─────────
+  useEffect(() => {
+    if (!statusData) return;
+    reset({
+      ...makeCrmEntry(activeCrm, crmConfigs),
+      base_url:  statusData.base_url  ?? '',
+      auth_type: statusData.auth_type ?? '',
+      // Credential fields intentionally left empty — secrets are never returned
+    });
+  }, [statusData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const helpInstructions    = crmConfig?.auth_instructions?.[authType] ?? null;
   const webhookInstructions = crmConfig?.webhook_instructions ?? null;
@@ -596,6 +640,7 @@ function PageConfigureCrm({ activeCrm, crmConfigs, onBack, onSuccess, onClose, m
     setSuccessData(null);
     setSubmitEnabled(false);
     setFieldsLocked(false);
+    setIsLocked(false); // unlock — admin can now enter new credentials
   };
 
   // ── Test Connection ───────────────────────────────────────────────────────
@@ -613,13 +658,24 @@ function PageConfigureCrm({ activeCrm, crmConfigs, onBack, onSuccess, onClose, m
     });
   });
 
-  // ── Submit ────────────────────────────────────────────────────────────────
+  // ── Submit — POST (new) or PATCH (update after Reset) ────────────────────
   const onSubmit = (formValues) => {
-    provisionMutation.mutate(transformFormToPayload({ ...formValues, _webhookModel: webhookModel }));
+    const payload = transformFormToPayload({ ...formValues, _webhookModel: webhookModel });
+    if (integrationId) {
+      updateMutation.mutate({ integrationId, payload });
+    } else {
+      provisionMutation.mutate(payload);
+    }
   };
 
   if (!crmConfig) return null;
-  const isDisabled = isSubmitting || isTesting;
+  const isDisabled = isSubmitting || isTesting || isDeprovisioning;
+
+  // ── Disconnect ─────────────────────────────────────────────────────────────
+  const handleDisconnect = () => {
+    if (!integrationId) return;
+    deprovisionMutation.mutate({ integrationId, wipe: true });
+  };
 
   return (
     <>
@@ -679,7 +735,7 @@ function PageConfigureCrm({ activeCrm, crmConfigs, onBack, onSuccess, onClose, m
                 <input {...registerWithReset('base_url')} type="url"
                   placeholder={crmConfig.default_base_url}
                   className={`pcf-input${errors.base_url ? ' has-err' : ''}`}
-                  disabled={fieldsLocked} />
+                  disabled={fieldsLocked || isLocked} />
               </Field>
 
               {/* Auth type */}
@@ -692,9 +748,9 @@ function PageConfigureCrm({ activeCrm, crmConfigs, onBack, onSuccess, onClose, m
                     const selected = authType === at.value;
                     return (
                       <label key={at.value}
-                        className={`pcf-radio-item${selected ? ' pcf-radio-item--selected' : ''}${fieldsLocked ? ' pcf-radio-item--disabled' : ''}`}>
-                        <input type="radio" value={at.value} checked={selected} disabled={fieldsLocked}
-                          onChange={() => { if (!fieldsLocked) { handleFieldChange(); setValue('auth_type', at.value, { shouldValidate: true }); } }} />
+                        className={`pcf-radio-item${selected ? ' pcf-radio-item--selected' : ''}${(fieldsLocked || isLocked) ? ' pcf-radio-item--disabled' : ''}`}>
+                        <input type="radio" value={at.value} checked={selected} disabled={fieldsLocked || isLocked}
+                          onChange={() => { if (!fieldsLocked && !isLocked) { handleFieldChange(); setValue('auth_type', at.value, { shouldValidate: true }); } }} />
                         <div className="pcf-radio-dot"><div className="pcf-radio-dot-inner" /></div>
                         <span className="pcf-radio-icon">{at.icon}</span>
                         <span className="pcf-radio-label">{at.label}</span>
@@ -714,13 +770,13 @@ function PageConfigureCrm({ activeCrm, crmConfigs, onBack, onSuccess, onClose, m
                 <div className="pcf-cred-sub">
                   {TOKEN_LIKE_RENDER.has(authType) && (
                     <TokenCredFields register={registerWithReset} errors={errors}
-                      authType={authType} disabled={fieldsLocked} />
+                      authType={authType} disabled={fieldsLocked || isLocked} />
                   )}
                   {authType === 'basic_auth' && (
-                    <BasicCredFields register={registerWithReset} errors={errors} disabled={fieldsLocked} />
+                    <BasicCredFields register={registerWithReset} errors={errors} disabled={fieldsLocked || isLocked} />
                   )}
                   {authType === 'oauth2' && (
-                    <OAuth2CredFields register={registerWithReset} errors={errors} disabled={fieldsLocked} />
+                    <OAuth2CredFields register={registerWithReset} errors={errors} disabled={fieldsLocked || isLocked} />
                   )}
                 </div>
               )}
@@ -766,8 +822,22 @@ function PageConfigureCrm({ activeCrm, crmConfigs, onBack, onSuccess, onClose, m
           {/* ── Alert area — sits immediately above the footer ────────── */}
           {!successData && (
             <div className="pcf-alerts-area">
+              {/* Locked / read-only info banner */}
+              {isLocked && (
+                <div className="pcf-alert pcf-alert--info">
+                  <span className="pcf-alert-ico">🔒</span>
+                  <div>
+                    <strong>Integration active and connected</strong><br />
+                    <span className="pcf-alert-sub">
+                      This integration is active and connected. Click <strong>Reset</strong> to enter
+                      new credentials or <strong>Disconnect</strong> to remove it.
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Test success */}
-              {testStatus === 'success' && (
+              {!isLocked && testStatus === 'success' && (
                 <div className="pcf-alert pcf-alert--ok">
                   <span className="pcf-alert-ico">✓</span>
                   <div>
@@ -781,7 +851,7 @@ function PageConfigureCrm({ activeCrm, crmConfigs, onBack, onSuccess, onClose, m
               )}
 
               {/* Test error */}
-              {testStatus === 'error' && testError && (
+              {!isLocked && testStatus === 'error' && testError && (
                 <div className="pcf-alert pcf-alert--err">
                   <span className="pcf-alert-ico">!</span>
                   <div>
@@ -792,8 +862,8 @@ function PageConfigureCrm({ activeCrm, crmConfigs, onBack, onSuccess, onClose, m
                 </div>
               )}
 
-              {/* Provision error */}
-              {apiError && (
+              {/* Provision / update error */}
+              {!isLocked && apiError && (
                 <div className="pcf-alert pcf-alert--err">
                   <span className="pcf-alert-ico">!</span>
                   <div>
@@ -805,7 +875,7 @@ function PageConfigureCrm({ activeCrm, crmConfigs, onBack, onSuccess, onClose, m
               )}
 
               {/* 502 hint */}
-              {errorStatus === 502 && (
+              {!isLocked && errorStatus === 502 && (
                 <div className="pcf-alert pcf-alert--warn">
                   <span className="pcf-alert-ico">⚠</span>
                   <span className="pcf-alert-sub">
@@ -819,20 +889,20 @@ function PageConfigureCrm({ activeCrm, crmConfigs, onBack, onSuccess, onClose, m
 
         </div>{/* /pcf-body */}
 
-        {/* Footer: [Back][Reset] ··· [Test Connection][Save … Connection] */}
+        {/* Footer: [Back][Reset] ··· [Test Connection][Save … Connection] | [Disconnect] */}
         <div className="pcf-cfg-footer">
           <div className="pcf-footer-left">
             <button type="button" className="pcf-btn-cancel" onClick={onBack} disabled={isDisabled}>
               Back
             </button>
             <button type="button" className="pcf-btn-reset" onClick={handleReset}
-              disabled={isDisabled} title="Clear all fields and start over">
+              disabled={isDisabled} title={isLocked ? 'Unlock form to enter new credentials' : 'Clear all fields and start over'}>
               <ResetSVG />
               Reset
             </button>
           </div>
 
-          {!successData && (
+          {!successData && !isLocked && (
             <div className="pcf-footer-right">
               <button type="button" className="pcf-btn-test" onClick={handleTestConnection}
                 disabled={isDisabled}>
@@ -847,6 +917,24 @@ function PageConfigureCrm({ activeCrm, crmConfigs, onBack, onSuccess, onClose, m
                 {isSubmitting
                   ? <><span className="pcf-spinner" />Saving…</>
                   : <><SaveSVG />Save {crmConfig.display_name} Connection</>}
+              </button>
+            </div>
+          )}
+
+          {!successData && isLocked && integrationId && (
+            <div className="pcf-footer-right">
+              <button type="button" className="pcf-btn-danger" onClick={handleDisconnect}
+                disabled={isDeprovisioning}
+                title="Permanently remove this integration and wipe stored credentials">
+                {isDeprovisioning
+                  ? <><span className="pcf-spinner pcf-spinner--danger" />Disconnecting…</>
+                  : <>
+                      <svg width="13" height="13" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.8">
+                        <path strokeLinecap="round" strokeLinejoin="round"
+                          d="M10 6L6 10M6 6l4 4M2 8a6 6 0 1112 0A6 6 0 012 8z" />
+                      </svg>
+                      Disconnect
+                    </>}
               </button>
             </div>
           )}
@@ -870,8 +958,9 @@ export default function ProvisionCredentialsForm({ onSuccess, onClose, modal = t
 
   const handleSelectCrm           = (key)  => { setActiveCrm(key); setStep('CONFIGURE_CRM'); };
   const handleBackToCrmSelection  = ()     => { setActiveCrm(null); setStep('SELECT_CRM'); };
-  const handleProvisionSuccess    = (resp) => { setCrmStatuses((p) => ({ ...p, [resp.crm_type]: 'success' })); onSuccess?.(resp); };
-  const handleProvisionError      = (key)  => { setCrmStatuses((p) => ({ ...p, [key]: 'error' })); };
+  const handleProvisionSuccess    = (resp) => { setCrmStatuses((p) => ({ ...p, [resp.crm_type]: { status: 'success', integration_id: resp.integration_id } })); onSuccess?.(resp); };
+  const handleProvisionError      = (key)  => { setCrmStatuses((p) => ({ ...p, [key]: { status: 'error', integration_id: null } })); };
+  const handleClearCrmStatus      = (key)  => { setCrmStatuses((p) => { const next = { ...p }; delete next[key]; return next; }); };
   const handleClose               = ()     => { setStep('SELECT_CRM'); setActiveCrm(null); onClose?.(); };
 
   const content = step === 'SELECT_CRM' ? (
@@ -880,8 +969,10 @@ export default function ProvisionCredentialsForm({ onSuccess, onClose, modal = t
       onSelectCrm={handleSelectCrm} onClose={handleClose} modal={modal} />
   ) : (
     <PageConfigureCrm activeCrm={activeCrm} crmConfigs={crmConfigs}
+      integrationId={crmStatuses[activeCrm]?.integration_id ?? null}
       onBack={handleBackToCrmSelection} onSuccess={handleProvisionSuccess}
-      onError={handleProvisionError} onClose={handleClose} modal={modal} />
+      onError={handleProvisionError} onClearStatus={handleClearCrmStatus}
+      onClose={handleClose} modal={modal} />
   );
 
   return (

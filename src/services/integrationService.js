@@ -405,6 +405,37 @@ export function useCrmConfigs(options = {}) {
   });
 }
 
+/**
+ * Fetch live metadata for an existing integration (no secrets returned).
+ *
+ * Maps to: GET /integrations/{id}/credentials/status
+ *
+ * Used by PageConfigureCrm when editing an already-provisioned integration:
+ * pre-fills base_url / auth_type and locks the form in read-only mode until
+ * the admin explicitly clicks Reset.
+ *
+ * Pass `enabled: !!integrationId` so the query only fires when an ID exists.
+ *
+ * Usage:
+ *   const { data, isLoading } = useIntegrationStatus(integrationId, {
+ *     enabled: !!integrationId,
+ *   });
+ *   // data shape: CredentialStatusResponse (see top of file)
+ *
+ * @param {string|null} integrationId
+ * @param {object}      [options]  — merged into useQuery options
+ */
+export function useIntegrationStatus(integrationId, options = {}) {
+  return useQuery({
+    queryKey: integrationKeys.detail(integrationId),
+    queryFn:  () => integrationApi.status(integrationId),
+    enabled:  !!integrationId,
+    staleTime: 30 * 1000, // 30 s — status is stable but not static
+    retry: 1,
+    ...options,
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // React Query — Mutations
 // ─────────────────────────────────────────────────────────────────────────────
@@ -559,4 +590,3 @@ export function useVerifyIntegration(integrationId, options = {}) {
     ...options,
   });
 }
-
