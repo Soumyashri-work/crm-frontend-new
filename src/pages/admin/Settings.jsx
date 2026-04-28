@@ -261,11 +261,8 @@ function IntegrationsTab() {
     <div style={{ maxWidth: 860 }}>
       {/* Section header */}
       <div style={{ marginBottom: 20 }}>
-        <h3 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 6px' }}>CRM Integrations</h3>
-        <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.6 }}>
-          Connect your CRM systems to start ingesting tickets and data.
-          Each integration requires credentials and optional webhook configuration.
-        </p>
+        <h3 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 6px' }}></h3>
+ 
         {provisionedCount > 0 && (
           <div style={{
             marginTop: 12,
@@ -310,9 +307,8 @@ export default function Settings() {
           {' › '}
           <span style={{ color: 'var(--text-primary)' }}>Settings</span>
         </div>
-        <h2 style={{ fontSize: 20, fontWeight: 700 }}>Settings</h2>
+        <h2 style={{ fontSize: 25, fontWeight: 800 }}>Settings</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, marginTop: 2 }}>
-          Manage your system configuration and preferences
         </p>
       </div>
 

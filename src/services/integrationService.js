@@ -62,6 +62,11 @@ export const integrationKeys = {
   verify: (id) => ['integrations', id, 'verify'],
 };
 
+/** Key for the static CRM config catalogue (changes only on deploy) */
+export const configKeys = {
+  crms: () => ['config', 'crms'],
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal: FastAPI error normalisation
 // ─────────────────────────────────────────────────────────────────────────────
@@ -124,6 +129,47 @@ function buildError(err) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const integrationApi = {
+  /**
+   * GET /config/crms
+   * Fetch all supported CRM adapters with complete metadata.
+   * Drives the dynamic CRM selection grid — no hardcoded configs in the UI.
+   *
+   * @returns {Promise<SupportedCrmsResponse>}
+   *   { crms: CrmInfoSchema[], total: number }
+   */
+  fetchCrmConfigs: async () => {
+    try {
+      const res = await api.get('/config/crms');
+      return res.data; // SupportedCrmsResponse
+    } catch (err) {
+      throw buildError(err);
+    }
+  },
+
+  /**
+   * POST /integrations/check-connection
+   * Test whether the provided credentials can authenticate against the CRM
+   * WITHOUT persisting anything. Acts as a pre-flight before provisioning.
+   *
+   * Accepts the same payload shape as provision() (ProvisionCredentialsRequest)
+   * so callers can pass the output of transformFormToPayload() directly.
+   *
+   * On success:  { status: "ok" }                         (200)
+   * On failure:  403 with failed_checks[] in detail       (403)
+   *              or 502 if the CRM itself is unreachable   (502)
+   *
+   * @param {object} payload  — built by transformFormToPayload()
+   * @returns {Promise<{ status: string }>}
+   */
+  checkConnection: async (payload) => {
+    try {
+      const res = await api.post('/integrations/check-connection', payload);
+      return res.data;
+    } catch (err) {
+      throw buildError(err);
+    }
+  },
+
   /**
    * POST /integrations/
    * Provision a new CRM integration.
@@ -331,8 +377,65 @@ export function transformFormToPayload(entry) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// React Query — Queries
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Fetch all supported CRM adapters and their metadata from the backend.
+ *
+ * Maps to: GET /config/crms
+ *
+ * Data is treated as near-static (changes only on deploy), so staleTime is
+ * set to 5 minutes to avoid redundant fetches across component mounts.
+ *
+ * Usage:
+ *   const { data, isLoading, error } = useCrmConfigs();
+ *   // data shape: { crms: CrmInfoSchema[], total: number }
+ *   // access the list via: data?.crms
+ *
+ * @param {object} [options]  — merged into useQuery options
+ */
+export function useCrmConfigs(options = {}) {
+  return useQuery({
+    queryKey: configKeys.crms(),
+    queryFn:  integrationApi.fetchCrmConfigs,
+    staleTime: 5 * 60 * 1000, // 5 min — CRM catalogue is effectively static
+    retry: 2,
+    ...options,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // React Query — Mutations
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Test a connection WITHOUT persisting credentials.
+ *
+ * Maps to: POST /integrations/check-connection
+ *
+ * Accepts the same payload as useProvisionIntegration — pass the output of
+ * transformFormToPayload() directly. No cache invalidation needed because
+ * nothing is written to the backend.
+ *
+ * Usage:
+ *   const mutation = useTestConnection();
+ *   mutation.mutate(transformFormToPayload(enrichedValues), {
+ *     onSuccess: () => { ... },   // 200 — credentials verified
+ *     onError:   (err) => { ... } // err.failedChecks populated on 403
+ *   });
+ *
+ * @param {object} [options]
+ */
+export function useTestConnection(options = {}) {
+  return useMutation({
+    mutationFn: integrationApi.checkConnection,
+    onSuccess:  (data)  => options.onSuccess?.(data),
+    onError:    (error) => options.onError?.(error),
+    onSettled:  options.onSettled,
+    ...options,
+  });
+}
 
 /**
  * Provision a new CRM integration.
@@ -456,3 +559,4 @@ export function useVerifyIntegration(integrationId, options = {}) {
     ...options,
   });
 }
+
