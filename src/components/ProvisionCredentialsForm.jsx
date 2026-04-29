@@ -647,6 +647,13 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
     return { ...reg, onChange: (e) => { handleFieldChange(); return reg.onChange(e); } };
   };
 
+  // Ensure the currently selected CRM type is always included in payloads.
+  useEffect(() => {
+    if (activeCrm) {
+      setValue('crm_type', activeCrm);
+    }
+  }, [activeCrm, setValue]);
+
   // ── Reset handler ─────────────────────────────────────────────────────────
   const handleReset = () => {
     reset(makeCrmEntry(activeCrm, crmConfigs));
@@ -658,9 +665,15 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
     setIsLocked(false); // unlock — admin can now enter new credentials
   };
 
+  const buildPayload = (formValues) => transformFormToPayload({
+    ...formValues,
+    _webhookModel: webhookModel,
+    crm_type: activeCrm ?? formValues.crm_type,
+  });
+
   // ── Test Connection ───────────────────────────────────────────────────────
   const handleTestConnection = handleSubmit((formValues) => {
-    const payload = transformFormToPayload({ ...formValues, _webhookModel: webhookModel });
+    const payload = buildPayload(formValues);
     setTestStatus(null); setTestError(null);
     testMutation.mutate(payload, {
       onSuccess: () => { setTestStatus('success'); setSubmitEnabled(true); setFieldsLocked(true); },
@@ -675,7 +688,7 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
 
   // ── Submit — POST (new) or PATCH (update after Reset) ────────────────────
   const onSubmit = (formValues) => {
-    const payload = transformFormToPayload({ ...formValues, _webhookModel: webhookModel });
+    const payload = buildPayload(formValues);
     if (integrationId) {
       updateMutation.mutate({ integrationId, payload });
     } else {
@@ -723,6 +736,7 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
+        <input type="hidden" {...register('crm_type')} />
         <div className="pcf-body">
 
           {/* Success banner — shown after submission */}
@@ -870,7 +884,7 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
                 <div className="pcf-alert pcf-alert--err">
                   <span className="pcf-alert-ico">!</span>
                   <div>
-                    <strong>{testError.status === 403 ? 'Insufficient permissions' : 'Connection test failed'}</strong><br />
+                    <strong>{testError.status === 403 ? 'Insufficient permissions' : testError.status === 422 ? 'Invalid CRM configuration' : 'Connection test failed'}</strong><br />
                     <span className="pcf-alert-sub">{testError.message}</span>
                     <ChecksLog checks={testError.failedChecks} />
                   </div>
@@ -882,7 +896,7 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
                 <div className="pcf-alert pcf-alert--err">
                   <span className="pcf-alert-ico">!</span>
                   <div>
-                    <strong>{errorStatus === 403 ? 'Insufficient permissions' : 'Submission failed'}</strong><br />
+                    <strong>{errorStatus === 403 ? 'Insufficient permissions' : errorStatus === 422 ? 'Invalid CRM configuration' : 'Submission failed'}</strong><br />
                     <span className="pcf-alert-sub">{apiError}</span>
                     <ChecksLog checks={failedChecks} />
                   </div>

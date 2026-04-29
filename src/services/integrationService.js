@@ -84,8 +84,8 @@ export const configKeys = {
  * object for 403 responses so callers can render the check list.
  */
 function extractError(error) {
-  const data  = error?.response?.data;
-  const status = error?.response?.status;
+  const data  = error?.response?.data ?? error?.data;
+  const status = error?.response?.status ?? error?.status;
 
   if (!data) {
     return { message: error?.message ?? 'An unexpected error occurred.', failedChecks: null };

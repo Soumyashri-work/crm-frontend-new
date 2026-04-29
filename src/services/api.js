@@ -79,10 +79,19 @@ api.interceptors.response.use(
         return;
       }
 
-      const message = data?.message || data?.detail || `Error ${status}`;
+      const detail = data?.detail;
+      const message = typeof data?.message === 'string'
+        ? data.message
+        : typeof detail === 'string'
+          ? detail
+          : detail && typeof detail === 'object'
+            ? detail.message ?? JSON.stringify(detail)
+            : `Error ${status}`;
+
       const err = new Error(message);
       err.status = status;
-      err.data = data?.data ?? null;
+      err.response = error.response;
+      err.data = data;
       return Promise.reject(err);
     }
 
