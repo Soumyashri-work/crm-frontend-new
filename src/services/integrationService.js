@@ -55,6 +55,9 @@ export const integrationKeys = {
   /** Root key — invalidate this to bust all integration queries */
   all: ()      => ['integrations'],
 
+  /** List of all active integrations for the tenant (used for mount-time hydration) */
+  active: ()   => ['integrations', 'active'],
+
   /** Scoped to a single integration */
   detail: (id) => ['integrations', id],
 
@@ -240,6 +243,29 @@ export const integrationApi = {
   },
 
   /**
+   * GET /tenant-source-systems/active?tenant_id=<uuid>
+   * Fetch all active source-system integrations for the given tenant.
+   * Used on mount to hydrate crmStatuses so green "Integrated" borders
+   * survive page refreshes.
+   *
+   * Response shape: TenantActiveIntegrationsResponse
+   *   { tenant_id, active_source_system_ids: number[], count: number }
+   *
+   * @param {string} tenantId  — UUID of the tenant (from auth context)
+   * @returns {Promise<TenantActiveIntegrationsResponse>}
+   */
+  listActiveByTenant: async (tenantId) => {
+    try {
+      const res = await api.get('/tenant-source-systems/active', {
+        params: { tenant_id: tenantId },
+      });
+      return res.data; // { tenant_id, active_source_system_ids, count }
+    } catch (err) {
+      throw buildError(err);
+    }
+  },
+
+  /**
    * GET /integrations/{integrationId}/credentials/status
    * Fetch metadata without decrypting secrets.
    *
@@ -406,6 +432,40 @@ export function useCrmConfigs(options = {}) {
 }
 
 /**
+ * Fetch all active source-system integrations for the current tenant on mount.
+ *
+ * Maps to: GET /tenant-source-systems/active?tenant_id=<uuid>
+ *
+ * Used by ProvisionCredentialsForm to seed `crmStatuses` on mount so that
+ * green "Integrated" borders on CRM cards survive page refreshes — the
+ * component is no longer relying on ephemeral React state alone.
+ *
+ * The query is disabled until `tenantId` is available so it never fires
+ * with an undefined param (which would return a 422).
+ *
+ * staleTime is kept at 60 s: the list only changes after a provision or
+ * deprovision, and those mutations already invalidate integrationKeys.all().
+ *
+ * Usage:
+ *   const { data } = useActiveIntegrations(tenantId);
+ *   // data shape: { tenant_id, active_source_system_ids: number[], count }
+ *   // access active IDs via: data?.active_source_system_ids
+ *
+ * @param {string|null|undefined} tenantId  — UUID from auth context
+ * @param {object} [options]  — merged into useQuery options
+ */
+export function useActiveIntegrations(tenantId, options = {}) {
+  return useQuery({
+    queryKey: [...integrationKeys.active(), tenantId],
+    queryFn:  () => integrationApi.listActiveByTenant(tenantId),
+    enabled:  !!tenantId, // don't fire until we have a tenant_id
+    staleTime: 60 * 1000, // 1 min — only changes on provision / deprovision
+    retry: 1,
+    ...options,
+  });
+}
+
+/**
  * Fetch live metadata for an existing integration (no secrets returned).
  *
  * Maps to: GET /integrations/{id}/credentials/status
@@ -417,10 +477,8 @@ export function useCrmConfigs(options = {}) {
  * Pass `enabled: !!integrationId` so the query only fires when an ID exists.
  *
  * Usage:
- *   const { data, isLoading } = useIntegrationStatus(integrationId, {
- *     enabled: !!integrationId,
- *   });
- *   // data shape: CredentialStatusResponse (see top of file)
+ *   const { data } = useIntegrationStatus(integrationId, { enabled: !!integrationId });
+ *   // data shape: CredentialStatusResponse
  *
  * @param {string|null} integrationId
  * @param {object}      [options]  — merged into useQuery options

@@ -250,37 +250,15 @@ function ProfileTab() {
 // Integrations Tab — embeds ProvisionCredentialsForm as an inline card (non-modal)
 // ---------------------------------------------------------------------------
 function IntegrationsTab() {
-  const [provisionedCount, setProvisionedCount] = useState(0);
-
   const handleProvisionSuccess = (data) => {
     console.log('Integration provisioned:', data.integration_id);
-    setProvisionedCount((c) => c + 1);
   };
 
   return (
     <div style={{ maxWidth: 860 }}>
-      {/* Section header */}
-      <div style={{ marginBottom: 20 }}>
-        <h3 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 6px' }}></h3>
- 
-        {provisionedCount > 0 && (
-          <div style={{
-            marginTop: 12,
-            display: 'inline-flex', alignItems: 'center', gap: 7,
-            background: '#f0fdf4', border: '1px solid #bbf7d0',
-            borderRadius: 8, padding: '6px 12px',
-            fontSize: 13, color: '#15803d', fontWeight: 500,
-          }}>
-            <span>✓</span>
-            {provisionedCount} integration{provisionedCount > 1 ? 's' : ''} provisioned this session
-          </div>
-        )}
-      </div>
-
       {/*
         ProvisionCredentialsForm rendered as an inline card (modal=false).
         onClose is a no-op here since there's nothing to close in an inline context.
-        onSuccess updates the session counter above.
       */}
       <ProvisionCredentialsForm
         modal={false}
@@ -312,20 +290,13 @@ export default function Settings() {
         </p>
       </div>
 
-      {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)' }}>
+      {/* Tab bar — horizontally scrollable on mobile so all tabs are reachable */}
+      <div className="settings-tabs-nav">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setActiveTab(id)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 7,
-              padding: '10px 16px', border: 'none', background: 'none',
-              cursor: 'pointer', fontSize: 14, fontFamily: 'inherit', fontWeight: 500,
-              color: activeTab === id ? 'var(--primary)' : 'var(--text-secondary)',
-              borderBottom: `2px solid ${activeTab === id ? 'var(--primary)' : 'transparent'}`,
-              marginBottom: -1, transition: 'all var(--transition)',
-            }}
+            className={`settings-tab-btn${activeTab === id ? ' settings-tab-btn--active' : ''}`}
           >
             <Icon size={15} /> {label}
           </button>

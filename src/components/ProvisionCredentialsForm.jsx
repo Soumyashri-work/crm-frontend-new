@@ -23,15 +23,28 @@ import { z } from 'zod';
 
 import {
   useCrmConfigs,
+  useActiveIntegrations,
+  useIntegrationStatus,
   useProvisionIntegration,
   useUpdateCredentials,
   useDeprovisionIntegration,
-  useIntegrationStatus,
   useTestConnection,
   transformFormToPayload,
 } from '../services/integrationService';
+import { useAuth } from '../context/AuthContext';
 
 import './ProvisionCredentialsForm.css';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HARDCODED SOURCE SYSTEM ID → CRM KEY MAP
+// TODO: replace with dynamic mapping from CrmInfoSchema.source_system_id
+//       once the backend exposes it via GET /config/crms
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SOURCE_SYSTEM_ID_TO_CRM_KEY = {
+  1: 'zammad',
+  2: 'espocrm',
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ZOD SCHEMAS
@@ -95,7 +108,9 @@ function buildCrmEntrySchema(crmConfigs) {
 function makeCrmEntry(crmKey, crmConfigs) {
   const cfg = crmConfigs?.find((c) => c.crm_key === crmKey);
   return {
-    crm_type: crmKey, base_url: cfg?.default_base_url ?? '',
+    // base_url intentionally starts empty — default_base_url is shown as
+    // placeholder only, so the user is never forced to clear a pre-filled value.
+    crm_type: crmKey, base_url: '',
     auth_type: cfg?.supported_auth_options?.[0]?.value ?? '',
     cred_token: '', cred_username: '', cred_password: '',
     cred_access_token: '', cred_refresh_token: '', cred_token_type: 'Bearer',
@@ -949,12 +964,44 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ProvisionCredentialsForm({ onSuccess, onClose, modal = true }) {
+  const { user } = useAuth();
+  const tenantId = user?.tenant_id ?? null;
+
   const [step, setStep]               = useState('SELECT_CRM');
   const [activeCrm, setActiveCrm]     = useState(null);
   const [crmStatuses, setCrmStatuses] = useState({});
 
   const { data: configsData, isLoading: isLoadingConfigs, error: configsError } = useCrmConfigs();
   const crmConfigs = configsData?.crms ?? null;
+
+  // ── Hydrate crmStatuses from backend on mount ─────────────────────────────
+  // Calls GET /tenant-source-systems/active?tenant_id=<uuid> and maps the
+  // returned numeric source_system_ids → crm_keys using the hardcoded map.
+  // Query is disabled until tenantId is available (user still loading).
+  const { data: activeIntegrationsData } = useActiveIntegrations(tenantId);
+
+  useEffect(() => {
+    if (!activeIntegrationsData) return;
+
+    const activeIds = activeIntegrationsData.active_source_system_ids ?? [];
+    if (activeIds.length === 0) return;
+
+    setCrmStatuses((prev) => {
+      const seeded = {};
+      activeIds.forEach((sourceSystemId) => {
+        const crmKey = SOURCE_SYSTEM_ID_TO_CRM_KEY[sourceSystemId];
+        // Skip if ID is unknown in our map, or already tracked locally
+        if (!crmKey || prev[crmKey]) return;
+        seeded[crmKey] = {
+          status: 'success',
+          // integration_id not returned by this endpoint; populated later
+          // when the user opens the CRM card and the status query runs.
+          integration_id: null,
+        };
+      });
+      return Object.keys(seeded).length > 0 ? { ...prev, ...seeded } : prev;
+    });
+  }, [activeIntegrationsData]);
 
   const handleSelectCrm           = (key)  => { setActiveCrm(key); setStep('CONFIGURE_CRM'); };
   const handleBackToCrmSelection  = ()     => { setActiveCrm(null); setStep('SELECT_CRM'); };
