@@ -289,13 +289,16 @@ export default function Agents() {
     setInviteModalOpen(false);
     setInviteModalMode('new');
     setInviteTargetAgent(null);
+    if (pendingRefresh) {
+      setPendingRefresh(false);
+      invalidateAgents(); // ← safe to call now, modal is already closed
+    }
   };
 
   // ─── Handle successful invite ────────────────────────────────────────
-  const handleInviteSuccess = async () => {
+  const handleInviteSuccess = () => {
+    setPendingRefresh(true);
     setBanner({ type: 'success', message: 'Invite sent to agent.' });
-    handleInviteModalClose();
-    await invalidateAgents();
   };
 
   // ─── Action button per agent ─────────────────────────────────────────
