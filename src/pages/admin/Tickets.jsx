@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Search } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import TicketTable from '../../components/TicketTable';
@@ -14,11 +14,26 @@ export default function AdminTickets() {
   const [page,           setPage]           = useState(1);
   const [includeDeleted, setIncludeDeleted] = useState(false);
 
-  const queryParams = { page, page_size: DEFAULT_PAGE_SIZE, include_deleted: includeDeleted };
+  // Fetch all tickets (large page) once to extract tenant's unique source systems
+const { data: allTicketsData } = useQuery({
+  queryKey: ['tickets', 'source-systems-fetch'],
+  queryFn:  () => ticketService.filter({ page: 1, page_size: 100 }),
+  staleTime: 5 * 60_000,
+});
 
+const sourceOptions = useMemo(() => {
+  const systems = new Set(
+    (allTicketsData?.items ?? [])
+      .map(t => t.crm ?? t.source_system)
+      .filter(s => s && s !== '—')
+  );
+  return [...systems].map(s => ({ value: s, label: s }));
+}, [allTicketsData]);
+
+  const queryParams = { page, page_size: DEFAULT_PAGE_SIZE, include_deleted: includeDeleted, ...filters };
   const { data, isLoading, isError, error, isFetching, refetch } = useQuery({
     queryKey: ticketKeys.list(queryParams),
-    queryFn:  () => ticketService.getAll(queryParams),
+    queryFn:  () => ticketService.filter(queryParams),
     placeholderData: (prev) => prev,
     staleTime: 30_000,
   });
@@ -34,12 +49,6 @@ export default function AdminTickets() {
       const q = search.toLowerCase();
       if (!q) return true;
       return t.title?.toLowerCase().includes(q) || t.crm_id?.toLowerCase().includes(q);
-    })
-    .filter(t => {
-      if (filters.status        && t.status        !== filters.status)        return false;
-      if (filters.priority      && t.priority      !== filters.priority)      return false;
-      if (filters.source_system && t.source_system !== filters.source_system) return false;
-      return true;
     })
     .sort((a, b) => {
       const v = t => t[sort.field] ?? '';
@@ -77,7 +86,11 @@ export default function AdminTickets() {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-        <Filters filters={filters} onChange={f => { setFilters(f); setPage(1); }} />
+        <Filters
+          filters={filters}
+          onChange={f => { setFilters(f); setPage(1); }}
+          sourceOptions={sourceOptions}
+        />
       </div>
 
       {/* Error */}

@@ -1,13 +1,3 @@
-/**
- * components/Filters.jsx
- *
- * Reusable filter toolbar used on Tickets and MyTickets pages.
- * Layout: full-width search on top, outlined dropdowns row below.
- *
- * Props:
- *   filters     { status?, priority?, source_system? }
- *   onChange    (newFilters) => void
- */
 import { ChevronDown } from 'lucide-react';
 
 const STATUS_OPTIONS = [
@@ -24,12 +14,7 @@ const PRIORITY_OPTIONS = [
   { value: 'low',    label: 'Low'    },
 ];
 
-const SOURCE_OPTIONS = [
-  { value: 'EspoCRM', label: 'EspoCRM' },
-  { value: 'Zammad',  label: 'Zammad'  },
-];
-
-export default function Filters({ filters = {}, onChange }) {
+export default function Filters({ filters = {}, onChange, sourceOptions = [] }) {
   const set = (key, val) => onChange({ ...filters, [key]: val || undefined });
   const hasActive = filters.status || filters.priority || filters.source_system;
 
@@ -66,18 +51,19 @@ export default function Filters({ filters = {}, onChange }) {
         <ChevronDown size={13} className="filter-chevron" />
       </div>
 
-      {/* Source CRM */}
+      {/* Source CRM — dynamic, tenant-scoped */}
       <div className="filter-select-wrap">
         <select
-          className={`filter-select${filters.source_system ? ' active' : ''}`}
-          value={filters.source_system ?? ''}
-          onChange={e => set('source_system', e.target.value)}
-        >
-          <option value="">Source CRM: All</option>
-          {SOURCE_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+  className={`filter-select${filters.source_system ? ' active' : ''}`}
+  value={filters.source_system ?? ''}
+  onChange={e => set('source_system', e.target.value)}
+  // no disabled prop
+>
+  <option value="">Source CRM: All</option>
+  {sourceOptions.map(o => (
+    <option key={o.value} value={o.value}>{o.label}</option>
+  ))}
+</select>
         <ChevronDown size={13} className="filter-chevron" />
       </div>
 
