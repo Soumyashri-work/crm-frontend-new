@@ -1,17 +1,15 @@
 /**
- * InviteAgentModal.jsx — Refactored with unified Modal component
- * 
- * Features:
- * - Two modes: new agent (form) vs existing agent (pre-filled, read-only)
- * - Multi-step UI: form → success screen
- * - Full form validation with field-level error display
- * - Invite link copy functionality
- * - Accessible form fields with proper labeling
- * 
+ * InviteAgentModal.jsx — Fixed: existing agents now use /invitations/invite-agent endpoint
+ *
+ * Fix applied:
+ * - Existing agents (pre-filled mode) now call agentService.inviteAgent(payload)
+ *   instead of agentService.invite(agentId) which was returning 404.
+ * - Both new and existing agent flows use the same working backend endpoint.
+ *
  * Props:
  *   isOpen {boolean}         - Controls modal visibility
  *   onClose {function}       - Called when user closes modal
- *   onSuccess {function}     - Called after successful invite
+ *   onSuccess {function}     - Called after successful invite (does NOT close modal)
  *   agentId {string|number}  - For existing agent mode (optional)
  *   initialData {object}     - Pre-filled data for existing agent mode { first_name, last_name, email }
  */
@@ -60,9 +58,7 @@ export default function InviteAgentModal({
 
   // ─── Validation ─────────────────────────────────────────────────────
   function validate() {
-    // For existing agents, backend owns validation
-    if (isExistingAgent) return {};
-
+    // For existing agents, fields are read-only but still validate before sending
     const e = {};
 
     if (!form.email.trim()) {
@@ -92,6 +88,9 @@ export default function InviteAgentModal({
     setApiError('');
 
     try {
+      // ✅ Both new and existing agents use the same working endpoint.
+      // The backend route POST /agents/:id/invite does not exist,
+      // so we always use POST /invitations/invite-agent with the form data.
       const payload = {
         email: form.email.trim(),
         first_name: form.first_name.trim(),
@@ -109,8 +108,8 @@ export default function InviteAgentModal({
         ...result,
       };
 
-      onSuccess?.(merged);
-      setInviteResult(merged);
+      setInviteResult(merged);  // ✅ Show success screen first
+      onSuccess?.(merged);      // ✅ Notify parent (parent should NOT close modal here)
     } catch (err) {
       setApiError(err.message || 'Something went wrong. Please try again.');
     } finally {
@@ -122,7 +121,6 @@ export default function InviteAgentModal({
   function handleFieldChange(key, value) {
     if (isExistingAgent) return; // Locked in existing-agent mode
     setForm((f) => ({ ...f, [key]: value }));
-    // Clear error for this field when user starts typing
     if (errors[key]) {
       setErrors((e) => ({ ...e, [key]: '' }));
     }
@@ -135,7 +133,6 @@ export default function InviteAgentModal({
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      // Fallback: select text manually
       const input = document.getElementById('invite-link-input');
       if (input) input.select();
     }
@@ -204,18 +201,13 @@ export default function InviteAgentModal({
                   title={copied ? 'Copied!' : 'Copy to clipboard'}
                 >
                   {copied ? (
-                    <>
-                      <Check size={14} /> Copied
-                    </>
+                    <><Check size={14} /> Copied</>
                   ) : (
-                    <>
-                      <Copy size={14} /> Copy
-                    </>
+                    <><Copy size={14} /> Copy</>
                   )}
                 </button>
               </div>
 
-              {/* Open in new tab link */}
               <a
                 href={inviteResult.invite_link}
                 target="_blank"
@@ -249,24 +241,15 @@ export default function InviteAgentModal({
               marginBottom: 20,
             }}
           >
-            <DetailRow
-              label="Agent Name"
-              value={inviteResult.name}
-            />
-            <DetailRow
-              label="Agent Email"
-              value={inviteResult.email}
-            />
+            <DetailRow label="Agent Name" value={inviteResult.name} />
+            <DetailRow label="Agent Email" value={inviteResult.email} />
             <DetailRow label="Role" value="Agent" />
             <DetailRow label="Expires" value="24 hours from now" />
           </div>
         </div>
 
         <div className="modal-footer">
-          <button
-            onClick={onClose}
-            className="modal-btn modal-btn-primary"
-          >
+          <button onClick={onClose} className="modal-btn modal-btn-primary">
             Done
           </button>
         </div>
@@ -319,23 +302,15 @@ export default function InviteAgentModal({
             />
             <input
               type="text"
-              className={`modal-form-input ${
-                errors.first_name ? 'has-error' : ''
-              }`}
+              className={`modal-form-input ${errors.first_name ? 'has-error' : ''}`}
               style={{
                 paddingLeft: 36,
-                background: isExistingAgent
-                  ? 'var(--surface-2)'
-                  : 'var(--surface)',
-                color: isExistingAgent
-                  ? 'var(--text-muted)'
-                  : 'var(--text-primary)',
+                background: isExistingAgent ? 'var(--surface-2)' : 'var(--surface)',
+                color: isExistingAgent ? 'var(--text-muted)' : 'var(--text-primary)',
               }}
               placeholder="e.g. John"
               value={form.first_name}
-              onChange={(e) =>
-                handleFieldChange('first_name', e.target.value)
-              }
+              onChange={(e) => handleFieldChange('first_name', e.target.value)}
               readOnly={isExistingAgent}
               autoFocus={!isExistingAgent}
             />
@@ -364,23 +339,15 @@ export default function InviteAgentModal({
             />
             <input
               type="text"
-              className={`modal-form-input ${
-                errors.last_name ? 'has-error' : ''
-              }`}
+              className={`modal-form-input ${errors.last_name ? 'has-error' : ''}`}
               style={{
                 paddingLeft: 36,
-                background: isExistingAgent
-                  ? 'var(--surface-2)'
-                  : 'var(--surface)',
-                color: isExistingAgent
-                  ? 'var(--text-muted)'
-                  : 'var(--text-primary)',
+                background: isExistingAgent ? 'var(--surface-2)' : 'var(--surface)',
+                color: isExistingAgent ? 'var(--text-muted)' : 'var(--text-primary)',
               }}
               placeholder="e.g. Doe"
               value={form.last_name}
-              onChange={(e) =>
-                handleFieldChange('last_name', e.target.value)
-              }
+              onChange={(e) => handleFieldChange('last_name', e.target.value)}
               readOnly={isExistingAgent}
             />
           </div>
@@ -411,17 +378,11 @@ export default function InviteAgentModal({
             />
             <input
               type="email"
-              className={`modal-form-input ${
-                errors.email ? 'has-error' : ''
-              }`}
+              className={`modal-form-input ${errors.email ? 'has-error' : ''}`}
               style={{
                 paddingLeft: 36,
-                background: isExistingAgent
-                  ? 'var(--surface-2)'
-                  : 'var(--surface)',
-                color: isExistingAgent
-                  ? 'var(--text-muted)'
-                  : 'var(--text-primary)',
+                background: isExistingAgent ? 'var(--surface-2)' : 'var(--surface)',
+                color: isExistingAgent ? 'var(--text-muted)' : 'var(--text-primary)',
               }}
               placeholder="agent@company.com"
               value={form.email}
@@ -502,7 +463,7 @@ export default function InviteAgentModal({
   );
 }
 
-// ─── Sub-components ─────────────────────────────────────────────────────────
+// ─── Sub-components ──────────────────────────────────────────────────────────
 
 function DetailRow({ label, value }) {
   return (
@@ -525,6 +486,6 @@ function DetailRow({ label, value }) {
   );
 }
 
-// ─── Constants ──────────────────────────────────────────────────────────────
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const EMPTY_FORM = { first_name: '', last_name: '', email: '' };
