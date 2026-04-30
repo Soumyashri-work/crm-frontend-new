@@ -1,21 +1,12 @@
 /**
- * Modal.css — Unified modal styling for all modals
- * 
- * Architecture:
- * - .modal-overlay      → Fixed backdrop with blur
- * - .modal-container    → Centered modal card
- * - .modal-header       → Fixed header with title + close button
- * - .modal-body         → Scrollable content area
- * - .modal-footer       → Fixed footer with action buttons
- * 
- * Z-Index hierarchy: backdrop (1100) < container (1101)
- * Ensures EditTicketModal can use z-index: 1300 to escape parent stacking contexts
+ * Modal.css — Unified modal styling
+ * Replaces both .modal-content and .modal-container with a single system.
+ * All modals must use: .modal-overlay > .modal-container
  */
 
 /* ============================================================
    OVERLAY (BACKDROP)
    ============================================================ */
-
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -30,42 +21,45 @@
 }
 
 /* ============================================================
-   CONTAINER (MODAL CARD)
+   CONTAINER — single canonical modal card
+   Replaces both .modal-content and .modal-container
    ============================================================ */
-
-.modal-container {
+.modal-container,
+.modal-content {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
   width: 100%;
   max-width: 520px;
   max-height: 90vh;
   animation: modal-slide-up 0.3s ease-out;
+  overflow: hidden;
 }
 
 /* ============================================================
-   HEADER (FIXED)
+   HEADER
    ============================================================ */
-
 .modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 20px 24px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1.5px solid var(--border);
   flex-shrink: 0;
   gap: 12px;
+  margin: 0;
 }
 
-.modal-title {
+.modal-title,
+.modal-header h2 {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
   color: var(--text-primary);
-  line-height: 1.2;
+  line-height: 1.25;
   flex: 1;
   min-width: 0;
 }
@@ -73,7 +67,7 @@
 .modal-close-btn {
   background: none;
   border: none;
-  padding: 4px;
+  padding: 6px;
   cursor: pointer;
   border-radius: var(--radius-sm);
   color: var(--text-muted);
@@ -82,6 +76,7 @@
   justify-content: center;
   transition: all 0.15s ease;
   flex-shrink: 0;
+  line-height: 1;
 }
 
 .modal-close-btn:hover {
@@ -97,53 +92,41 @@
 /* ============================================================
    BODY (SCROLLABLE)
    ============================================================ */
-
 .modal-body {
   flex: 1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   padding: 24px;
   display: flex;
   flex-direction: column;
+  gap: 0;
 }
 
-/* Smooth scrollbar for webkit browsers */
-.modal-body::-webkit-scrollbar {
-  width: 8px;
-}
-
-.modal-body::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.modal-body::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
-}
-
-.modal-body::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
-}
+.modal-body::-webkit-scrollbar { width: 5px; }
+.modal-body::-webkit-scrollbar-track { background: transparent; }
+.modal-body::-webkit-scrollbar-thumb { background: var(--border-dark); border-radius: 99px; }
+.modal-body::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 /* ============================================================
-   FOOTER (FIXED)
+   FOOTER
    ============================================================ */
-
 .modal-footer {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
   padding: 16px 24px;
-  border-top: 1px solid var(--border);
+  border-top: 1.5px solid var(--border);
   background: var(--surface);
   flex-shrink: 0;
   flex-wrap: wrap;
+  margin: 0;
 }
 
 /* ============================================================
-   BUTTON STYLES (STANDARD)
+   BUTTONS
    ============================================================ */
-
 .modal-btn {
   padding: 9px 18px;
   font-size: 13px;
@@ -158,6 +141,7 @@
   align-items: center;
   gap: 8px;
   min-height: 36px;
+  line-height: 1;
 }
 
 .modal-btn:disabled {
@@ -176,60 +160,29 @@
 }
 
 .modal-btn-secondary {
-  background: var(--surface-2);
+  background: var(--surface);
   color: var(--text-secondary);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border-dark);
 }
 
 .modal-btn-secondary:hover:not(:disabled) {
-  background: var(--surface-3);
+  background: var(--surface-2);
   color: var(--text-primary);
 }
 
 .modal-btn-danger {
-  background: #DC2626;
+  background: var(--danger);
   color: white;
 }
 
 .modal-btn-danger:hover:not(:disabled) {
-  background: #B91C1C;
+  background: var(--danger-dark);
   box-shadow: var(--shadow-md);
 }
 
 /* ============================================================
-   ANIMATIONS
+   FORM UTILITIES
    ============================================================ */
-
-@keyframes modal-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes modal-slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* ============================================================
-   FORM UTILITIES (COMMON IN MODALS)
-   ============================================================ */
-
 .modal-form-group {
   display: flex;
   flex-direction: column;
@@ -243,172 +196,193 @@
 
 .modal-form-label {
   display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
+}
+
+.modal-form-label .required {
+  color: var(--danger);
+  margin-left: 2px;
 }
 
 .modal-form-input,
-.modal-form-select {
+.modal-form-select,
+.modal-form-textarea {
   padding: 9px 12px;
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border-dark);
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 14px;
   font-family: inherit;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  width: 100%;
 }
 
 .modal-form-input:focus,
-.modal-form-select:focus {
+.modal-form-select:focus,
+.modal-form-textarea:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(79, 110, 247, 0.1);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .modal-form-input:disabled,
-.modal-form-select:disabled {
+.modal-form-select:disabled,
+.modal-form-textarea:disabled {
   background: var(--surface-2);
   color: var(--text-muted);
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.7;
+}
+
+.modal-form-input::placeholder,
+.modal-form-textarea::placeholder {
+  color: var(--text-muted);
 }
 
 .modal-form-input.has-error,
-.modal-form-select.has-error {
-  border-color: #DC2626;
-  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+.modal-form-select.has-error,
+.modal-form-textarea.has-error {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
 }
 
 .modal-form-error {
   font-size: 11.5px;
-  color: #DC2626;
+  color: var(--danger);
   display: flex;
   align-items: center;
   gap: 4px;
+  margin-top: 2px;
 }
 
 .modal-form-hint {
   font-size: 11.5px;
   color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.modal-form-textarea {
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.5;
 }
 
 /* ============================================================
-   ERROR & SUCCESS BANNERS
+   ALERT BANNERS
    ============================================================ */
-
 .modal-error-banner {
-  padding: 12px 14px;
-  margin-bottom: 18px;
-  background: #FEF2F2;
-  border: 1px solid #FECACA;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  background: var(--danger-light);
+  border: 1.5px solid var(--danger-border);
   border-radius: var(--radius-sm);
   font-size: 13px;
-  color: #DC2626;
+  color: var(--danger);
   display: flex;
   align-items: flex-start;
   gap: 10px;
 }
 
 .modal-success-banner {
-  padding: 12px 14px;
-  margin-bottom: 18px;
-  background: #F0FDF4;
-  border: 1px solid #BBEF63;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  background: var(--success-light);
+  border: 1.5px solid var(--success-border);
   border-radius: var(--radius-sm);
   font-size: 13px;
-  color: #166534;
+  color: var(--success-dark);
   display: flex;
   align-items: flex-start;
   gap: 10px;
 }
 
 .modal-info-banner {
-  padding: 12px 14px;
-  margin-bottom: 18px;
-  background: #EFF6FF;
-  border: 1px solid #BFDBFE;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  background: var(--primary-lighter);
+  border: 1.5px solid var(--primary-border);
   border-radius: var(--radius-sm);
   font-size: 13px;
-  color: #1e40af;
+  color: var(--primary-dark);
   display: flex;
   align-items: flex-start;
   gap: 10px;
 }
 
 /* ============================================================
-   RESPONSIVE DESIGN
+   DIVIDER UTILITY
    ============================================================ */
+.modal-divider {
+  border: none;
+  border-top: 1.5px solid var(--border);
+  margin: 0 -24px;
+}
 
-/* Tablet (768px and below) */
+/* ============================================================
+   SIZES
+   ============================================================ */
+.modal-sm { max-width: 400px; }
+.modal-md { max-width: 520px; }
+.modal-lg { max-width: 680px; }
+.modal-xl { max-width: 860px; }
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes modal-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes modal-slide-up {
+  from { opacity: 0; transform: translateY(16px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
 @media (max-width: 768px) {
-  .modal-overlay {
-    padding: 12px;
-  }
+  .modal-overlay { padding: 12px; }
 
-  .modal-container {
-    width: 100%;
+  .modal-container,
+  .modal-content {
     max-width: 100%;
     max-height: 95vh;
-    border-radius: var(--radius);
   }
 
-  .modal-header {
-    padding: 16px 20px;
-  }
-
-  .modal-title {
-    font-size: 16px;
-  }
-
-  .modal-body {
-    padding: 20px;
-  }
-
-  .modal-footer {
-    padding: 14px 20px;
-    justify-content: space-between;
-  }
-
-  .modal-btn {
-    padding: 9px 16px;
-    font-size: 13px;
-    min-height: 36px;
-  }
+  .modal-header { padding: 16px 20px; }
+  .modal-title,
+  .modal-header h2 { font-size: 16px; }
+  .modal-body { padding: 20px; }
+  .modal-footer { padding: 14px 20px; }
 
   .modal-form-input,
-  .modal-form-select {
-    padding: 9px 12px;
-    font-size: 16px; /* Prevents iOS zoom on input focus */
-    min-height: 44px; /* Touch target */
+  .modal-form-select,
+  .modal-form-textarea {
+    font-size: 16px;
+    min-height: 44px;
   }
 }
 
-/* Mobile (480px and below) */
 @media (max-width: 480px) {
-  .modal-overlay {
-    padding: 8px;
+  .modal-overlay { padding: 8px; align-items: flex-end; }
+
+  .modal-container,
+  .modal-content {
+    max-height: 92vh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   }
 
-  .modal-container {
-    max-height: 100vh;
-  }
-
-  .modal-header {
-    padding: 14px 16px;
-    gap: 8px;
-  }
-
-  .modal-title {
-    font-size: 15px;
-  }
-
-  .modal-body {
-    padding: 16px;
-  }
+  .modal-header { padding: 14px 16px; gap: 8px; }
+  .modal-title,
+  .modal-header h2 { font-size: 15px; }
+  .modal-body { padding: 16px; }
 
   .modal-footer {
     padding: 12px 16px;
@@ -418,80 +392,18 @@
 
   .modal-btn {
     width: 100%;
-    padding: 10px 16px;
     justify-content: center;
-    font-size: 13px;
-    min-height: 44px; /* Touch target */
-  }
-
-  .modal-form-group {
-    margin-bottom: 16px;
-  }
-
-  .modal-form-input,
-  .modal-form-select {
-    padding: 11px 12px;
-    font-size: 16px;
     min-height: 44px;
   }
 
-  .modal-form-label {
-    font-size: 12px;
-  }
-
-  /* Ensure modals don't go beyond viewport on small screens */
-  .modal-container {
-    width: 100% !important;
-    margin: 0 auto;
+  .modal-form-input,
+  .modal-form-select,
+  .modal-form-textarea {
+    min-height: 44px;
+    font-size: 16px;
   }
 }
-
-/* Very small mobile (360px and below) */
-@media (max-width: 360px) {
-  .modal-overlay {
-    padding: 4px;
-  }
-
-  .modal-container {
-    max-height: calc(100vh - 8px);
-  }
-
-  .modal-header {
-    padding: 12px 14px;
-  }
-
-  .modal-body {
-    padding: 14px;
-  }
-
-  .modal-footer {
-    padding: 10px 14px;
-  }
-}
-
-/* ============================================================
-   SCROLLING BEHAVIOR
-   ============================================================ */
-
-/* Prevent modal body from scrolling body behind it (iOS fix) */
-.modal-body {
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-}
-
-/* Ensure header/footer don't have bottom/top margin that could show body */
-.modal-header,
-.modal-footer {
-  margin: 0;
-  padding: 0;
-}
-
-/* ============================================================
-   PRINT STYLES
-   ============================================================ */
 
 @media print {
-  .modal-overlay {
-    display: none;
-  }
+  .modal-overlay { display: none; }
 }

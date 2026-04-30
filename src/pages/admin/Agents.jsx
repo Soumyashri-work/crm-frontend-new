@@ -516,70 +516,29 @@ export default function Agents() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontSize: 12,
-              color: 'var(--text-muted)',
-              marginBottom: 4,
-              fontWeight: 500,
-            }}
-          >
-            <span
-              onClick={() => navigate('/admin/dashboard')}
-              style={{ cursor: 'pointer', transition: 'color 0.2s' }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.color = 'var(--primary)')
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.color = 'var(--text-muted)')
-              }
-            >
-              Dashboard
-            </span>
-            {' › '}
-            <span style={{ color: 'var(--text-secondary)' }}>Agents</span>
-          </div>
-          <h1>Agents</h1>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {isFetching && !isLoading && (
-            <div
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: 'var(--primary)',
-                opacity: 0.6,
-                animation: 'pulse 1s ease-in-out infinite',
-              }}
-            />
-          )}
-          <button
-            onClick={handleAddAgentClick}
-            style={{
-              padding: '9px 16px',
-              fontSize: 13,
-              fontWeight: 600,
-              background: 'var(--primary)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 'var(--radius-sm)',
-              cursor: 'pointer',
-            }}
-          >
-            + Add Agent
-          </button>
-        </div>
-      </div>
-
+    {/* Header */}
+<div className="page-header">
+  <div className="page-header-left">
+    <div className="breadcrumb"></div>
+    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 500 }}>
+      <span onClick={() => navigate('/admin/dashboard')} style={{ cursor: 'pointer', transition: 'color 0.2s' }} onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary)')} onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}>
+        Dashboard
+      </span>
+      {' › '}
+      <span style={{ color: 'var(--text-secondary)' }}>Agents</span>
+    </div>
+    <h1>Agents</h1>
+      <p>Manage agents across your organization</p> 
+  </div>
+  <div className="page-header-actions">
+    {isFetching && !isLoading && (
+      <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', opacity: 0.6, animation: 'pulse 1s ease-in-out infinite' }} />
+    )}
+    <button onClick={handleAddAgentClick} className="btn btn-primary">
+      + Add Agent
+    </button>
+  </div>
+</div>
       {/* Banners */}
       {isError && (
         <div

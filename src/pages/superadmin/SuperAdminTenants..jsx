@@ -57,24 +57,22 @@ export default function SuperAdminTenants() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 500 }}>
-            <span>Dashboard</span><span style={{ margin: '0 5px' }}>›</span>
-            <span style={{ color: 'var(--text-secondary)' }}>Tenants</span>
-          </div>
-          <h1>Tenants</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, marginTop: 4 }}>Manage all tenant organizations</p>
-        </div>
-        <button onClick={() => setShowModal(true)} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px', fontSize: 14 }}>
-          <Plus size={16} /> Add Tenant
-        </button>
-      </div>
+      {/* ── Header ── */}
+     {/* Header */}
+<div className="page-header">
+ <div className="page-header-left">
+  <div className="breadcrumb">
+    <span onClick={() => navigate('/superadmin/dashboard')} style={{ cursor:'pointer' }} onMouseEnter={e => e.currentTarget.style.textDecoration='underline'} onMouseLeave={e => e.currentTarget.style.textDecoration='none'}>Dashboard</span>
+    <ChevronRight size={13} />
+    <span style={{ color:'var(--text-secondary)' }}>Tenants</span>
+  </div>
+  <h1>Tenants</h1>
+  <p>Manage all organizations on the platform</p>
+</div>
+</div>
 
       {/* Filter toolbar */}
       <div className="filter-toolbar">
-        {/* Search */}
         <div className="filter-search-row">
           <Search size={16} className="filter-search-icon" />
           <input
@@ -84,8 +82,6 @@ export default function SuperAdminTenants() {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-
-        {/* Dropdowns */}
         <div className="filter-dropdowns-row">
           <div className="filter-select-wrap">
             <select className={`filter-select${statusFilter ? ' active' : ''}`} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
@@ -95,7 +91,6 @@ export default function SuperAdminTenants() {
             </select>
             <ChevronDown size={13} className="filter-chevron" />
           </div>
-
           <button
             onClick={() => fetchTenants()}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', border: '1.5px solid var(--border-dark)', borderRadius: 'var(--radius-sm)', background: 'var(--surface)', fontSize: 13, cursor: 'pointer', color: 'var(--text-secondary)', fontFamily: 'inherit' }}
@@ -104,16 +99,15 @@ export default function SuperAdminTenants() {
           >
             <RefreshCw size={14} /> Refresh
           </button>
-
           {hasActive && <button className="filter-clear-btn" onClick={() => { setSearch(''); setStatusFilter(''); }}>Clear Filters</button>}
         </div>
       </div>
 
       {/* Error */}
       {error && (
-        <div style={{ padding: '12px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 'var(--radius-sm)', fontSize: 13, color: '#B91C1C', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="alert-error">
           {error}
-          <button onClick={() => fetchTenants()} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#B91C1C', fontSize: 13, fontFamily: 'inherit', textDecoration: 'underline' }}>Retry</button>
+          <button className="alert-retry-btn" onClick={() => fetchTenants()}>Retry</button>
         </div>
       )}
 
@@ -153,22 +147,10 @@ export default function SuperAdminTenants() {
                   <td style={{ color: 'var(--text-secondary)', fontSize: 13.5 }}>{formatDate(t.created_at)}</td>
                   <td onClick={e => e.stopPropagation()}>
                     <div className="row-actions">
-                      <button
-                        className="icon-action-btn edit"
-                        type="button"
-                        title="Edit tenant (coming soon)"
-                        aria-label="Edit tenant"
-                        disabled
-                      >
+                      <button className="icon-action-btn edit" type="button" title="Edit tenant (coming soon)" aria-label="Edit tenant" disabled>
                         <Edit2 size={14} />
                       </button>
-                      <button
-                        className="icon-action-btn delete"
-                        type="button"
-                        title="Delete tenant (coming soon)"
-                        aria-label="Delete tenant"
-                        disabled
-                      >
+                      <button className="icon-action-btn delete" type="button" title="Delete tenant (coming soon)" aria-label="Delete tenant" disabled>
                         <Trash2 size={14} />
                       </button>
                     </div>
