@@ -8,11 +8,10 @@ import { ticketService, ticketKeys } from '../../services/ticketService';
 const DEFAULT_PAGE_SIZE = 20;
 
 export default function AdminTickets() {
-  const [filters,        setFilters]        = useState({});
-  const [search,         setSearch]         = useState('');
-  const [sort,           setSort]           = useState({ field: 'updated_at', dir: 'desc' });
-  const [page,           setPage]           = useState(1);
-  const [includeDeleted, setIncludeDeleted] = useState(false);
+  const [filters, setFilters] = useState({});
+  const [search,  setSearch]  = useState('');
+  const [sort,    setSort]    = useState({ field: 'updated_at', dir: 'desc' });
+  const [page,    setPage]    = useState(1);
 
   // Fetch all tickets (large page) once to extract tenant's unique source systems
 const { data: allTicketsData } = useQuery({
@@ -30,7 +29,8 @@ const sourceOptions = useMemo(() => {
   return [...systems].map(s => ({ value: s, label: s }));
 }, [allTicketsData]);
 
-  const queryParams = { page, page_size: DEFAULT_PAGE_SIZE, include_deleted: includeDeleted, ...filters };
+  // Always filter out deleted tickets
+  const queryParams = { page, page_size: DEFAULT_PAGE_SIZE, ...filters, is_deleted: false };
   const { data, isLoading, isError, error, isFetching, refetch } = useQuery({
     queryKey: ticketKeys.list(queryParams),
     queryFn:  () => ticketService.filter(queryParams),

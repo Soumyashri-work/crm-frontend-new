@@ -18,11 +18,13 @@ export default function MyTickets() {
 
   const agentId = user?.agent_id;
 
+  // Always filter out deleted tickets
   const queryParams = {
     page,
     page_size: DEFAULT_PAGE_SIZE,
     status:    filters.status   || undefined,
     priority:  filters.priority || undefined,
+    is_deleted: false,
   };
 
   const { data, isLoading, isError, error, isFetching, refetch } = useQuery({
