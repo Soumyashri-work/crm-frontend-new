@@ -71,7 +71,7 @@ export default function Agents() {
   const [sortField, setSortField] = useState('');
   const [sortDir, setSortDir] = useState('asc');
   const [page, setPage] = useState(1);
-  const [selectedRows, setSelectedRows] = useState(new Set());
+  // const [selectedRows, setSelectedRows] = useState(new Set());
   const [banner, setBanner] = useState(null);
 
   // ─── Modal state ────────────────────────────────────────────────────
@@ -178,22 +178,22 @@ export default function Agents() {
       }),
   });
 
-  const bulkInviteMutation = useMutation({
-    mutationFn: (ids) => agentService.bulkInvite(ids),
-    onSuccess: async (_d, ids) => {
-      setBanner({
-        type: 'success',
-        message: `Invited ${ids.length} agent(s).`,
-      });
-      setSelectedRows(new Set());
-      await invalidateAgents();
-    },
-    onError: (err) =>
-      setBanner({
-        type: 'error',
-        message: err?.message || 'Bulk invite failed.',
-      }),
-  });
+  // const bulkInviteMutation = useMutation({
+  //   mutationFn: (ids) => agentService.bulkInvite(ids),
+  //   onSuccess: async (_d, ids) => {
+  //     setBanner({
+  //       type: 'success',
+  //       message: `Invited ${ids.length} agent(s).`,
+  //     });
+  //     setSelectedRows(new Set());
+  //     await invalidateAgents();
+  //   },
+  //   onError: (err) =>
+  //     setBanner({
+  //       type: 'error',
+  //       message: err?.message || 'Bulk invite failed.',
+  //     }),
+  // });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => agentService.update(id, data),
@@ -231,23 +231,23 @@ export default function Agents() {
     }
   };
 
-  const handleRowSelect = (rowId, selected) => {
-    const next = new Set(selectedRows);
-    if (selected) {
-      next.add(rowId);
-    } else {
-      next.delete(rowId);
-    }
-    setSelectedRows(next);
-  };
+  // const handleRowSelect = (rowId, selected) => {
+  //   const next = new Set(selectedRows);
+  //   if (selected) {
+  //     next.add(rowId);
+  //   } else {
+  //     next.delete(rowId);
+  //   }
+  //   setSelectedRows(next);
+  // };
 
-  const handleSelectAll = (selected) => {
-    if (selected) {
-      setSelectedRows(new Set(sorted.map((a) => a.id)));
-    } else {
-      setSelectedRows(new Set());
-    }
-  };
+  // const handleSelectAll = (selected) => {
+  //   if (selected) {
+  //     setSelectedRows(new Set(sorted.map((a) => a.id)));
+  //   } else {
+  //     setSelectedRows(new Set());
+  //   }
+  // };
 
   const handleEditSave = (formData) => {
     if (!editingAgent) return;
@@ -265,11 +265,11 @@ export default function Agents() {
   };
 
   // ─── Open invite modal for new agent (from "+ Add Agent" button) ──────
-  const handleAddAgentClick = () => {
-    setInviteModalMode('new');
-    setInviteTargetAgent(null);
-    setInviteModalOpen(true);
-  };
+  // const handleAddAgentClick = () => {
+  //   setInviteModalMode('new');
+  //   setInviteTargetAgent(null);
+  //   setInviteModalOpen(true);
+  // };
 
   // ─── Open invite modal for existing agent (from "Invite" action button) 
   const handleInviteExistingAgent = (agent) => {
@@ -537,9 +537,6 @@ export default function Agents() {
     {isFetching && !isLoading && (
       <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', opacity: 0.6, animation: 'pulse 1s ease-in-out infinite' }} />
     )}
-    <button onClick={handleAddAgentClick} className="btn btn-primary">
-      + Add Agent
-    </button>
   </div>
 </div>
       {/* Banners */}
@@ -605,7 +602,7 @@ export default function Agents() {
         </div>
       )}
 
-      {/* Bulk actions (only if rows selected) */}
+      {/* Bulk actions (only if rows selected)
       {selectedRows.size > 0 && (
         <div
           style={{
@@ -641,9 +638,9 @@ export default function Agents() {
             Bulk Invite
           </button>
         </div>
-      )}
+      )} */}
 
-      {/* DataTable */}
+            {/* DataTable */}
       <DataTable
         columns={columns}
         data={sorted}
@@ -665,10 +662,6 @@ export default function Agents() {
         sortField={sortField}
         sortDir={sortDir}
         onSort={handleSort}
-        selectedRows={selectedRows}
-        onRowSelect={handleRowSelect}
-        onSelectAll={handleSelectAll}
-        showCheckboxes={statusFilter === 'not_invited'}
         searchPlaceholder="Search by name or email…"
         emptyMessage={
           search || statusFilter || sourceFilter
