@@ -11,6 +11,11 @@
  *   ['tickets', 'comments', ticketId, params]– comments for a ticket
  *   ['tickets', 'stats']                     – global stats
  *   ['tickets', 'agentStats', agentId]       – per-agent stats
+ *
+ * ERROR HANDLING NOTES:
+ * - Backend now returns HTTP 422 with CRM-specific validation errors
+ * - Example: "Zammad requires a pending_until timestamp when status is set to 'pending'"
+ * - The unwrap() function will throw with these error details
  */
 
 import api from './api';
@@ -40,6 +45,12 @@ function unwrap(response) {
     const err    = new Error(body.message || 'An unexpected error occurred');
     err.status   = response.status;
     err.data     = body.data;
+    
+    // Attach detail for CRM-specific validation errors (HTTP 422)
+    if (response.status === 422 && body.detail) {
+      err.detail = body.detail;
+    }
+    
     throw err;
   }
   return body.data;
@@ -134,27 +145,34 @@ export const ticketService = {
     return unwrap(res); // { items, total, page, page_size, total_pages }
   },
 
-/** POST /api/v1/sync/{ticketId}/comments/sync */
-syncComments: async (ticketId) => {
-  const res = await api.post(`/sync/${ticketId}/comments/sync`);
-  return unwrap(res);
-},
+  /** POST /api/v1/sync/{ticketId}/comments/sync */
+  syncComments: async (ticketId) => {
+    const res = await api.post(`/sync/${ticketId}/comments/sync`);
+    return unwrap(res);
+  },
 
   /** POST /api/v1/tickets/ */
-  create: (data)        => api.post('/tickets/', data),
+  create: (data) => api.post('/tickets/', data),
 
-  /** PUT /api/v1/tickets/{id} */
-  update: (id, data)    => api.put(`/tickets/${id}`, data),
+  /**
+   * PUT /api/v1/tickets/{id}
+   * 
+   * NOW: Returns HTTP 422 with CRM-specific validation errors
+   * Examples:
+   * - "Zammad requires a pending_until timestamp when status is set to 'pending'"
+   * - "pending_until must be in the future. Zammad pending reminders require a future deadline"
+   */
+  update: (id, data) => api.put(`/tickets/${id}`, data),
 
   /** DELETE /api/v1/tickets/{id} */
-  delete: (id, data)    => api.delete(`/tickets/${id}`, { data }),
+  delete: (id, data) => api.delete(`/tickets/${id}`, { data }),
 
-/** POST /api/v1/tickets/{ticketId}/comments */
-addComment: async (ticketId, { text, author_name = "Agent", author_email = null }) => {
-  const res = await api.post(
-    `/tickets/${ticketId}/comments`,
-    { text, author_name, author_email }
-  );
-  return unwrap(res);
-},
+  /** POST /api/v1/tickets/{ticketId}/comments */
+  addComment: async (ticketId, { text, author_name = "Agent", author_email = null }) => {
+    const res = await api.post(
+      `/tickets/${ticketId}/comments`,
+      { text, author_name, author_email }
+    );
+    return unwrap(res);
+  },
 };

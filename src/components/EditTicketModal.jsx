@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Clock } from 'lucide-react';
+import { X, Clock, Info } from 'lucide-react';
 import { Modal } from './Modal';
 import {
   TICKET_STATUSES,
@@ -31,7 +31,12 @@ export default function EditTicketModal({
   const [error, setError] = useState(null);
 
   const role = getUserRole();
-  const isPendingStatus = formValues.status === 'pending' && ticket?.crm === 'zammad';
+  
+  // Show pending_until field for BOTH Espo and Zammad when status is pending
+  const isPendingStatus = formValues.status === 'pending';
+  
+  // Only REQUIRE pending_until for Zammad (Espo allows it to be optional)
+  const isPendingRequiredForCRM = formValues.status === 'pending' && ticket?.crm === 'zammad';
 
   useEffect(() => {
     if (ticket && isOpen) {
@@ -52,6 +57,7 @@ export default function EditTicketModal({
     setFormValues((prev) => ({
       ...prev,
       status: newStatus,
+      // Clear pending_until when transitioning away from pending
       ...(newStatus !== 'pending' ? { pending_until: '' } : {}),
     }));
   };
@@ -61,15 +67,19 @@ export default function EditTicketModal({
   };
 
   const validate = () => {
-    if (isPendingStatus && !formValues.pending_until) {
-      return 'A deadline is required when setting status to Pending.';
+    // Zammad requires pending_until when status is pending
+    if (isPendingRequiredForCRM && !formValues.pending_until) {
+      return 'Zammad requires a deadline when setting status to Pending.';
     }
+
+    // Validate that pending_until is in the future (if provided)
     const deadline = formValues.pending_until
       ? new Date(formValues.pending_until)
       : null;
     if (deadline && deadline <= new Date()) {
       return 'The pending deadline must be in the future.';
     }
+
     return null;
   };
 
@@ -77,6 +87,7 @@ export default function EditTicketModal({
     e.preventDefault();
     setError(null);
 
+    // Client-side validation
     const validationError = validate();
     if (validationError) {
       setError(validationError);
@@ -108,6 +119,8 @@ export default function EditTicketModal({
       if (onSave) onSave(updatedTicket);
       if (onUpdate) onUpdate(updatedTicket);
     } catch (err) {
+      // Backend will return HTTP 422 with CRM-specific error messages
+      // Example: "Zammad requires a pending_until timestamp when status is set to 'pending'"
       setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
@@ -161,12 +174,12 @@ export default function EditTicketModal({
           </div>
         )}
 
-        {/* Pending deadline */}
+        {/* Pending deadline — now shown for both Espo and Zammad */}
         {isPendingStatus && (
           <div className="modal-form-group">
             <label className="modal-form-label">
               <Clock size={12} style={{ display: 'inline', marginRight: 6 }} />
-              Pending Until <span style={{ color: '#DC2626' }}>*</span>
+              Pending Until {isPendingRequiredForCRM && <span style={{ color: '#DC2626' }}>*</span>}
             </label>
             <input
               type="datetime-local"
@@ -176,11 +189,23 @@ export default function EditTicketModal({
               onChange={handleFieldChange('pending_until')}
               className="modal-form-input"
               disabled={isLoading}
-              required
+              // Only required for Zammad; Espo allows it to be optional
+              required={isPendingRequiredForCRM}
             />
-            <div className="modal-form-hint">
-              The ticket will stay pending until this deadline.
-            </div>
+            
+            {/* CRM-specific hint text */}
+            {ticket?.crm === 'zammad' ? (
+              <div className="modal-form-hint">
+                Zammad requires a deadline. The ticket will stay pending with a reminder 
+                scheduled for this time.
+              </div>
+            ) : (
+              <div className="modal-form-hint" style={{ color: '#0284C7' }}>
+                <Info size={12} style={{ display: 'inline', marginRight: 4 }} />
+                Optional for {ticket?.crm ?? 'this CRM'}. Stored for reference but doesn't affect ticket 
+                reminders (this CRM doesn't use pending reminders).
+              </div>
+            )}
           </div>
         )}
 
