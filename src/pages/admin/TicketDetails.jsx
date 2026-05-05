@@ -91,6 +91,7 @@ function HoverPopup({ children, popup }) {
       </span>
       {visible && (
         <div
+          onClick={(e) => e.stopPropagation()}
           onMouseEnter={() => clearTimeout(timerRef.current)}
           onMouseLeave={hide}
           style={{
@@ -111,7 +112,7 @@ function HoverPopup({ children, popup }) {
 // ─── Popup contents ───────────────────────────────────────────────────────────
 function PersonPopup({ name, email, role, phone, extra }) {
   return (
-    <div>
+    <div onClick={(e) => e.stopPropagation()} style={{ pointerEvents: 'auto' }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10,
         marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid var(--border)',
@@ -129,10 +130,14 @@ function PersonPopup({ name, email, role, phone, extra }) {
         </div>
       </div>
       {email && (
-        <a href={`mailto:${email}`} style={{
-          display: 'flex', alignItems: 'center', gap: 7,
-          fontSize: 12.5, color: 'var(--primary)', marginBottom: 6, textDecoration: 'none',
-        }}>
+        <a 
+          href={`mailto:${email}`}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); return false; }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            fontSize: 12.5, color: 'var(--primary)', marginBottom: 6, textDecoration: 'none',
+            cursor: 'pointer',
+          }}>
           <Mail size={13} /> {email}
         </a>
       )}
@@ -180,10 +185,9 @@ function DetailRow({ icon: Icon, label, children }) {
     <div 
       className="detail-row-container"
       style={{
-        display: 'grid',
-        gridTemplateColumns: '116px minmax(0, 1fr)',
-        alignItems: 'center',
-        gap: 8,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
         padding: '10px 0',
       }}>
       <div style={{
@@ -193,7 +197,7 @@ function DetailRow({ icon: Icon, label, children }) {
       }}>
         <Icon size={12} /> {label}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', minWidth: 0 }}>
+      <div style={{ display: 'flex', minWidth: 0 }}>
         {children}
       </div>
     </div>
@@ -208,8 +212,9 @@ function Chip({ onClick, avatarName, label, icon, linkable }) {
       role={linkable ? 'button' : undefined}
       tabIndex={linkable ? 0 : undefined}
       style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-        width: '100%',
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 8,
+        maxWidth: '100%',
+        minWidth: 0,
         padding: '6px 8px', borderRadius: 'var(--radius-sm)',
         background: 'var(--surface-2)',
         cursor: linkable ? 'pointer' : 'default',
@@ -228,7 +233,15 @@ function Chip({ onClick, avatarName, label, icon, linkable }) {
         </div>
       )}
       {icon}
-      <span style={{ fontSize: 13, color: linkable ? 'var(--primary)' : 'inherit', fontWeight: linkable ? 500 : 400 }}>
+      <span style={{ 
+        fontSize: 13, 
+        color: linkable ? 'var(--primary)' : 'inherit', 
+        fontWeight: linkable ? 500 : 400,
+        minWidth: 0,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+      }}>
         {label}
       </span>
       {linkable && <ExternalLink size={11} color="var(--primary)" />}
