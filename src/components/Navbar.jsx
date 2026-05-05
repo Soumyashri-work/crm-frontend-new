@@ -45,7 +45,8 @@ export default function Navbar({
   const isSuperAdmin = user?.role === 'superadmin';
   const orgLabel     = isSuperAdmin ? 'Platform'          : (user?.tenant_name ?? '…');
   const orgInitial   = isSuperAdmin ? 'P'                 : (user?.tenant_name?.[0] ?? '…');
-  const orgBg        = isSuperAdmin ? '#6366F1'           : '#3B82F6';
+  // ✅ REFACTORED: Use CSS variables instead of hardcoded colors
+  const orgBg        = isSuperAdmin ? 'var(--org-color-superadmin)' : 'var(--org-color-admin)';
 
   return (
     <header style={{
@@ -232,7 +233,7 @@ export default function Navbar({
                     transition:   'background 0.2s',
                     fontFamily:   'inherit',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#FEF2F2'}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--danger-light)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'none'}
                 >
                   Sign out

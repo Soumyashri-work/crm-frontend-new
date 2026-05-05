@@ -1,9 +1,11 @@
 /**
- * src/pages/admin/Agents.jsx — REFACTORED (PHASE 6)
- *
- * Uses DataTable component for search, sort, filter, pagination + checkboxes
- * Maintains all invite/update/delete mutations
- * Pagination logic now internal to DataTable component
+ * src/pages/admin/Agents.jsx — Updated with refactored InviteAgentModal
+ * 
+ * Changes:
+ * - Invite modal now works for both:
+ *   1. New agents (via "+ Add Agent" button, no pre-filled data)
+ *   2. Existing agents (via "Invite" action button, pre-filled data)
+ * - Fixed modal state management to handle both modes
  */
 
 import { useState, useEffect, useMemo } from 'react';
@@ -69,13 +71,14 @@ export default function Agents() {
   const [sortField, setSortField] = useState('');
   const [sortDir, setSortDir] = useState('asc');
   const [page, setPage] = useState(1);
-  const [selectedRows, setSelectedRows] = useState(new Set());
+  // const [selectedRows, setSelectedRows] = useState(new Set());
   const [banner, setBanner] = useState(null);
 
   // ─── Modal state ────────────────────────────────────────────────────
   const [editingAgent, setEditingAgent] = useState(null);
   const [deletingAgent, setDeletingAgent] = useState(null);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [inviteModalMode, setInviteModalMode] = useState('new'); // 'new' or 'existing'
   const [inviteTargetAgent, setInviteTargetAgent] = useState(null);
 
   // ─── Fetch source systems for filter ─────────────────────────────────
@@ -175,22 +178,22 @@ export default function Agents() {
       }),
   });
 
-  const bulkInviteMutation = useMutation({
-    mutationFn: (ids) => agentService.bulkInvite(ids),
-    onSuccess: async (_d, ids) => {
-      setBanner({
-        type: 'success',
-        message: `Invited ${ids.length} agent(s).`,
-      });
-      setSelectedRows(new Set());
-      await invalidateAgents();
-    },
-    onError: (err) =>
-      setBanner({
-        type: 'error',
-        message: err?.message || 'Bulk invite failed.',
-      }),
-  });
+  // const bulkInviteMutation = useMutation({
+  //   mutationFn: (ids) => agentService.bulkInvite(ids),
+  //   onSuccess: async (_d, ids) => {
+  //     setBanner({
+  //       type: 'success',
+  //       message: `Invited ${ids.length} agent(s).`,
+  //     });
+  //     setSelectedRows(new Set());
+  //     await invalidateAgents();
+  //   },
+  //   onError: (err) =>
+  //     setBanner({
+  //       type: 'error',
+  //       message: err?.message || 'Bulk invite failed.',
+  //     }),
+  // });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => agentService.update(id, data),
@@ -228,23 +231,23 @@ export default function Agents() {
     }
   };
 
-  const handleRowSelect = (rowId, selected) => {
-    const next = new Set(selectedRows);
-    if (selected) {
-      next.add(rowId);
-    } else {
-      next.delete(rowId);
-    }
-    setSelectedRows(next);
-  };
+  // const handleRowSelect = (rowId, selected) => {
+  //   const next = new Set(selectedRows);
+  //   if (selected) {
+  //     next.add(rowId);
+  //   } else {
+  //     next.delete(rowId);
+  //   }
+  //   setSelectedRows(next);
+  // };
 
-  const handleSelectAll = (selected) => {
-    if (selected) {
-      setSelectedRows(new Set(sorted.map((a) => a.id)));
-    } else {
-      setSelectedRows(new Set());
-    }
-  };
+  // const handleSelectAll = (selected) => {
+  //   if (selected) {
+  //     setSelectedRows(new Set(sorted.map((a) => a.id)));
+  //   } else {
+  //     setSelectedRows(new Set());
+  //   }
+  // };
 
   const handleEditSave = (formData) => {
     if (!editingAgent) return;
@@ -261,21 +264,41 @@ export default function Agents() {
     });
   };
 
-  const handleInvite = (a) => {
-    const [first_name = '', ...rest] = (a.name ?? '').split(' ');
+  // ─── Open invite modal for new agent (from "+ Add Agent" button) ──────
+  // const handleAddAgentClick = () => {
+  //   setInviteModalMode('new');
+  //   setInviteTargetAgent(null);
+  //   setInviteModalOpen(true);
+  // };
+
+  // ─── Open invite modal for existing agent (from "Invite" action button) 
+  const handleInviteExistingAgent = (agent) => {
+    const [first_name = '', ...rest] = (agent.name ?? '').split(' ');
+    setInviteModalMode('existing');
     setInviteTargetAgent({
-      id: a.id,
+      id: agent.id,
       first_name,
       last_name: rest.join(' '),
-      email: a.email ?? '',
+      email: agent.email ?? '',
     });
     setInviteModalOpen(true);
   };
 
-  const handleInviteAgentSuccess = async () => {
-    setBanner({ type: 'success', message: 'Invite sent to agent.' });
+  // ─── Close invite modal ──────────────────────────────────────────────
+  const handleInviteModalClose = () => {
+    setInviteModalOpen(false);
+    setInviteModalMode('new');
     setInviteTargetAgent(null);
-    await invalidateAgents();
+    if (pendingRefresh) {
+      setPendingRefresh(false);
+      invalidateAgents(); // ← safe to call now, modal is already closed
+    }
+  };
+
+  // ─── Handle successful invite ────────────────────────────────────────
+  const handleInviteSuccess = () => {
+    setPendingRefresh(true);
+    setBanner({ type: 'success', message: 'Invite sent to agent.' });
   };
 
   // ─── Action button per agent ─────────────────────────────────────────
@@ -284,7 +307,7 @@ export default function Agents() {
     if (status === 'not_invited') {
       return (
         <button
-          onClick={() => handleInvite(a)}
+          onClick={() => handleInviteExistingAgent(a)}
           disabled={inviteMutation.isPending}
           style={{
             padding: '6px 12px',
@@ -355,7 +378,7 @@ export default function Agents() {
           >
             {getInitials(row.name)}
           </div>
-          <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+          <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
             {row.name || '—'}
           </span>
         </div>
@@ -496,70 +519,26 @@ export default function Agents() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontSize: 12,
-              color: 'var(--text-muted)',
-              marginBottom: 4,
-              fontWeight: 500,
-            }}
-          >
-            <span
-              onClick={() => navigate('/admin/dashboard')}
-              style={{ cursor: 'pointer', transition: 'color 0.2s' }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.color = 'var(--primary)')
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.color = 'var(--text-muted)')
-              }
-            >
-              Dashboard
-            </span>
-            {' › '}
-            <span style={{ color: 'var(--text-secondary)' }}>Agents</span>
-          </div>
-          <h1>Agents</h1>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {isFetching && !isLoading && (
-            <div
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: 'var(--primary)',
-                opacity: 0.6,
-                animation: 'pulse 1s ease-in-out infinite',
-              }}
-            />
-          )}
-          <button
-            onClick={() => setInviteModalOpen(true)}
-            style={{
-              padding: '9px 16px',
-              fontSize: 13,
-              fontWeight: 600,
-              background: 'var(--primary)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 'var(--radius-sm)',
-              cursor: 'pointer',
-            }}
-          >
-            + Add Agent
-          </button>
-        </div>
-      </div>
-
+    {/* Header */}
+<div className="page-header">
+  <div className="page-header-left">
+    <div className="breadcrumb"></div>
+    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 500 }}>
+      <span onClick={() => navigate('/admin/dashboard')} style={{ cursor: 'pointer', transition: 'color 0.2s' }} onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary)')} onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}>
+        Dashboard
+      </span>
+      {' › '}
+      <span style={{ color: 'var(--text-secondary)' }}>Agents</span>
+    </div>
+    <h1>Agents</h1>
+      <p>Manage agents across your organization</p> 
+  </div>
+  <div className="page-header-actions">
+    {isFetching && !isLoading && (
+      <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', opacity: 0.6, animation: 'pulse 1s ease-in-out infinite' }} />
+    )}
+  </div>
+</div>
       {/* Banners */}
       {isError && (
         <div
@@ -623,7 +602,7 @@ export default function Agents() {
         </div>
       )}
 
-      {/* Bulk actions (only if rows selected) */}
+      {/* Bulk actions (only if rows selected)
       {selectedRows.size > 0 && (
         <div
           style={{
@@ -659,9 +638,9 @@ export default function Agents() {
             Bulk Invite
           </button>
         </div>
-      )}
+      )} */}
 
-      {/* DataTable — PHASE 6: Unified pagination now internal to DataTable */}
+            {/* DataTable */}
       <DataTable
         columns={columns}
         data={sorted}
@@ -683,10 +662,6 @@ export default function Agents() {
         sortField={sortField}
         sortDir={sortDir}
         onSort={handleSort}
-        selectedRows={selectedRows}
-        onRowSelect={handleRowSelect}
-        onSelectAll={handleSelectAll}
-        showCheckboxes={statusFilter === 'not_invited'}
         searchPlaceholder="Search by name or email…"
         emptyMessage={
           search || statusFilter || sourceFilter
@@ -695,35 +670,43 @@ export default function Agents() {
         }
       />
 
-      {/* Modals */}
+      {/* Edit Modal */}
       {editingAgent && (
         <EditAgentModal
+          isOpen={!!editingAgent}
           agent={editingAgent}
           onClose={() => setEditingAgent(null)}
           onSave={handleEditSave}
         />
       )}
 
+      {/* Delete Modal */}
       {deletingAgent && (
         <ConfirmDeleteModal
-          title={`Delete ${deletingAgent.name}?`}
-          message="This agent will be removed from the system. This action cannot be undone."
+          isOpen={!!deletingAgent}
+          agent={deletingAgent}
+          onClose={() => setDeletingAgent(null)}
           onConfirm={handleDeleteConfirm}
-          onCancel={() => setDeletingAgent(null)}
-          isLoading={deleteMutation.isPending}
+          isDeleting={deleteMutation.isPending}
         />
       )}
 
-      {inviteModalOpen && (
-        <InviteAgentModal
-          agent={inviteTargetAgent}
-          onClose={() => {
-            setInviteModalOpen(false);
-            setInviteTargetAgent(null);
-          }}
-          onSuccess={handleInviteAgentSuccess}
-        />
-      )}
+      {/* Invite Modal (for both new and existing agents) */}
+      <InviteAgentModal
+        isOpen={inviteModalOpen}
+        agentId={inviteModalMode === 'existing' ? inviteTargetAgent?.id : null}
+        initialData={
+          inviteModalMode === 'existing' && inviteTargetAgent
+            ? {
+                first_name: inviteTargetAgent.first_name,
+                last_name: inviteTargetAgent.last_name,
+                email: inviteTargetAgent.email,
+              }
+            : null
+        }
+        onClose={handleInviteModalClose}
+        onSuccess={handleInviteSuccess}
+      />
     </div>
   );
 }

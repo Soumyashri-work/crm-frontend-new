@@ -7,6 +7,7 @@
  *     shown checked + blue-highlighted (identical to Add Tenant modal)
  *  ✅ Status column: sortable:false — no sort arrows
  *  ✅ Contact Email column: sortable:true + comparator reads email||contact_email (functional)
+ *  ✅ DELETE FUNCTIONALITY: Trash2 button now opens ConfirmDeleteModal
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -161,37 +162,7 @@ function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
               {errors.email && <p style={ms.fieldError}>{errors.email}</p>}
             </div>
 
-            {/* CRM Systems — NO legend dot/line, pre-selected shown in blue */}
-            <div style={{ marginBottom:18 }}>
-              <label style={{ ...ms.label, marginBottom:6 }}>
-                Source / CRM Systems <span style={{ color:'var(--danger)' }}>*</span>
-              </label>
-              <div style={{ border: errors.systems ? '1px solid var(--danger)' : '1px solid var(--border)', borderRadius:'var(--radius-sm)', background:'var(--surface)', overflow:'hidden' }}>
-                {systemOptions.map((sys, idx) => {
-                  const checked = selectedSystems.includes(sys);
-                  return (
-                    <label
-                      key={sys}
-                      style={{
-                        display:'flex', alignItems:'center', gap:10, padding:'9px 12px', cursor:'pointer',
-                        borderTop: idx > 0 ? '1px solid var(--border-light)' : 'none',
-                        background: checked ? 'var(--primary-light)' : 'transparent',
-                        userSelect:'none',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleSystem(sys)}
-                        style={{ cursor:'pointer', accentColor:'var(--primary)' }}
-                      />
-                      <span style={{ fontSize:13.5, color:'var(--text-primary)', flex:1 }}>{sys}</span>
-                    </label>
-                  );
-                })}
-              </div>
-              {errors.systems && <p style={ms.fieldError}>{errors.systems}</p>}
-            </div>
+
           </div>
 
           <div style={ms.footer}>
@@ -398,7 +369,7 @@ export default function SuperAdminTenants() {
             <Edit2 size={14} />
           </button>
           <button
-            onClick={() => {}} // Removed logic: Nothing happens
+            onClick={() => setDeletingTenant(row)}
             title="Delete tenant"
             style={{ padding:6, border:'none', background:'none', cursor:'pointer', color:'var(--text-muted)', transition:'color 0.2s' }}
             onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}

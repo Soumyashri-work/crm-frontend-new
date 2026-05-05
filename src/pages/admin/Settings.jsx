@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { Settings as SettingsIcon, Shield, User } from 'lucide-react';
+import { Settings as SettingsIcon, Shield, User, Plug } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getInitials, getAvatarColor } from '../../utils/helpers';
+import ProvisionCredentialsForm from '../../components/ProvisionCredentialsForm';
 
 const tabs = [
-  { id: 'general', label: 'General',            icon: SettingsIcon },
-  { id: 'roles',   label: 'Roles & Permissions', icon: Shield },
-  { id: 'profile', label: 'Profile',             icon: User },
+  { id: 'general',      label: 'General',            icon: SettingsIcon },
+  { id: 'roles',        label: 'Roles & Permissions', icon: Shield },
+  { id: 'profile',      label: 'Profile',             icon: User },
+  { id: 'integrations', label: 'Integrations',        icon: Plug },
 ];
 
 const ADMIN_PERMS = ['View all tickets', 'Manage agents', 'Manage accounts', 'System settings', 'Delete data'];
@@ -128,7 +130,6 @@ function ProfileTab() {
   const [pwSaved, setPwSaved] = useState(false);
 
   // TODO: replace with real API call (e.g. PUT /auth/me or PUT /admins/me)
-  // when the endpoint is available.
   const saveProfile = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -246,6 +247,29 @@ function ProfileTab() {
 }
 
 // ---------------------------------------------------------------------------
+// Integrations Tab — embeds ProvisionCredentialsForm as an inline card (non-modal)
+// ---------------------------------------------------------------------------
+function IntegrationsTab() {
+  const handleProvisionSuccess = (data) => {
+    console.log('Integration provisioned:', data.integration_id);
+  };
+
+  return (
+    <div style={{ maxWidth: 860 }}>
+      {/*
+        ProvisionCredentialsForm rendered as an inline card (modal=false).
+        onClose is a no-op here since there's nothing to close in an inline context.
+      */}
+      <ProvisionCredentialsForm
+        modal={false}
+        onClose={() => {}}
+        onSuccess={handleProvisionSuccess}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Settings (shell)
 // ---------------------------------------------------------------------------
 export default function Settings() {
@@ -261,26 +285,18 @@ export default function Settings() {
           {' › '}
           <span style={{ color: 'var(--text-primary)' }}>Settings</span>
         </div>
-        <h2 style={{ fontSize: 20, fontWeight: 700 }}>Settings</h2>
+        <h2 style={{ fontSize: 25, fontWeight: 800 }}>Settings</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, marginTop: 2 }}>
-          Manage your system configuration and preferences
         </p>
       </div>
 
-      {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)' }}>
+      {/* Tab bar — horizontally scrollable on mobile so all tabs are reachable */}
+      <div className="settings-tabs-nav">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setActiveTab(id)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 7,
-              padding: '10px 16px', border: 'none', background: 'none',
-              cursor: 'pointer', fontSize: 14, fontFamily: 'inherit', fontWeight: 500,
-              color: activeTab === id ? 'var(--primary)' : 'var(--text-secondary)',
-              borderBottom: `2px solid ${activeTab === id ? 'var(--primary)' : 'transparent'}`,
-              marginBottom: -1, transition: 'all var(--transition)',
-            }}
+            className={`settings-tab-btn${activeTab === id ? ' settings-tab-btn--active' : ''}`}
           >
             <Icon size={15} /> {label}
           </button>
@@ -288,9 +304,10 @@ export default function Settings() {
       </div>
 
       <div style={{ paddingTop: 4 }}>
-        {activeTab === 'general' && <GeneralTab />}
-        {activeTab === 'roles'   && <RolesTab />}
-        {activeTab === 'profile' && <ProfileTab />}
+        {activeTab === 'general'      && <GeneralTab />}
+        {activeTab === 'roles'        && <RolesTab />}
+        {activeTab === 'profile'      && <ProfileTab />}
+        {activeTab === 'integrations' && <IntegrationsTab />}
       </div>
     </div>
   );

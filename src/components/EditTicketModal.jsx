@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Clock } from 'lucide-react';
+import { X, Clock, Info } from 'lucide-react';
+import { Modal } from './Modal';
 import {
   TICKET_STATUSES,
   TICKET_PRIORITIES,
@@ -11,27 +12,7 @@ import { getUserRole, isFieldVisible } from '../utils/rolePermissions';
 import { buildTicketUpdatePayload, hasChanges } from '../utils/ticketPayload';
 import { ticketService } from '../services/ticketService';
 import { getErrorMessage } from '../utils/ticketErrorHandler';
-import './EditTicketModal.css';
 
-/**
- * EditTicketModal — Complete ticket update flow with error handling.
- *
- * Rendered via ReactDOM.createPortal into document.body so it always
- * sits above any parent stacking context (including TicketModal).
- *
- * Pending state contract:
- * When status is set to "pending", a `pending_until` datetime field appears
- * and is required before the form can be submitted. This mirrors the backend
- * validation (TicketUpdateRequest.model_validator) so the user gets a clear
- * inline error rather than a raw API 422.
- *
- * When status changes away from "pending", the pending_until field is hidden
- * and its value is cleared — the backend handles DB cleanup automatically.
- *
- * Field visibility rules:
- * Agent  → status only (+ pending_until when status = "pending")
- * Admin  → status, priority, agent_id (+ pending_until when status = "pending")
- */
 export default function EditTicketModal({
   ticket,
   isOpen,
@@ -41,59 +22,42 @@ export default function EditTicketModal({
   agents = [],
 }) {
   const [formValues, setFormValues] = useState({
-    status:        '',
-    priority:      '',
-    agent_id:      null,
+    status: '',
+    priority: '',
+    agent_id: null,
     pending_until: '',
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError]         = useState(null);
+  const [error, setError] = useState(null);
 
-  const role            = getUserRole();
-  const isPendingStatus = formValues.status === 'pending' && ticket?.crm === 'zammad';
+  const role = getUserRole();
+  
+  // Show pending_until field for BOTH Espo and Zammad when status is pending
+  const isPendingStatus = formValues.status === 'pending';
+  
+  // Only REQUIRE pending_until for Zammad (Espo allows it to be optional)
+  const isPendingRequiredForCRM = formValues.status === 'pending' && ticket?.crm === 'zammad';
 
-  // Initialize form whenever the modal opens or the ticket changes.
   useEffect(() => {
     if (ticket && isOpen) {
       setFormValues({
-        status:        ticket.status   ?? '',
-        priority:      ticket.priority ?? '',
-        agent_id:      ticket.agent?.id ?? null,
+        status: ticket.status ?? '',
+        priority: ticket.priority ?? '',
+        agent_id: ticket.agent?.id ?? null,
         pending_until: toDatetimeLocalString(ticket.pending_until),
       });
       setError(null);
     }
   }, [ticket, isOpen]);
 
-  // Prevent body scroll while modal is open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen]);
-
-  // Close on Escape key
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e) => { if (e.key === 'Escape' && !isLoading) onClose(); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [isOpen, isLoading, onClose]);
-
   if (!isOpen || !ticket) return null;
-
-  // ----------------------------------------------------------------
-  // Handlers
-  // ----------------------------------------------------------------
 
   const handleStatusChange = (e) => {
     const newStatus = e.target.value;
     setFormValues((prev) => ({
       ...prev,
       status: newStatus,
+      // Clear pending_until when transitioning away from pending
       ...(newStatus !== 'pending' ? { pending_until: '' } : {}),
     }));
   };
@@ -102,31 +66,28 @@ export default function EditTicketModal({
     setFormValues((prev) => ({ ...prev, [field]: e.target.value || null }));
   };
 
-  // ----------------------------------------------------------------
-  // Client-side validation
-  // ----------------------------------------------------------------
-
   const validate = () => {
-    if (isPendingStatus && !formValues.pending_until) {
-      return 'A deadline is required when setting status to Pending.';
+    // Zammad requires pending_until when status is pending
+    if (isPendingRequiredForCRM && !formValues.pending_until) {
+      return 'Zammad requires a deadline when setting status to Pending.';
     }
+
+    // Validate that pending_until is in the future (if provided)
     const deadline = formValues.pending_until
       ? new Date(formValues.pending_until)
       : null;
     if (deadline && deadline <= new Date()) {
       return 'The pending deadline must be in the future.';
     }
+
     return null;
   };
-
-  // ----------------------------------------------------------------
-  // Submit
-  // ----------------------------------------------------------------
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
 
+    // Client-side validation
     const validationError = validate();
     if (validationError) {
       setError(validationError);
@@ -143,217 +104,195 @@ export default function EditTicketModal({
     setIsLoading(true);
 
     try {
-      const res           = await ticketService.update(ticket.id, payload);
+      const res = await ticketService.update(ticket.id, payload);
       const updatedTicket = res.data?.data ?? res.data;
 
-      if (onUpdate) onUpdate(updatedTicket);
-
       setFormValues({
-        status:        updatedTicket.status   ?? '',
-        priority:      updatedTicket.priority ?? '',
-        agent_id:      updatedTicket.agent?.id ?? null,
+        status: updatedTicket.status ?? '',
+        priority: updatedTicket.priority ?? '',
+        agent_id: updatedTicket.agent?.id ?? null,
         pending_until: toDatetimeLocalString(updatedTicket.pending_until),
       });
 
       onClose();
 
       if (onSave) onSave(updatedTicket);
+      if (onUpdate) onUpdate(updatedTicket);
     } catch (err) {
+      // Backend will return HTTP 422 with CRM-specific error messages
+      // Example: "Zammad requires a pending_until timestamp when status is set to 'pending'"
       setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ----------------------------------------------------------------
-  // Field visibility
-  // ----------------------------------------------------------------
-
   const canEdit = {
-    status:   isFieldVisible('status',   role),
+    status: isFieldVisible('status', role),
     priority: isFieldVisible('priority', role),
     agent_id: isFieldVisible('agent_id', role),
   };
 
   const minDatetime = toDatetimeLocalString(new Date());
 
-  // ----------------------------------------------------------------
-  // Render — portalled into document.body so it escapes any parent
-  // stacking context (e.g. TicketModal or its backdrop).
-  // ----------------------------------------------------------------
-
   const modalContent = (
-    <div
-      className="edit-ticket-modal-overlay"
-      style={{ zIndex: 1300 }}
-      onClick={(e) => { if (e.target === e.currentTarget && !isLoading) onClose(); }}
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Edit Ticket"
+      maxWidth="500px"
+      disableBackdropClick={isLoading}
+      disableEscapeKey={isLoading}
+      zIndex={1300}
     >
-      <div className="edit-ticket-modal-content">
+      <form onSubmit={handleSubmit} className="modal-body">
+        {/* Error Banner */}
+        {error && (
+          <div className="modal-error-banner" role="alert">
+            {error}
+          </div>
+        )}
 
-        {/* Header */}
-        <div className="edit-ticket-modal-header">
-          <h2>Edit Ticket</h2>
-          <button
-            onClick={onClose}
-            className="edit-ticket-close-btn"
-            aria-label="Close"
-            disabled={isLoading}
-          >
-            <X size={20} color="var(--text-muted)" />
-          </button>
-        </div>
+        {/* Status */}
+        {canEdit.status && (
+          <div className="modal-form-group">
+            <label className="modal-form-label">Status</label>
+            <select
+              name="status"
+              value={formValues.status}
+              onChange={handleStatusChange}
+              className="modal-form-select"
+              disabled={isLoading}
+            >
+              <option value="">— Select status —</option>
+              {TICKET_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {STATUS_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="edit-ticket-form">
+        {/* Pending deadline — now shown for both Espo and Zammad */}
+        {isPendingStatus && (
+          <div className="modal-form-group">
+            <label className="modal-form-label">
+              <Clock size={12} style={{ display: 'inline', marginRight: 6 }} />
+              Pending Until {isPendingRequiredForCRM && <span style={{ color: '#DC2626' }}>*</span>}
+            </label>
+            <input
+              type="datetime-local"
+              name="pending_until"
+              value={formValues.pending_until ?? ''}
+              min={minDatetime}
+              onChange={handleFieldChange('pending_until')}
+              className="modal-form-input"
+              disabled={isLoading}
+              // Only required for Zammad; Espo allows it to be optional
+              required={isPendingRequiredForCRM}
+            />
+            
+            {/* CRM-specific hint text */}
+            {ticket?.crm === 'zammad' ? (
+              <div className="modal-form-hint">
+                Zammad requires a deadline. The ticket will stay pending with a reminder 
+                scheduled for this time.
+              </div>
+            ) : (
+              <div className="modal-form-hint" style={{ color: '#0284C7' }}>
+                <Info size={12} style={{ display: 'inline', marginRight: 4 }} />
+                Optional for {ticket?.crm ?? 'this CRM'}. Stored for reference but doesn't affect ticket 
+                reminders (this CRM doesn't use pending reminders).
+              </div>
+            )}
+          </div>
+        )}
 
-          {/* Inline error banner */}
-          {error && (
-            <div className="edit-ticket-error-banner" role="alert">
-              {error}
-            </div>
-          )}
+        {/* Priority (admin only) */}
+        {canEdit.priority && (
+          <div className="modal-form-group">
+            <label className="modal-form-label">Priority</label>
+            <select
+              name="priority"
+              value={formValues.priority}
+              onChange={handleFieldChange('priority')}
+              className="modal-form-select"
+              disabled={isLoading}
+            >
+              <option value="">— Select priority —</option>
+              {TICKET_PRIORITIES.map((p) => (
+                <option key={p} value={p}>
+                  {PRIORITY_LABELS[p]}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
-          {/* Status */}
-          {canEdit.status && (
-            <div className="form-group">
-              <label className="form-label">Status</label>
-              <select
-                name="status"
-                value={formValues.status}
-                onChange={handleStatusChange}
-                className="form-select"
-                disabled={isLoading}
-              >
-                <option value="">— Select status —</option>
-                {TICKET_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {STATUS_LABELS[s]}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+        {/* Assign to (admin only) */}
+        {canEdit.agent_id && (
+          <div className="modal-form-group">
+            <label className="modal-form-label">Assign To</label>
+            <select
+              name="agent_id"
+              value={formValues.agent_id ?? ''}
+              onChange={(e) =>
+                setFormValues((v) => ({
+                  ...v,
+                  agent_id: e.target.value || null,
+                }))
+              }
+              className="modal-form-select"
+              disabled={isLoading}
+            >
+              <option value="">— Unassigned —</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
-          {/* Pending deadline */}
-          {isPendingStatus && (
-            <div className="form-group">
-              <label className="form-label">
-                <Clock size={13} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                Pending Until
-                <span className="form-label-required" aria-hidden="true"> *</span>
-              </label>
-              <input
-                type="datetime-local"
-                name="pending_until"
-                value={formValues.pending_until ?? ''}
-                min={minDatetime}
-                onChange={handleFieldChange('pending_until')}
-                className="form-select"
-                disabled={isLoading}
-                required
-              />
-              <p className="form-hint">
-                The ticket will stay pending until this deadline.
-              </p>
-            </div>
-          )}
+        {/* Agent permission note */}
+        {role === 'agent' && (
+          <div className="modal-info-banner">
+            💡 You can only update ticket status.
+          </div>
+        )}
+      </form>
 
-          {/* Priority (admin only) */}
-          {canEdit.priority && (
-            <div className="form-group">
-              <label className="form-label">Priority</label>
-              <select
-                name="priority"
-                value={formValues.priority}
-                onChange={handleFieldChange('priority')}
-                className="form-select"
-                disabled={isLoading}
-              >
-                <option value="">— Select priority —</option>
-                {TICKET_PRIORITIES.map((p) => (
-                  <option key={p} value={p}>
-                    {PRIORITY_LABELS[p]}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Assign to (admin only) */}
-          {canEdit.agent_id && (
-            <div className="form-group">
-              <label className="form-label">Assign To</label>
-              <select
-                name="agent_id"
-                value={formValues.agent_id ?? ''}
-                onChange={(e) =>
-                  setFormValues((v) => ({
-                    ...v,
-                    agent_id: e.target.value || null,
-                  }))
-                }
-                className="form-select"
-                disabled={isLoading}
-              >
-                <option value="">— Unassigned —</option>
-                {agents.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Agent permission note */}
-          {role === 'agent' && (
-            <div className="edit-ticket-permission-note">
-              💡 You can only update ticket status.
-            </div>
-          )}
-        </form>
-
-        {/* Footer */}
-        <div className="edit-ticket-modal-footer">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={onClose}
-            disabled={isLoading}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={handleSubmit}
-            disabled={isLoading}
-          >
-            {isLoading ? 'Saving…' : 'Save Changes'}
-          </button>
-        </div>
-
+      <div className="modal-footer">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={isLoading}
+          className="modal-btn modal-btn-secondary"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={isLoading}
+          className="modal-btn modal-btn-primary"
+        >
+          {isLoading ? 'Saving…' : 'Save Changes'}
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 
+  // Use createPortal to ensure this modal stays above other modals (z-index: 1300)
   return createPortal(modalContent, document.body);
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Convert an ISO 8601 string (or Date) to "YYYY-MM-DDTHH:MM" for
- * <input type="datetime-local">. Uses local browser timezone methods.
- */
-function toDatetimeLocalString(dateInput) {
-  if (!dateInput) return '';
-  const d = new Date(dateInput);
-  if (isNaN(d.getTime())) return '';
-
+// Helper function (keep from original)
+function toDatetimeLocalString(value) {
+  if (!value) return '';
+  const d = new Date(value);
   const pad = (n) => String(n).padStart(2, '0');
-
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }

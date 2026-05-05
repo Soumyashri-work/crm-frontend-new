@@ -8,6 +8,7 @@
  * ✅ Sort arrows added for Admin (name), Tenant, and Created columns
  * ✅ Status column: no sort arrows
  * ✅ Alignment: Actions column right-aligned to match Tenants page
+ * ✅ DELETE FUNCTIONALITY: Trash2 button now opens ConfirmDeleteModal
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -20,6 +21,7 @@ import {
 import { User, Mail } from 'lucide-react';
 import { getInitials, getAvatarColor } from '../../utils/helpers';
 import AddAdminModal from '../../components/superadmin/AddAdminModal';
+import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import { superAdminService } from '../../services/superAdminService';
 import { StatusBadge } from './SuperAdminTenants';
 
@@ -222,6 +224,7 @@ export default function SuperAdminAdmins() {
   const [statusFilter, setStatusFilter] = useState('');
   const [showModal, setShowModal]     = useState(false);
   const [editingAdmin, setEditingAdmin] = useState(null);
+  const [deletingAdmin, setDeletingAdmin] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [setupLinkData, setSetupLinkData] = useState(null);
   // Sort state
@@ -306,6 +309,17 @@ export default function SuperAdminAdmins() {
     setAdmins(prev => prev.map(a => a.id === updated.id ? { ...a, ...updated } : a));
   };
 
+  const handleDeleteConfirm = async () => {
+    if (!deletingAdmin) return;
+    try {
+      await superAdminService.deleteAdmin(deletingAdmin.id);
+      setAdmins((prev) => prev.filter((a) => a.id !== deletingAdmin.id));
+      setDeletingAdmin(null);
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    }
+  };
+
   const formatDate = (iso) => {
     if (!iso) return '—';
     return new Date(iso).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
@@ -330,29 +344,34 @@ export default function SuperAdminAdmins() {
         <PasswordSetupLinkModal setupLink={setupLinkData.link} adminName={setupLinkData.adminName} onClose={() => setSetupLinkData(null)} />
       )}
 
+      {deletingAdmin && (
+        <ConfirmDeleteModal
+          agent={deletingAdmin}
+          isOpen={!!deletingAdmin}
+          onClose={() => setDeletingAdmin(null)}
+          onConfirm={handleDeleteConfirm}
+          isDeleting={false}
+        />
+      )}
+
       {/* Page header */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-        <div>
-          {/* Breadcrumb */}
-          <div style={{ fontSize:12, color:'var(--text-muted)', marginBottom:4, fontWeight:500, display:'flex', alignItems:'center', gap:4 }}>
-            <span
-              onClick={() => navigate('/superadmin/dashboard')}
-              style={{ cursor:'pointer', color:'var(--text-muted)' }}
-              onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
-              onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
-            >
-              Dashboard
-            </span>
-            <span style={{ margin:'0 2px' }}>›</span>
-            <span style={{ color:'var(--text-secondary)' }}>Admins</span>
-          </div>
-          <h1>Admins</h1>
-          <p style={{ color:'var(--text-secondary)', fontSize:13.5, marginTop:4 }}>Manage admin users across all tenants</p>
-        </div>
-        <button onClick={() => setShowModal(true)} className="btn btn-primary" style={{ display:'flex', alignItems:'center', gap:7, padding:'10px 18px', fontSize:14 }}>
-          <Plus size={16} /> Add Admin
-        </button>
-      </div>
+ {/* Page header */}
+<div className="page-header">
+ <div className="page-header-left">
+  <div className="breadcrumb">
+    <span onClick={() => navigate('/superadmin/dashboard')} style={{ cursor:'pointer' }} onMouseEnter={e => e.currentTarget.style.textDecoration='underline'} onMouseLeave={e => e.currentTarget.style.textDecoration='none'}>Dashboard</span>
+    <span>›</span>
+    <span style={{ color:'var(--text-secondary)' }}>Admins</span>
+  </div>
+  <h1>Admins</h1>
+  <p>Manage admin users across all tenants</p>
+</div>
+  <div className="page-header-actions">
+    <button onClick={() => setShowModal(true)} className="btn btn-primary">
+      <Plus size={16} /> Add Admin
+    </button>
+  </div>
+</div>
 
       {/* Filter toolbar */}
       <div className="filter-toolbar">
@@ -448,7 +467,7 @@ export default function SuperAdminAdmins() {
                       <button
                         type="button"
                         title="Delete admin"
-                        onClick={() => {}} // Removed logic: Nothing happens
+                        onClick={() => setDeletingAdmin(a)}
                         style={{ padding:6, border:'none', background:'none', cursor:'pointer', color:'var(--text-muted)', transition:'color 0.2s' }}
                         onMouseEnter={e => e.currentTarget.style.color = '#EF4444'}
                         onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}

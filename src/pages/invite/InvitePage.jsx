@@ -10,7 +10,8 @@
  *   2. User sets password and clicks Join Now
  *   3. POST /invitations/accept { token, password }
  *      → backend marks token used, sets password in Keycloak, creates DashboardUser
- *   4. Show success → redirect to /login
+ *   4. On success → redirect to /login
+ *      (CRM provisioning is done later via Settings → Integrations)
  *
  * Token is NEVER reusable after accept — backend marks it immediately.
  */
@@ -76,6 +77,8 @@ export default function InvitePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to activate account.');
       setSuccess(true);
+      // Auto-redirect to login after 2.5 s so the user can read the success message
+      setTimeout(() => navigate('/login'), 2500);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -118,10 +121,13 @@ export default function InvitePage() {
             You've joined <strong style={{ color: 'var(--primary)' }}>{invite?.tenant_name}</strong>{' '}
             as <strong>{invite?.role}</strong>.
           </p>
-          <p style={{ ...s.sub, marginTop: 8 }}>You can now sign in with your email and password.</p>
-          <button style={s.btn} onClick={() => navigate('/login')}>
-            Go to Login →
-          </button>
+          <p style={{ ...s.sub, marginTop: 8 }}>
+            You can now sign in. To connect CRM integrations, go to{' '}
+            <strong>Settings → Integrations</strong> after logging in.
+          </p>
+          <p style={{ ...s.sub, marginTop: 8, color: 'var(--text-muted)', fontSize: 12 }}>
+            Redirecting to login…
+          </p>
         </div>
       </Screen>
     );

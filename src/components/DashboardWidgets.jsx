@@ -8,8 +8,8 @@ const WIDGETS = [
     change: '+12.5%',
     up: true,
     icon: Ticket,
-    color: '#2563EB',
-    bg: '#EFF6FF',
+    color: 'var(--primary)',
+    bg: 'var(--primary-light)',
   },
   {
     key: 'open',
@@ -18,8 +18,8 @@ const WIDGETS = [
     change: '+8.2%',
     up: true,
     icon: AlertCircle,
-    color: '#F59E0B',
-    bg: '#FFFBEB',
+    color: 'var(--warning)',
+    bg: 'var(--warning-light)',
   },
   {
     key: 'closed',
@@ -28,8 +28,8 @@ const WIDGETS = [
     change: '+15.3%',
     up: true,
     icon: CheckCircle2,
-    color: '#10B981',
-    bg: '#F0FDF4',
+    color: 'var(--success)',
+    bg: 'var(--success-light)',
   },
   {
     key: 'high',
@@ -38,8 +38,8 @@ const WIDGETS = [
     change: '-5.1%',
     up: false,
     icon: Clock,
-    color: '#EF4444',
-    bg: '#FEF2F2',
+    color: 'var(--danger)',
+    bg: 'var(--danger-light)',
   },
 ];
 
@@ -58,30 +58,29 @@ export default function DashboardWidgets({ stats }) {
         return (
           <div
             key={w.key}
-            className="card animate-in"
-            style={{
-              padding: '20px 24px',
-              animationDelay: `${i * 0.07}s`,
-              cursor: 'default',
-              transition: 'box-shadow var(--transition), transform var(--transition)',
+            className="card animate-in widget-card"
+            style={{ animationDelay: `${i * 0.07}s` }}
+            onMouseEnter={e => { 
+              e.currentTarget.style.boxShadow = 'var(--shadow-md)'; 
+              e.currentTarget.style.transform = 'translateY(-2px)'; 
             }}
-            onMouseEnter={e => { e.currentTarget.style.boxShadow = 'var(--shadow-md)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-            onMouseLeave={e => { e.currentTarget.style.boxShadow = ''; e.currentTarget.style.transform = ''; }}
+            onMouseLeave={e => { 
+              e.currentTarget.style.boxShadow = ''; 
+              e.currentTarget.style.transform = ''; 
+            }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-              <div style={{
-                width: 40, height: 40, borderRadius: 10,
-                background: w.bg, display: 'flex',
-                alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0,
-              }}>
+            <div className="flex-between" style={{ marginBottom: 'var(--space-lg)' }}>
+              <div 
+                className="widget-icon-box"
+                style={{ background: w.bg }}
+              >
                 <Icon size={20} color={w.color} />
               </div>
             </div>
-            <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.5px', lineHeight: 1, wordBreak: 'break-word' }}>
+            <div className="widget-value">
               {w.value}
             </div>
-            <div style={{ marginTop: 4, fontSize: 13.5, color: 'var(--text-secondary)' }}>
+            <div className="widget-label">
               {w.label}
             </div>
           </div>
