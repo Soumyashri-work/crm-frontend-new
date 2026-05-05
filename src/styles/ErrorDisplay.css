@@ -1,0 +1,235 @@
+/**
+ * src/styles/ErrorDisplay.css
+ * 
+ * Styling for error display components
+ */
+
+/* Error Box Container */
+.error-box {
+  padding: 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Error types */
+.error-box-error {
+  background-color: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #7f1d1d;
+}
+
+.error-box-warning {
+  background-color: #fef3c7;
+  border: 1px solid #fcd34d;
+  color: #78350f;
+}
+
+.error-box-info {
+  background-color: #dbeafe;
+  border: 1px solid #93c5fd;
+  color: #1e3a8a;
+}
+
+.error-box-success {
+  background-color: #dcfce7;
+  border: 1px solid #86efac;
+  color: #15803d;
+}
+
+/* Error Box Header */
+.error-box-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.error-box-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.error-box-title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 15px;
+  flex: 1;
+}
+
+.error-box-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.error-box-close:hover {
+  opacity: 1;
+}
+
+/* Error Box Message */
+.error-box-message {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Error Box Details */
+.error-box-details {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 14px;
+}
+
+.error-box-details li {
+  padding: 4px 0;
+  margin-left: 24px;
+}
+
+.error-box-details li:before {
+  content: "•";
+  margin-left: -16px;
+  margin-right: 8px;
+}
+
+.error-box-detail {
+  font-size: 13px;
+  margin-top: 8px;
+  opacity: 0.9;
+}
+
+/* Error Box Actions */
+.error-box-retry-btn {
+  margin-top: 12px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.1);
+  color: inherit;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 13px;
+  transition: background-color 0.2s;
+}
+
+.error-box-retry-btn:hover {
+  background-color: rgba(0, 0, 0, 0.15);
+}
+
+/* Field-level Error */
+.field-error {
+  display: block;
+  color: #dc2626;
+  font-size: 13px;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+/* Form Field Feedback Container */
+.form-field-feedback {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* Character Counter */
+.char-counter {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.char-counter.error {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+/* Validation Error Alert */
+.validation-error-alert {
+  /* Uses base error-box-error styling */
+}
+
+/* API Error Alert */
+.api-error-alert {
+  /* Uses base error-box-error styling */
+}
+
+/* Form field input with error state */
+input.input-error,
+textarea.input-error,
+select.input-error {
+  border-color: #dc2626 !important;
+  background-color: #fef2f2;
+}
+
+input.input-error:focus,
+textarea.input-error:focus,
+select.input-error:focus {
+  outline: none;
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .error-box-error {
+    background-color: #7f1d1d;
+    border-color: #991b1b;
+    color: #fee2e2;
+  }
+
+  .error-box-warning {
+    background-color: #78350f;
+    border-color: #a16207;
+    color: #fef3c7;
+  }
+
+  .error-box-info {
+    background-color: #1e3a8a;
+    border-color: #1e40af;
+    color: #dbeafe;
+  }
+
+  .error-box-success {
+    background-color: #15803d;
+    border-color: #166534;
+    color: #dcfce7;
+  }
+
+  .error-box-retry-btn {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: inherit;
+  }
+
+  .error-box-retry-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+
+  input.input-error,
+  textarea.input-error,
+  select.input-error {
+    background-color: rgba(220, 38, 38, 0.1);
+  }
+}

@@ -1,10 +1,10 @@
 /**
- * InviteAgentModal.jsx — Fixed: existing agents now use /invitations/invite-agent endpoint
+ * InviteAgentModal.jsx — Enhanced with new error parsing
  *
- * Fix applied:
- * - Existing agents (pre-filled mode) now call agentService.inviteAgent(payload)
- *   instead of agentService.invite(agentId) which was returning 404.
- * - Both new and existing agent flows use the same working backend endpoint.
+ * Updates:
+ * - Uses new error parser to handle 422 validation errors
+ * - Field-level error extraction from backend responses
+ * - Better error UX with inline field errors
  *
  * Props:
  *   isOpen {boolean}         - Controls modal visibility
@@ -18,6 +18,13 @@ import { useState, useEffect } from 'react';
 import { UserPlus, Mail, User, Loader2, Copy, Check, ExternalLink } from 'lucide-react';
 import { Modal } from './Modal';
 import { agentService } from '../services/agentService';
+import { 
+  isValidationError, 
+  parseValidationErrors, 
+  validationErrorsToMap,
+  getErrorStatus 
+} from '../utils/errorParser';
+import { validateEmail, validateRequired } from '../utils/validationHelpers';
 
 export default function InviteAgentModal({
   isOpen,
@@ -61,14 +68,16 @@ export default function InviteAgentModal({
     // For existing agents, fields are read-only but still validate before sending
     const e = {};
 
-    if (!form.email.trim()) {
-      e.email = 'Email is required.';
-    } else if (!/\S+@\S+\.\S+/.test(form.email)) {
-      e.email = 'Enter a valid email address.';
+    // Validate first name
+    const firstNameResult = validateRequired(form.first_name, 'First name');
+    if (!firstNameResult.valid) {
+      e.first_name = firstNameResult.message;
     }
 
-    if (!form.first_name.trim()) {
-      e.first_name = 'First name is required.';
+    // Validate email
+    const emailResult = validateEmail(form.email);
+    if (!emailResult.valid) {
+      e.email = emailResult.message;
     }
 
     return e;
@@ -111,7 +120,15 @@ export default function InviteAgentModal({
       setInviteResult(merged);  // ✅ Show success screen first
       onSuccess?.(merged);      // ✅ Notify parent (parent should NOT close modal here)
     } catch (err) {
-      setApiError(err.message || 'Something went wrong. Please try again.');
+      // Handle server validation errors (422)
+      if (isValidationError(err)) {
+        const backendErrors = parseValidationErrors(err.response);
+        const errorMap = validationErrorsToMap(backendErrors);
+        setErrors(errorMap);
+      } else {
+        // Other errors
+        setApiError(err.message || 'Something went wrong. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
