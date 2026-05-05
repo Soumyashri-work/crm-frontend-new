@@ -1,0 +1,259 @@
+/**
+ * src/styles/CustomerForm.css
+ * 
+ * Styling for CustomerForm component
+ * Reference implementation for form styling
+ */
+
+.customer-form {
+  max-width: 500px;
+}
+
+/* Form Alert */
+.form-alert {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  animation: slideIn 0.2s ease-out;
+}
+
+.form-alert-error {
+  background-color: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #7f1d1d;
+}
+
+.form-alert-warning {
+  background-color: #fef3c7;
+  border: 1px solid #fcd34d;
+  color: #78350f;
+}
+
+.form-alert-success {
+  background-color: #dcfce7;
+  border: 1px solid #86efac;
+  color: #15803d;
+}
+
+.form-alert-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.form-alert-close:hover {
+  opacity: 1;
+}
+
+.form-alert-content {
+  flex: 1;
+}
+
+.form-alert-content strong {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.form-alert-content p {
+  margin: 0;
+  font-size: 13px;
+}
+
+/* Form Group */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+/* Form Label */
+.form-label {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.form-required {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+/* Form Input */
+.form-input {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background-color: var(--surface);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.1);
+}
+
+.form-input:disabled {
+  background-color: var(--surface-2);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.form-input-error {
+  border-color: #dc2626 !important;
+  background-color: #fef2f2;
+}
+
+.form-input-error:focus {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+/* Form Hint Text */
+.form-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: block;
+  margin-top: 4px;
+}
+
+/* Form Actions */
+.form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* Form Buttons */
+.form-btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 120px;
+  justify-content: center;
+}
+
+.form-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.form-btn-primary {
+  background-color: var(--primary);
+  color: white;
+}
+
+.form-btn-primary:hover:not(:disabled) {
+  background-color: var(--primary-dark);
+  box-shadow: 0 2px 8px rgba(var(--primary-rgb), 0.3);
+}
+
+.form-btn-secondary {
+  background-color: var(--surface-2);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.form-btn-secondary:hover:not(:disabled) {
+  background-color: var(--surface-3);
+}
+
+/* Spinner animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.form-btn svg.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Character Counter in FormFieldFeedback */
+.form-field-feedback {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.char-counter {
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.char-counter.error {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.field-error {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .form-alert-error {
+    background-color: #7f1d1d;
+    border-color: #991b1b;
+    color: #fee2e2;
+  }
+
+  .form-alert-warning {
+    background-color: #78350f;
+    border-color: #a16207;
+    color: #fef3c7;
+  }
+
+  .form-alert-success {
+    background-color: #15803d;
+    border-color: #166534;
+    color: #dcfce7;
+  }
+
+  .form-input-error {
+    background-color: rgba(220, 38, 38, 0.1);
+  }
+}
+
+/* Mobile responsive */
+@media (max-width: 600px) {
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .form-btn {
+    width: 100%;
+  }
+}

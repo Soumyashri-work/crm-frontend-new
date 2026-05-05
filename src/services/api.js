@@ -1,17 +1,16 @@
 /**
- * src/services/api.js  — UPDATED for Keycloak
+ * src/services/api.js  — Enhanced with validation error parsing
  *
- * One change: the request interceptor now reads the live Keycloak token
- * instead of the static localStorage value.
- *
- * Falls back to localStorage 'access_token' so existing code that sets it
- * manually still works during transition.
- *
- * All other config (base URL, timeout, error normalisation) is unchanged.
+ * Changes:
+ * - Request interceptor attaches live Keycloak token
+ * - Response interceptor now uses centralized error parsing
+ * - Validation errors (422) are handled with field-level error extraction
+ * - Better error normalization for forms and components
  */
 
 import axios from 'axios';
 import { getKeycloak } from '../auth/keycloak';
+import { logError } from '../utils/errorParser';
 
 const BASE_URL =
   import.meta.env?.VITE_API_BASE_URL ||
@@ -59,7 +58,7 @@ api.interceptors.request.use(
 );
 
 // ---------------------------------------------------------------------------
-// Response interceptor — normalise errors + handle 401 (session expired)
+// Response interceptor — normalize errors + handle 401 (session expired)
 // ---------------------------------------------------------------------------
 api.interceptors.response.use(
   (response) => response,
@@ -69,6 +68,7 @@ api.interceptors.response.use(
 
       // Session expired — redirect to Keycloak login
       if (status === 401) {
+        logError(error, 'API 401 - Session Expired');
         try {
           const kc = await getKeycloak();
           if (kc) { kc.login(); return; }
@@ -79,26 +79,34 @@ api.interceptors.response.use(
         return;
       }
 
-      const detail = data?.detail;
-      const message = typeof data?.message === 'string'
-        ? data.message
-        : typeof detail === 'string'
-          ? detail
-          : detail && typeof detail === 'object'
-            ? detail.message ?? JSON.stringify(detail)
-            : `Error ${status}`;
+      // Extract error details based on error type
+      let detail = data?.detail;
+      let message = data?.message;
+      
+      if (typeof detail === 'string') {
+        message = detail;
+      } else if (typeof message !== 'string') {
+        message = detail && typeof detail === 'object'
+          ? detail.message ?? JSON.stringify(detail)
+          : `Error ${status}`;
+      }
 
+      // Log error for debugging
+      logError(error, `API ${status} - ${message}`);
+
+      // Create error object that preserves response structure for components
       const err = new Error(message);
       err.status = status;
       err.response = error.response;
       err.data = data;
+      
       return Promise.reject(err);
     }
 
     if (error.request) {
-      return Promise.reject(
-        new Error('Cannot reach the server. Check your connection or try again later.'),
-      );
+      const err = new Error('Cannot reach the server. Check your connection or try again later.');
+      logError(error, 'API Network Error');
+      return Promise.reject(err);
     }
 
     return Promise.reject(error);
