@@ -1,4 +1,5 @@
 
+
 /**
  * ProvisionCredentialsForm.jsx  ─  v11 · Strict Webhook Validation + Conditional Display
  * ─────────────────────────────────────────────────────────────────────────────
@@ -64,6 +65,7 @@ import {
   useCrmConfigs,
   useActiveIntegrations,
   useIntegrationStatus,
+  useIntegrationDetail,
   useProvisionIntegration,
   useUpdateCredentials,
   useDeprovisionIntegration,
@@ -84,6 +86,11 @@ const SOURCE_SYSTEM_ID_TO_CRM_KEY = {
   1: 'zammad',
   2: 'espocrm',
 };
+
+// Reverse map: crm_key → source_system_id (used to fetch integration detail on form open)
+const CRM_KEY_TO_SOURCE_SYSTEM_ID = Object.fromEntries(
+  Object.entries(SOURCE_SYSTEM_ID_TO_CRM_KEY).map(([id, key]) => [key, Number(id)])
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ZOD SCHEMAS
@@ -308,6 +315,25 @@ const ResetSVG = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M1.5 1.5v3h3M14.5 14.5v-3h-3" />
   </svg>
 );
+const EditSVG = () => (
+  <svg width="13" height="13" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.8">
+    <path strokeLinecap="round" strokeLinejoin="round"
+      d="M11.5 2.5a1.414 1.414 0 012 2L5 13H2v-3L11.5 2.5z" />
+  </svg>
+);
+const EyeOpenSVG = () => (
+  <svg width="15" height="15" fill="none" viewBox="0 0 20 20" stroke="currentColor" strokeWidth="1.7">
+    <path strokeLinecap="round" strokeLinejoin="round"
+      d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6z" />
+    <circle cx="10" cy="10" r="2.5" strokeLinecap="round" />
+  </svg>
+);
+const EyeClosedSVG = () => (
+  <svg width="15" height="15" fill="none" viewBox="0 0 20 20" stroke="currentColor" strokeWidth="1.7">
+    <path strokeLinecap="round" strokeLinejoin="round"
+      d="M3 3l14 14M10 4c5 0 8 6 8 6s-.6 1.2-1.7 2.3M6.3 6.3C4.5 7.5 3 10 3 10s3 6 7 6c2 0 3.8-.9 5-2.2" />
+  </svg>
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SKELETON LOADER
@@ -515,19 +541,39 @@ function HelpBox({ instructions, title }) {
 // CREDENTIAL FIELD GROUPS
 // ─────────────────────────────────────────────────────────────────────────────
 
-function TokenCredFields({ register, errors, authType, disabled }) {
+function TokenCredFields({ register, errors, authType, disabled, showEyeToggle = false }) {
+  const [revealed, setRevealed] = useState(false);
   const err = errors?.cred_token?.message;
+  const inputType = showEyeToggle && revealed ? 'text' : 'password';
+
   return (
     <Field label={authType === 'hmac' ? 'API Key' : 'API Token / Key'} required error={err}
       hint={authType === 'hmac' ? 'The API Key used to authenticate outbound calls to the CRM' : undefined}>
-      <input {...register('cred_token')} type="password" autoComplete="new-password"
-        placeholder="••••••••••••••••••••"
-        className={`pcf-input pcf-secret${err ? ' has-err' : ''}`} disabled={disabled} />
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <input {...register('cred_token')} type={inputType} autoComplete="new-password"
+          placeholder={disabled && !showEyeToggle ? '••••••••  (unchanged)' : '••••••••••••••••••••'}
+          className={`pcf-input pcf-secret${err ? ' has-err' : ''}`}
+          disabled={disabled}
+          style={showEyeToggle ? { paddingRight: 38 } : undefined} />
+        {showEyeToggle && (
+          <button
+            type="button"
+            onClick={() => setRevealed((r) => !r)}
+            className="pcf-eye-btn"
+            title={revealed ? 'Hide token' : 'Reveal token'}
+            tabIndex={-1}
+          >
+            {revealed ? <EyeClosedSVG /> : <EyeOpenSVG />}
+          </button>
+        )}
+      </div>
     </Field>
   );
 }
 
-function BasicCredFields({ register, errors, disabled }) {
+function BasicCredFields({ register, errors, disabled, showEyeToggle = false }) {
+  const [revealed, setRevealed] = useState(false);
+  const pwType = showEyeToggle && revealed ? 'text' : 'password';
   return (
     <div className="pcf-g2">
       <Field label="Username" required error={errors?.cred_username?.message}>
@@ -535,9 +581,19 @@ function BasicCredFields({ register, errors, disabled }) {
           className={`pcf-input${errors?.cred_username ? ' has-err' : ''}`} disabled={disabled} />
       </Field>
       <Field label="Password" required error={errors?.cred_password?.message}>
-        <input {...register('cred_password')} type="password" autoComplete="new-password"
-          placeholder="••••••••" className={`pcf-input pcf-secret${errors?.cred_password ? ' has-err' : ''}`}
-          disabled={disabled} />
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <input {...register('cred_password')} type={pwType} autoComplete="new-password"
+            placeholder={disabled && !showEyeToggle ? '••••••••  (unchanged)' : '••••••••'}
+            className={`pcf-input pcf-secret${errors?.cred_password ? ' has-err' : ''}`}
+            disabled={disabled}
+            style={showEyeToggle ? { paddingRight: 38 } : undefined} />
+          {showEyeToggle && (
+            <button type="button" onClick={() => setRevealed((r) => !r)}
+              className="pcf-eye-btn" title={revealed ? 'Hide password' : 'Reveal password'} tabIndex={-1}>
+              {revealed ? <EyeClosedSVG /> : <EyeOpenSVG />}
+            </button>
+          )}
+        </div>
       </Field>
     </div>
   );
@@ -821,8 +877,26 @@ function PageSelectCrm({ crmConfigs, crmStatuses, isLoadingConfigs, configsError
 // PAGE 2: CONFIGURATION FORM
 // ─────────────────────────────────────────────────────────────────────────────
 
-function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSuccess, onError, onClearStatus, onClose, modal }) {
+function PageConfigureCrm({ activeCrm, crmConfigs, integrationId: integrationIdProp, tenantId, onBack, onSuccess, onError, onClearStatus, onClose, modal }) {
   const crmConfig = crmConfigs?.find((c) => c.crm_key === activeCrm);
+
+  // ── Resolve source_system_id for this CRM key ─────────────────────────────
+  const sourceSystemId = CRM_KEY_TO_SOURCE_SYSTEM_ID[activeCrm] ?? null;
+
+  // ── Fetch full integration detail on mount (the fix for blank form on refresh) ──
+  // This call resolves the real integration_id + base_url + auth_type even when
+  // the parent only knows "this CRM has a green border" (integration_id = null).
+  // On 404 (no integration yet) it returns null — form shows in new-integration mode.
+  const {
+    data: integrationDetail,
+    isLoading: isDetailLoading,
+  } = useIntegrationDetail(tenantId, sourceSystemId, {
+    enabled: !!tenantId && sourceSystemId != null,
+  });
+
+  // Resolved integration ID: prefer the detail fetch (always up-to-date), fall
+  // back to the prop passed from the parent (set after a same-session provision).
+  const integrationId = integrationDetail?.integration_id ?? integrationIdProp ?? null;
 
   // ── Gatekeeper state ──────────────────────────────────────────────────────
   const [testStatus,    setTestStatus]    = useState(null);
@@ -832,65 +906,91 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
   const [successData,   setSuccessData]   = useState(null);
 
   /**
+   * Edit mode — toggled when admin clicks "Edit" on a locked existing integration.
+   * While isEditing=true:
+   *   • Form fields are unlocked (isLocked is overridden for rendering purposes)
+   *   • Secret fields show an eye-reveal toggle
+   *   • Footer shows Test Connection + Save (PATCH) + Cancel
+   *   • Cancel reverts all edits and test state without touching the backend
+   */
+  const [isEditing, setIsEditing] = useState(false);
+
+  /**
    * [change 1] — Track whether the admin had webhooks enabled at the moment
-   * they submitted the form. This is captured as a ref so it does not cause
-   * a re-render but is available synchronously inside onSuccess.
-   *
-   * After success, we read `submittedWebhooksEnabled.current` to decide
-   * whether to query for the webhook URL and render WebhookDisplay.
+   * they submitted the form.
    */
   const submittedWebhooksEnabled = useRef(false);
-  // Mirror into state so the JSX can react after successData is set.
   const [successWebhooksEnabled, setSuccessWebhooksEnabled] = useState(false);
 
   // ── Read-only / locked state ──────────────────────────────────────────────
-  const [isLocked, setIsLocked] = useState(!!integrationId);
+  // Lock when an integration already exists (from detail fetch OR prop) and no
+  // success just happened in this session. Re-derives whenever integrationId changes.
+  const [isLocked, setIsLocked] = useState(false);
 
-  // ── Fetch existing integration status ──────────────────────────────────────
+  // Sync isLocked whenever detail data arrives (covers the refresh case)
+  useEffect(() => {
+    if (isDetailLoading) return; // wait for fetch to complete
+    // Lock if an integration exists and we haven't just shown a success banner
+    if (integrationId && !successData) {
+      setIsLocked(true);
+    } else if (!integrationId) {
+      setIsLocked(false);
+    }
+  }, [integrationId, isDetailLoading, successData]);
+
+  // ── Fetch existing integration status (metadata only, no secrets) ─────────
   const { data: statusData } = useIntegrationStatus(integrationId, {
     enabled: !!integrationId,
   });
 
-  // ── [change 1] Fetch webhook URL — only when needed ───────────────────────
-  //
-  // For the "locked / viewing existing integration" path: show the webhook
-  // URL unconditionally because the integration already has webhooks configured
-  // (has_webhook_secrets tells us this, but as a safe default we always fetch
-  // for existing integrations in locked mode — the backend returns 404 if
-  // there are no webhook secrets, which we handle gracefully).
-  //
-  // For the "just provisioned" path: only enable the query when the admin
-  // actually toggled webhooks on before submitting (successWebhooksEnabled).
+  // ── Fetch webhook URL ─────────────────────────────────────────────────────
+  // For existing integrations: fetch as soon as we have an integration_id so
+  // the URL is visible in the locked form view (regardless of whether webhooks
+  // were originally set up — the backend returns 404 which we handle gracefully).
+  // For just-provisioned: only fetch when the admin had webhooks enabled.
   const webhookUrlQueryId = successData?.integration_id ?? integrationId ?? null;
   const {
     data: webhookUrlData,
     isLoading: isWebhookUrlLoading,
   } = useGetWebhookUrl(webhookUrlQueryId, {
-    // Locked/existing integration: always fetch so the URL is visible.
-    // Post-provision: only fetch when the admin actually enabled webhooks.
     enabled:
       !!webhookUrlQueryId &&
-      (isLocked || (!!successData && successWebhooksEnabled)),
+      (
+        // Existing integration: always try to fetch (404 is handled gracefully)
+        (!successData && !!integrationId) ||
+        // Just provisioned: only fetch when webhooks were enabled at submit time
+        (!!successData && successWebhooksEnabled)
+      ),
   });
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const provisionMutation = useProvisionIntegration({
     onSuccess: (responseData) => {
       setSuccessData(responseData);
-      // Promote the ref snapshot into state so the webhook display gate re-evaluates
       setSuccessWebhooksEnabled(submittedWebhooksEnabled.current);
-      // Notify the parent grid so the CRM card turns green — but do NOT navigate
-      // away; the admin must stay on this page to copy the webhook URL.
       onSuccess?.(responseData);
     },
   });
 
   const updateMutation = useUpdateCredentials({
     onSuccess: (responseData) => {
-      setSuccessData(responseData);
-      setSuccessWebhooksEnabled(submittedWebhooksEnabled.current);
-      // Same as provision: notify parent but stay on page.
-      onSuccess?.(responseData);
+      if (isEditing) {
+        // Edit mode: credentials updated — go back to clean locked read-only state.
+        // Do NOT show the successData banner (that's for new integrations only).
+        setIsEditing(false);
+        setIsLocked(true);
+        setTestStatus(null);
+        setTestError(null);
+        setSubmitEnabled(false);
+        setFieldsLocked(false);
+        // Notify parent so the CRM card stays green
+        onSuccess?.(responseData);
+      } else {
+        // Same-session update (non-edit path — upsert flow)
+        setSuccessData(responseData);
+        setSuccessWebhooksEnabled(submittedWebhooksEnabled.current);
+        onSuccess?.(responseData);
+      }
     },
   });
 
@@ -929,9 +1029,22 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
   const authType = watch('auth_type');
   const enableWh = watch('enable_webhooks');
 
-  // ── Pre-fill from status data ─────────────────────────────────────────────
+  // ── Pre-fill from integration detail (covers the refresh/navigate-back case) ─
+  // Priority: use detail data (which has base_url + auth_type from the DB) over
+  // statusData (same fields but requires integration_id to be known first).
+  // Credential secrets are intentionally NOT pre-filled — the form stays locked.
   useEffect(() => {
-    if (!statusData) return;
+    if (!integrationDetail) return;
+    reset({
+      ...makeCrmEntry(activeCrm, crmConfigs),
+      base_url:  integrationDetail.base_url  ?? '',
+      auth_type: integrationDetail.auth_type ?? '',
+    });
+  }, [integrationDetail]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Pre-fill from statusData as fallback (same-session flow) ─────────────
+  useEffect(() => {
+    if (!statusData || integrationDetail) return; // prefer detail data
     reset({
       ...makeCrmEntry(activeCrm, crmConfigs),
       base_url:  statusData.base_url  ?? '',
@@ -973,6 +1086,57 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
     setSubmitEnabled(false);
     setFieldsLocked(false);
     setIsLocked(false);
+    setIsEditing(false);
+  };
+
+  // ── Edit mode handlers ────────────────────────────────────────────────────
+
+  /**
+   * Enter edit mode: unlock the form without changing any backend state.
+   * The form keeps its existing prefilled values (base_url, auth_type) but clears
+   * the secret token field so the admin must type a new one.
+   */
+  const handleEnterEdit = () => {
+    // Clear secret fields only — admin must type new credentials.
+    // Non-secret fields (base_url, auth_type) stay as-is for reference.
+    // enable_webhooks is preserved from the current form value so the toggle
+    // accurately reflects whether webhooks were active on this integration.
+    setValue('cred_token', '');
+    setValue('cred_username', '');
+    setValue('cred_password', '');
+    setValue('cred_access_token', '');
+    setValue('cred_refresh_token', '');
+    setValue('cred_client_secret', '');
+    // Restore enable_webhooks from detail data so the toggle shows the real state
+    const hasWebhooks = !!(integrationDetail?.webhook_uuid || webhookUrlData);
+    setValue('enable_webhooks', hasWebhooks);
+    // Reset gatekeeper so Test Connection is required before Save
+    setTestStatus(null);
+    setTestError(null);
+    setSubmitEnabled(false);
+    setFieldsLocked(false);
+    setIsEditing(true);
+  };
+
+  /**
+   * Cancel edit: discard all edits, clear all test state, restore the form to
+   * the original read-only values from integrationDetail (or statusData fallback).
+   * No backend call is made — the original credentials remain active.
+   */
+  const handleCancelEdit = () => {
+    const source = integrationDetail ?? statusData;
+    reset({
+      ...makeCrmEntry(activeCrm, crmConfigs),
+      base_url:  source?.base_url  ?? '',
+      auth_type: source?.auth_type ?? '',
+    });
+    setTestStatus(null);
+    setTestError(null);
+    setSubmitEnabled(false);
+    setFieldsLocked(false);
+    setIsEditing(false);
+    // Re-lock the form
+    setIsLocked(true);
   };
 
   const buildPayload = (formValues) => transformFormToPayload({
@@ -1004,14 +1168,16 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
   });
 
   // ── Submit ────────────────────────────────────────────────────────────────
-  // [change 1] Capture the enable_webhooks value at the moment of submission
-  // before the async call resolves.
   const onSubmit = (formValues) => {
-    // Snapshot the webhook intent from the validated form values
     submittedWebhooksEnabled.current = !!formValues.enable_webhooks;
 
     const payload = buildPayload(formValues);
-    if (integrationId) {
+
+    // In edit mode we always PATCH the existing integration.
+    // Outside edit mode: PATCH if we have an ID, POST to provision otherwise.
+    if (isEditing && integrationId) {
+      updateMutation.mutate({ integrationId, payload });
+    } else if (integrationId) {
       updateMutation.mutate({ integrationId, payload });
     } else {
       provisionMutation.mutate(payload);
@@ -1019,6 +1185,39 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
   };
 
   if (!crmConfig) return null;
+
+  // Show a loading state while we resolve the integration detail
+  if (isDetailLoading) {
+    return (
+      <>
+        <div className="pcf-hdr">
+          <div className="pcf-hdr-l">
+            <button type="button" className="pcf-hdr-back" onClick={onBack} aria-label="Go back">
+              <BackArrowSVG />
+            </button>
+            <div className="pcf-ico">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                <path strokeLinecap="round" strokeLinejoin="round"
+                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="pcf-ttl">Configure {crmConfig.display_name}</h2>
+              <p className="pcf-sub">Loading integration details…</p>
+            </div>
+          </div>
+        </div>
+        <div className="pcf-body">
+          <div className="pcf-cfg-form">
+            <div className="pcf-skeleton" style={{ height: 40, borderRadius: 'var(--radius-sm)', width: '100%' }} />
+            <div className="pcf-skeleton" style={{ height: 40, borderRadius: 'var(--radius-sm)', width: '100%', marginTop: 12 }} />
+            <div className="pcf-skeleton" style={{ height: 40, borderRadius: 'var(--radius-sm)', width: '60%', marginTop: 12 }} />
+          </div>
+        </div>
+      </>
+    );
+  }
+
   const isDisabled = isSubmitting || isTesting || isDeprovisioning;
 
   // ── Disconnect ────────────────────────────────────────────────────────────
@@ -1124,7 +1323,7 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
                 <input {...registerWithReset('base_url')} type="url"
                   placeholder={crmConfig.default_base_url}
                   className={`pcf-input${errors.base_url ? ' has-err' : ''}`}
-                  disabled={fieldsLocked || isLocked} />
+                  disabled={fieldsLocked || (isLocked && !isEditing)} />
               </Field>
 
               {/* Auth type */}
@@ -1135,12 +1334,13 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
                 <div className="pcf-radio-group">
                   {crmConfig.supported_auth_options?.map((at) => {
                     const selected = authType === at.value;
+                    const isDisabledRadio = fieldsLocked || (isLocked && !isEditing);
                     return (
                       <label key={at.value}
-                        className={`pcf-radio-item${selected ? ' pcf-radio-item--selected' : ''}${(fieldsLocked || isLocked) ? ' pcf-radio-item--disabled' : ''}`}>
-                        <input type="radio" value={at.value} checked={selected} disabled={fieldsLocked || isLocked}
+                        className={`pcf-radio-item${selected ? ' pcf-radio-item--selected' : ''}${isDisabledRadio ? ' pcf-radio-item--disabled' : ''}`}>
+                        <input type="radio" value={at.value} checked={selected} disabled={isDisabledRadio}
                           onChange={() => {
-                            if (!fieldsLocked && !isLocked) {
+                            if (!fieldsLocked && !(isLocked && !isEditing)) {
                               handleFieldChange();
                               setValue('auth_type', at.value, { shouldValidate: true });
                             }
@@ -1164,18 +1364,23 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
                 <div className="pcf-cred-sub">
                   {TOKEN_LIKE_RENDER.has(authType) && (
                     <TokenCredFields register={registerWithReset} errors={errors}
-                      authType={authType} disabled={fieldsLocked || isLocked} />
+                      authType={authType}
+                      disabled={fieldsLocked || (isLocked && !isEditing)}
+                      showEyeToggle={isEditing} />
                   )}
                   {authType === 'basic_auth' && (
-                    <BasicCredFields register={registerWithReset} errors={errors} disabled={fieldsLocked || isLocked} />
+                    <BasicCredFields register={registerWithReset} errors={errors}
+                      disabled={fieldsLocked || (isLocked && !isEditing)}
+                      showEyeToggle={isEditing} />
                   )}
                   {authType === 'oauth2' && (
-                    <OAuth2CredFields register={registerWithReset} errors={errors} disabled={fieldsLocked || isLocked} />
+                    <OAuth2CredFields register={registerWithReset} errors={errors}
+                      disabled={fieldsLocked || (isLocked && !isEditing)} />
                   )}
                 </div>
               )}
 
-              {/* Webhook toggle */}
+              {/* Webhook toggle — always shown when form is active (locked read-only hides it via isLocked && !isEditing check below) */}
               <div>
                 <div className="pcf-wh-toggle-row">
                   <div className="pcf-wh-toggle-info">
@@ -1191,6 +1396,7 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
                       <input
                         type="checkbox"
                         {...register('enable_webhooks')}
+                        disabled={isLocked && !isEditing}
                         onChange={(e) => {
                           handleFieldChange();
                           register('enable_webhooks').onChange(e);
@@ -1202,18 +1408,12 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
                   </div>
                 </div>
 
-                {/*
-                  Webhook credential sub-panels.
-                  Both components now receive `errors` for has-err propagation (change [3]).
-                  webhookUrl is passed as empty string while editing — the real URL
-                  is only available after a successful provision.
-                */}
                 {enableWh && webhookModel === 'shared' && (
                   <div style={{ marginTop: 14 }}>
                     <WebhookShared
                       register={register}
                       errors={errors}
-                      webhookUrl=""
+                      webhookUrl={webhookUrlData?.webhook_url ?? ''}
                       crmDisplayName={crmConfig.display_name}
                       webhookInstructions={webhookInstructions}
                     />
@@ -1225,7 +1425,7 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
                       register={register}
                       control={control}
                       errors={errors}
-                      webhookUrl=""
+                      webhookUrl={webhookUrlData?.webhook_url ?? ''}
                       crmDisplayName={crmConfig.display_name}
                       webhookInstructions={webhookInstructions}
                     />
@@ -1240,22 +1440,37 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
           {!successData && (
             <div className="pcf-alerts-area">
 
-              {/* Locked / read-only info banner */}
-              {isLocked && (
+              {/* Locked / read-only info banner — shown only when not editing */}
+              {isLocked && !isEditing && (
                 <div className="pcf-alert pcf-alert--info">
                   <span className="pcf-alert-ico">🔒</span>
                   <div>
                     <strong>Integration active and connected</strong><br />
                     <span className="pcf-alert-sub">
-                      Click <strong>Reset</strong> to enter new credentials or{' '}
+                      Click <strong>Edit</strong> to update credentials or{' '}
                       <strong>Disconnect</strong> to remove this integration.
                     </span>
                   </div>
                 </div>
               )}
 
-              {/* Webhook URL for existing locked integration (unchanged from v10) */}
-              {isLocked && webhookUrlData && (
+              {/* Edit mode info banner */}
+              {isEditing && (
+                <div className="pcf-alert pcf-alert--warn">
+                  <div>
+                    <strong>Editing credentials</strong><br />
+                    <span className="pcf-alert-sub">
+                      Enter your new credentials and run a connection test. The current integration
+                      remains active until you save successfully.
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Webhook URL for existing locked integration — only shown when the
+                  webhook toggle is off (so the URL isn't already visible inside
+                  WebhookShared / WebhookPerEvent above) */}
+              {isLocked && !isEditing && !enableWh && webhookUrlData && (
                 <WebhookDisplay
                   webhookData={webhookUrlData}
                   crmDisplayName={crmConfig.display_name}
@@ -1263,20 +1478,20 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
               )}
 
               {/* Test success */}
-              {!isLocked && testStatus === 'success' && (
+              {(isEditing || !isLocked) && testStatus === 'success' && (
                 <div className="pcf-alert pcf-alert--ok">
                   <span className="pcf-alert-ico">✓</span>
                   <div>
                     <strong>Connection test passed!</strong><br />
                     <span className="pcf-alert-sub">
-                      Credentials verified — you can now save the integration.
+                      Credentials verified — you can now save the{isEditing ? ' updated' : ''} integration.
                     </span>
                   </div>
                 </div>
               )}
 
               {/* Test error */}
-              {!isLocked && testStatus === 'error' && testError && (
+              {(isEditing || !isLocked) && testStatus === 'error' && testError && (
                 <div className="pcf-alert pcf-alert--err">
                   <span className="pcf-alert-ico">!</span>
                   <div>
@@ -1294,7 +1509,7 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
               )}
 
               {/* Provision / update error */}
-              {!isLocked && apiError && (
+              {(isEditing || !isLocked) && apiError && (
                 <div className="pcf-alert pcf-alert--err">
                   <span className="pcf-alert-ico">!</span>
                   <div>
@@ -1312,7 +1527,7 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
               )}
 
               {/* 502 hint */}
-              {!isLocked && errorStatus === 502 && (
+              {(isEditing || !isLocked) && errorStatus === 502 && (
                 <div className="pcf-alert pcf-alert--warn">
                   <span className="pcf-alert-ico">⚠</span>
                   <span className="pcf-alert-sub">
@@ -1329,22 +1544,73 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
         {/* Footer */}
         <div className="pcf-cfg-footer">
           <div className="pcf-footer-left">
+            {/* Back / Back-to-list button — always shown, label changes per state */}
             <button type="button" className="pcf-btn-cancel" onClick={onBack} disabled={isDisabled}>
               {successData ? 'Back to CRM List' : 'Back'}
             </button>
-            {/* Reset is hidden once saved — admin must go back and re-enter configure flow */}
-            {!successData && (
+
+            {/* Reset — only for brand-new (not-yet-saved) integration flow */}
+            {!successData && !isLocked && !isEditing && (
               <button type="button" className="pcf-btn-reset" onClick={handleReset}
                 disabled={isDisabled}
-                title={isLocked ? 'Unlock form to enter new credentials' : 'Clear all fields and start over'}>
+                title="Clear all fields and start over">
                 <ResetSVG />
                 Reset
               </button>
             )}
           </div>
 
-          {/* Action buttons — hidden after a successful save */}
-          {!successData && !isLocked && (
+          {/* ── Locked read-only state: Edit + Disconnect ── */}
+          {!successData && isLocked && !isEditing && integrationId && (
+            <div className="pcf-footer-right">
+              <button type="button" className="pcf-btn-edit" onClick={handleEnterEdit}
+                disabled={isDisabled}
+                title="Update credentials for this integration">
+                <EditSVG />
+                Edit
+              </button>
+              <button type="button" className="pcf-btn-danger" onClick={handleDisconnect}
+                disabled={isDeprovisioning}
+                title="Permanently remove this integration and wipe stored credentials">
+                {isDeprovisioning
+                  ? <><span className="pcf-spinner pcf-spinner--danger" />Disconnecting…</>
+                  : <>
+                      <svg width="13" height="13" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.8">
+                        <path strokeLinecap="round" strokeLinejoin="round"
+                          d="M10 6L6 10M6 6l4 4M2 8a6 6 0 1112 0A6 6 0 012 8z" />
+                      </svg>
+                      Disconnect
+                    </>}
+              </button>
+            </div>
+          )}
+
+          {/* ── Edit mode: Test Connection + Save + Cancel ── */}
+          {!successData && isEditing && (
+            <div className="pcf-footer-right">
+              <button type="button" className="pcf-btn-cancel pcf-btn-cancel--edit"
+                onClick={handleCancelEdit} disabled={isDisabled}
+                title="Discard changes and return to read-only view">
+                Cancel
+              </button>
+              <button type="button" className="pcf-btn-test" onClick={handleTestConnection}
+                disabled={isDisabled}>
+                {isTesting
+                  ? <><span className="pcf-spinner pcf-spinner--dark" />Testing…</>
+                  : <><BeakerSVG />{testStatus === 'success' ? 'Retest Connection' : 'Test Connection'}</>}
+              </button>
+              <button className="pcf-btn-submit" type="submit"
+                disabled={isDisabled || !submitEnabled}
+                title={!submitEnabled ? 'Run a successful connection test first' : 'Save updated credentials'}>
+                {isSubmitting
+                  ? <><span className="pcf-spinner" />Saving…</>
+                  : <><SaveSVG />Save Changes</>}
+              </button>
+            </div>
+          )}
+
+          {/* ── New integration: Test Connection + Save ── */}
+          {!successData && !isLocked && !isEditing && (
             <div className="pcf-footer-right">
               <button type="button" className="pcf-btn-test" onClick={handleTestConnection}
                 disabled={isDisabled}>
@@ -1359,24 +1625,6 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId, onBack, onSucc
                 {isSubmitting
                   ? <><span className="pcf-spinner" />Saving…</>
                   : <><SaveSVG />Save {crmConfig.display_name} Connection</>}
-              </button>
-            </div>
-          )}
-
-          {!successData && isLocked && integrationId && (
-            <div className="pcf-footer-right">
-              <button type="button" className="pcf-btn-danger" onClick={handleDisconnect}
-                disabled={isDeprovisioning}
-                title="Permanently remove this integration and wipe stored credentials">
-                {isDeprovisioning
-                  ? <><span className="pcf-spinner pcf-spinner--danger" />Disconnecting…</>
-                  : <>
-                      <svg width="13" height="13" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.8">
-                        <path strokeLinecap="round" strokeLinejoin="round"
-                          d="M10 6L6 10M6 6l4 4M2 8a6 6 0 1112 0A6 6 0 012 8z" />
-                      </svg>
-                      Disconnect
-                    </>}
               </button>
             </div>
           )}
@@ -1452,6 +1700,7 @@ export default function ProvisionCredentialsForm({ onSuccess, onClose, modal = t
       activeCrm={activeCrm}
       crmConfigs={crmConfigs}
       integrationId={crmStatuses[activeCrm]?.integration_id ?? null}
+      tenantId={tenantId}
       onBack={handleBackToCrmSelection}
       onSuccess={handleProvisionSuccess}
       onError={handleProvisionError}

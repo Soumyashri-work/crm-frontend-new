@@ -340,9 +340,9 @@ export default function SuperAdminAdmins() {
 
       {editingAdmin && <EditAdminModal admin={editingAdmin} onClose={() => setEditingAdmin(null)} onSave={handleSaveEdit} />}
 
-      {setupLinkData && (
+      {/* {setupLinkData && (
         <PasswordSetupLinkModal setupLink={setupLinkData.link} adminName={setupLinkData.adminName} onClose={() => setSetupLinkData(null)} />
-      )}
+      )} */}
 
       {deletingAdmin && (
         <ConfirmDeleteModal
