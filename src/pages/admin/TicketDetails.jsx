@@ -776,35 +776,37 @@ export default function TicketDetails() {
             </div>
 
             {/* Comment input */}
-            <div style={{
-              borderTop: commentsReady && comments.length > 0 ? '1px solid var(--border-light)' : 'none',
-              paddingTop: commentsReady && comments.length > 0 ? 16 : 0,
-            }}>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <textarea
-                  className="form-input"
-                  style={{ flex: 1, resize: 'vertical', minHeight: 80 }}
-                  placeholder="Add a comment… (Ctrl+Enter to send)"
-                  value={comment}
-                  disabled={addCommentMutation.isPending}
-                  onChange={e => setComment(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleComment(); }}
-                />
-                <button
-                  className="btn btn-primary"
-                  onClick={handleComment}
-                  disabled={addCommentMutation.isPending || !comment.trim()}
-                  style={{ alignSelf: 'flex-end', padding: '10px 14px' }}
-                  title="Send (Ctrl+Enter)"
-                >
-                  {addCommentMutation.isPending ? <Spinner /> : <Send size={16} />}
-                </button>
-              </div>
+            {user?.role === 'agent' && (
+              <div style={{
+                borderTop: commentsReady && comments.length > 0 ? '1px solid var(--border-light)' : 'none',
+                paddingTop: commentsReady && comments.length > 0 ? 16 : 0,
+              }}>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <textarea
+                    className="form-input"
+                    style={{ flex: 1, resize: 'vertical', minHeight: 80 }}
+                    placeholder="Add a comment… (Ctrl+Enter to send)"
+                    value={comment}
+                    disabled={addCommentMutation.isPending}
+                    onChange={e => setComment(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleComment(); }}
+                  />
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleComment}
+                    disabled={addCommentMutation.isPending || !comment.trim()}
+                    style={{ alignSelf: 'flex-end', padding: '10px 14px' }}
+                    title="Send (Ctrl+Enter)"
+                  >
+                    {addCommentMutation.isPending ? <Spinner /> : <Send size={16} />}
+                  </button>
+                </div>
 
-              {addCommentError && (
-                <AddCommentErrorBanner onDismiss={() => setAddCommentError(false)} />
-              )}
-            </div>
+                {addCommentError && (
+                  <AddCommentErrorBanner onDismiss={() => setAddCommentError(false)} />
+                )}
+              </div>
+            )}
           </div>
         </div>
 
