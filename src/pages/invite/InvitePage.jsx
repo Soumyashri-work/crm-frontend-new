@@ -119,7 +119,7 @@ export default function InvitePage() {
           <h2 style={s.title}>Account Activated!</h2>
           <p style={s.sub}>
             You've joined <strong style={{ color: 'var(--primary)' }}>{invite?.tenant_name}</strong>{' '}
-            as <strong>{invite?.role}</strong>.
+            as <strong>{invite?.role}</strong> in Unified CRM Ticket Dashboard.
           </p>
           <p style={{ ...s.sub, marginTop: 8 }}>
             You can now sign in. To connect CRM integrations, go to{' '}
@@ -152,7 +152,7 @@ export default function InvitePage() {
         <h1 style={s.title}>Join {invite?.tenant_name}</h1>
         <p style={s.sub}>
           You're being added as <strong>{invite?.role}</strong> to{' '}
-          <strong>{invite?.tenant_name}</strong>.
+          <strong>{invite?.tenant_name}</strong> in Unified CRM Ticket Dashboard.
         </p>
         <p style={s.email}>📧 {invite?.email}</p>
 
