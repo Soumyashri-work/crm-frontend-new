@@ -22,6 +22,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { useParams, useNavigate, useLocation }       from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient }     from '@tanstack/react-query';
 import {
@@ -365,6 +366,18 @@ function Spinner({ size = 16, color = 'white' }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function TicketDetails() {
+  // Get logged-in user info
+  const { user } = useAuth();
+
+  // Helper to get best available display name for user
+  function getUserDisplayName(user) {
+    return (
+      user?.name?.trim() ||
+      user?.preferred_username?.trim() ||
+      user?.email?.split('@')[0] ||
+      'Agent'
+    );
+  }
   const { id }      = useParams();
   const navigate    = useNavigate();
   const location    = useLocation();
@@ -460,22 +473,28 @@ export default function TicketDetails() {
 
   // ── Add comment mutation (optimistic) ─────────────────────────────────────────
   const addCommentMutation = useMutation({
-    mutationFn: (text) => ticketService.addComment(id, { text }),
+    mutationFn: (text) => ticketService.addComment(id, {
+      text,
+      author_name: getUserDisplayName(user),
+      author_email: user?.email || null,
+    }),
 
     onMutate: async (text) => {
       setAddCommentError(false);
       await queryClient.cancelQueries({ queryKey: ticketKeys.comments(id, commentsParams) });
       const previous = queryClient.getQueryData(ticketKeys.comments(id, commentsParams));
 
+      // Use real user name and email for optimistic comment
+      const optimistic = {
+        id:             `optimistic-${Date.now()}`,
+        author_name:    getUserDisplayName(user),
+        author_email:   user?.email || null,
+        body:           text,
+        crm_created_at: new Date().toISOString(),
+        is_internal:    false,
+        comment_type:   'note',
+      };
       queryClient.setQueryData(ticketKeys.comments(id, commentsParams), (old) => {
-        const optimistic = {
-          id:             `optimistic-${Date.now()}`,
-          author_name:    'You',
-          body:           text,
-          crm_created_at: new Date().toISOString(),
-          is_internal:    false,
-          comment_type:   'note',
-        };
         return old
           ? { ...old, items: [...(old.items ?? []), optimistic], total: (old.total ?? 0) + 1 }
           : { items: [optimistic], total: 1 };
@@ -484,8 +503,24 @@ export default function TicketDetails() {
       return { previous };
     },
 
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ticketKeys.comments(id, commentsParams) });
+
+    onSuccess: (data, _text, _context) => {
+      // Remove optimistic comment and merge server response
+      queryClient.setQueryData(ticketKeys.comments(id, commentsParams), (old) => {
+        if (!old || !old.items) return old;
+        // Remove any optimistic comment (id starts with 'optimistic-')
+        const filtered = old.items.filter(c => !String(c.id).startsWith('optimistic-'));
+        // If backend did not return author_name, fallback to optimistic
+        const mergedData = {
+          ...data,
+          author_name: data?.author_name || getUserDisplayName(user),
+        };
+        return {
+          ...old,
+          items: [...filtered, mergedData],
+          total: (old.total ?? 1),
+        };
+      });
     },
 
     onError: (err, _text, context) => {
