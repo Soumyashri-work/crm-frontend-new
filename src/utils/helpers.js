@@ -63,19 +63,18 @@ const AGENT_STATUS_LABELS = {
   not_invited: 'Not Invited',
   pending: 'Pending',
   expired: 'Expired',
-  rejected: 'Rejected', 
-  active: 'Active',     
+  rejected: 'Rejected',
+  active: 'Active',
 };
 
 export function normalizeAgentStatus(status, isActive) {
   const raw = String(status || '').toLowerCase().trim().replace(/\s+/g, '_');
 
-  // 'accepted' comes from our Invitation table now
   if (['active', 'accepted', 'enabled'].includes(raw)) return 'active';
   if (['pending', 'invited', 'invite_sent'].includes(raw)) return 'pending';
   if (['expired', 'invite_expired'].includes(raw)) return 'expired';
-  if (['rejected'].includes(raw)) return 'rejected'; // <-- ADDED
-  
+  if (['rejected'].includes(raw)) return 'rejected';
+
   if (['not_invited', 'not-invited', 'inactive', 'new', 'uninvited'].includes(raw)) {
     return 'not_invited';
   }
@@ -89,11 +88,10 @@ export function normalizeAgentStatus(status, isActive) {
 
 export function getAgentStatusMeta(status) {
   const key = normalizeAgentStatus(status);
-  // Give 'rejected' a danger badge too
-  const badgeClass = key === 'active' 
-    ? 'badge-success' 
-    : key === 'pending' 
-      ? 'badge-warning' 
+  const badgeClass = key === 'active'
+    ? 'badge-success'
+    : key === 'pending'
+      ? 'badge-warning'
       : 'badge-danger';
 
   return {
@@ -129,25 +127,96 @@ export function getAgentRouteSlug(agent) {
   return slug || 'agent';
 }
 
+/**
+ * Extract CRM source references from an agent object.
+ *
+ * Returns an array of values that are either:
+ *   - display-name strings  (e.g. "EspoCRM")  — ready to render
+ *   - numeric-id strings    (e.g. "3")         — caller must resolve via sourceSystems
+ *
+ * The function intentionally does NOT resolve IDs to names here because it
+ * doesn't have access to the tenant sourceSystems list. The Agents page
+ * column renderer does the ID→name resolution after calling this.
+ */
 export function getAgentCrmSources(agent) {
-  const candidates =
-    agent?.crm_sources ||
-    agent?.crms ||
-    agent?.sources ||
-    agent?.source_systems ||
-    null;
+  if (!agent) return [];
 
-  if (Array.isArray(candidates)) {
-    const unique = [...new Set(candidates.filter(Boolean).map(String))];
-    return unique;
+  // ── 1. Array fields (preferred — most complete) ──────────────────────────
+  const arrayFields = [
+    'source_systems',
+    'crm_sources',
+    'crms',
+    'sources',
+  ];
+
+  for (const field of arrayFields) {
+    const val = agent[field];
+    if (Array.isArray(val) && val.length > 0) {
+      const normalized = val
+        .map((c) => {
+          if (!c) return null;
+          if (typeof c === 'string') return c.trim() || null;
+          if (typeof c === 'object') {
+            // Return display name if present, else fall back to ID string
+            // so the caller can resolve it.
+            return (
+              c.system_name ??
+              c.name ??
+              c.systemName ??
+              (c.id != null ? String(c.id) : null) ??
+              (c.source_system_id != null ? String(c.source_system_id) : null)
+            );
+          }
+          return String(c);
+        })
+        .filter(Boolean);
+
+      if (normalized.length > 0) {
+        return [...new Set(normalized)];
+      }
+    }
   }
 
-  if (typeof candidates === 'string') {
-    const split = candidates.split(',').map(s => s.trim()).filter(Boolean);
-    if (split.length > 0) return [...new Set(split)];
+  // ── 2. Comma-separated string arrays ────────────────────────────────────
+  for (const field of arrayFields) {
+    const val = agent[field];
+    if (typeof val === 'string' && val.trim()) {
+      const parts = val.split(',').map((s) => s.trim()).filter(Boolean);
+      if (parts.length > 0) return [...new Set(parts)];
+    }
   }
 
-  if (agent?.source) return [String(agent.source)];
+  // ── 3. Singular object/string fields ────────────────────────────────────
+  // Covers source_system (object or string), crm (string), source_system_name
+  const singularFields = [
+    'source_system',
+    'crm',
+    'source_system_name',
+    'source',
+  ];
+
+  for (const field of singularFields) {
+    const val = agent[field];
+    if (!val) continue;
+
+    if (typeof val === 'object') {
+      const name =
+        val.system_name ??
+        val.name ??
+        val.systemName ??
+        (val.id != null ? String(val.id) : null);
+      if (name) return [name];
+    }
+
+    if (typeof val === 'string' && val.trim()) {
+      return [val.trim()];
+    }
+
+    if (typeof val === 'number') {
+      return [String(val)];
+    }
+  }
+
   return [];
 }
 
@@ -176,16 +245,9 @@ export function truncate(str, n = 40) {
 }
 
 // ── Ticket field normalizer ──────────────────────────────────────────────────
-// Maps the backend DB schema to the shape the frontend components expect.
-// Backend fields:  crm_ticket_id, source_system_id, status_id, priority_id,
-//                  company_id, customer_id, agent_id, created_at, updated_at
-//                  (joined relations may arrive as status{name}, priority{name},
-//                   source_system{name}, company{name,…}, customer{name,…},
-//                   agent{name,…})
 export function normalizeTicket(raw) {
   if (!raw) return null;
 
-  // ── status ──
   const status =
     raw.status?.name ||
     raw.status_name ||
@@ -193,7 +255,6 @@ export function normalizeTicket(raw) {
     raw.status_id?.toString() ||
     'Open';
 
-  // ── priority ──
   const priority =
     raw.priority?.name ||
     raw.priority_name ||
@@ -201,14 +262,12 @@ export function normalizeTicket(raw) {
     raw.priority_id?.toString() ||
     'Medium';
 
-  // ── CRM / source system ──
   const crm =
     raw.source_system?.name ||
     raw.source_system_name ||
     (typeof raw.crm === 'string' ? raw.crm : null) ||
     'EspoCRM';
 
-  // ── assignee (agent) ──
   const agentRaw = raw.agent || raw.assignee || {};
   const assignee =
     typeof agentRaw === 'string'
@@ -220,7 +279,6 @@ export function normalizeTicket(raw) {
           role:  agentRaw.role  || 'Agent',
         };
 
-  // ── customer ──
   const custRaw = raw.customer || {};
   const customer =
     typeof custRaw === 'string'
@@ -233,42 +291,32 @@ export function normalizeTicket(raw) {
           account: custRaw.account || custRaw.company || raw.company?.name || null,
         };
 
-  // ── account / company ──
   const compRaw = raw.company || raw.account || {};
   const account =
     typeof compRaw === 'string'
       ? compRaw
       : {
-          id:     compRaw.id    || raw.company_id || null,
-          name:   compRaw.name  || '—',
-          email:  compRaw.email || null,
-          phone:  compRaw.phone || null,
-          crm:    compRaw.crm   || crm,
+          id:      compRaw.id    || raw.company_id || null,
+          name:    compRaw.name  || '—',
+          email:   compRaw.email || null,
+          phone:   compRaw.phone || null,
+          crm:     compRaw.crm   || crm,
           tickets: compRaw.tickets || null,
         };
 
   return {
-    // identifiers
     id:          raw.id,
     crm_id:      raw.crm_ticket_id || raw.crm_id || `#${raw.id}`,
-
-    // core fields
     title:       raw.title       || '(no title)',
     description: raw.description || '',
     status,
     priority,
     crm,
-
-    // relations
     assignee,
     customer,
     account,
-
-    // timestamps
     created:  raw.created_at  || raw.created  || null,
     updated:  raw.updated_at  || raw.updated  || raw.created_at || null,
-
-    // pass through anything else
     ...( raw._raw ? {} : { _raw: raw } ),
   };
 }
