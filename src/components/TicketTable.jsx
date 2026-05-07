@@ -30,7 +30,12 @@ function filterData(data, filters, search) {
   return data.filter(t => {
     if (filters.status   && t.status   !== filters.status)   return false;
     if (filters.priority && t.priority !== filters.priority) return false;
-    if (filters.crm      && t.crm      !== filters.crm)      return false;
+    // Accept either `crm` or `source_system` or `source` filter keys (some pages use different names)
+    const crmFilter = filters.crm ?? filters.source_system ?? filters.source;
+    if (crmFilter) {
+      const crmVal = (t.crm ?? t.source_system ?? '').toString().toLowerCase();
+      if (crmVal !== String(crmFilter).toLowerCase()) return false;
+    }
     if (search) {
       const q     = search.toLowerCase();
       const title = (t.title  || '').toLowerCase();

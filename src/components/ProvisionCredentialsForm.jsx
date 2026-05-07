@@ -104,6 +104,83 @@ const webhookEventSchema = z.object({
 const TOKEN_LIKE_AUTH_TYPES = ['api_token', 'bearer_token', 'access_token', 'api_key', 'hmac'];
 const TOKEN_LIKE_RENDER     = new Set(TOKEN_LIKE_AUTH_TYPES);
 
+function normalizeAuthType(rawAuthType, supportedAuthOptions = []) {
+  const value = String(rawAuthType ?? '').trim().toLowerCase();
+  if (!value) return '';
+
+  const supportedMap = new Map(
+    (supportedAuthOptions ?? []).map((opt) => [String(opt.value).trim().toLowerCase(), opt.value]),
+  );
+  if (supportedMap.has(value)) return supportedMap.get(value);
+
+  const compactValue = value.replace(/[^a-z0-9]/g, '');
+
+  for (const [normalized, original] of supportedMap.entries()) {
+    if (normalized.replace(/[^a-z0-9]/g, '') === compactValue) {
+      return original;
+    }
+  }
+
+  const aliases = {
+    token: 'api_token',
+    apitoken: 'api_token',
+    apikey: 'api_key',
+    api_key_auth: 'api_key',
+    api: 'api_token',
+    bearer: 'bearer_token',
+    basic: 'basic_auth',
+    basicauth: 'basic_auth',
+    basic_authentication: 'basic_auth',
+    'basic auth': 'basic_auth',
+    oauth: 'oauth2',
+    oauth2token: 'oauth2',
+    token_auth: 'api_token',
+    tokenauth: 'api_token',
+  };
+
+  const mapped = aliases[value] ?? aliases[compactValue] ?? '';
+  if (mapped && supportedMap.has(mapped)) return supportedMap.get(mapped);
+
+  for (const [normalized, original] of supportedMap.entries()) {
+    if (normalized.includes('token') && (compactValue.includes('token') || compactValue.includes('apikey'))) {
+      return original;
+    }
+  }
+
+  return supportedAuthOptions?.[0]?.value ?? '';
+}
+
+function extractAuthTypeFromSource(source, supportedAuthOptions = []) {
+  const direct = normalizeAuthType(source?.auth_type, supportedAuthOptions);
+  if (direct) return direct;
+
+  const nested = normalizeAuthType(source?.credentials?.auth_type, supportedAuthOptions);
+  if (nested) return nested;
+
+  const creds = source?.credentials ?? {};
+  if (creds.username || creds.password) {
+    return normalizeAuthType('basic_auth', supportedAuthOptions);
+  }
+  if (creds.access_token || creds.refresh_token || creds.client_id) {
+    return normalizeAuthType('oauth2', supportedAuthOptions);
+  }
+  if (creds.token || creds.api_token) {
+    return normalizeAuthType('api_token', supportedAuthOptions);
+  }
+
+  return supportedAuthOptions?.[0]?.value ?? '';
+}
+
+function hasConfiguredWebhooks(source) {
+  if (!source) return false;
+
+  if (typeof source.has_webhook_secrets === 'boolean') {
+    return source.has_webhook_secrets;
+  }
+
+  return Boolean(source.webhook_uuid);
+}
+
 /**
  * Build the per-form Zod schema.
  *
@@ -642,7 +719,7 @@ function OAuth2CredFields({ register, errors, disabled }) {
  * `errors` is now forwarded so the webhook_secret input receives the red
  * `has-err` border and the inline `ErrMsg` when validation fails (change [3]).
  */
-function WebhookShared({ register, errors, webhookUrl, crmDisplayName, webhookInstructions }) {
+function WebhookShared({ register, errors, webhookUrl, crmDisplayName, webhookInstructions, disabled = false }) {
   const secretErr = errors?.webhook_secret?.message;
   return (
     <div className="pcf-wh-box">
@@ -666,6 +743,7 @@ function WebhookShared({ register, errors, webhookUrl, crmDisplayName, webhookIn
           autoComplete="new-password"
           placeholder="••••••••••••••••"
           className={`pcf-input pcf-secret${secretErr ? ' has-err' : ''}`}
+          disabled={disabled}
         />
       </Field>
       <span className="pcf-hint">Your CRM sends this in a header (e.g., <code>X-Hub-Signature</code>).</span>
@@ -688,7 +766,7 @@ function WebhookShared({ register, errors, webhookUrl, crmDisplayName, webhookIn
  * are no items, or on errors.per_event_secrets.root for array-level issues).
  * Both paths are checked (change [3]).
  */
-function WebhookPerEvent({ register, control, errors, webhookUrl, crmDisplayName, webhookInstructions }) {
+function WebhookPerEvent({ register, control, errors, webhookUrl, crmDisplayName, webhookInstructions, disabled = false }) {
   const { fields, append, remove } = useFieldArray({ control, name: 'per_event_secrets' });
 
   // react-hook-form v7 surfaces a root array error differently depending on
@@ -728,6 +806,7 @@ function WebhookPerEvent({ register, control, errors, webhookUrl, crmDisplayName
                   type="text"
                   placeholder="e.g., Lead.create"
                   className={`pcf-input${rowErr?.event ? ' has-err' : ''}`}
+                  disabled={disabled}
                 />
                 {/* Secret input — has-err when secret is missing (change [3]) */}
                 <input
@@ -736,15 +815,16 @@ function WebhookPerEvent({ register, control, errors, webhookUrl, crmDisplayName
                   autoComplete="new-password"
                   placeholder="secret"
                   className={`pcf-input pcf-secret${rowErr?.secret ? ' has-err' : ''}`}
+                  disabled={disabled}
                 />
-                <button type="button" className="pcf-kv-del" onClick={() => remove(i)} aria-label="Remove row">×</button>
+                <button type="button" className="pcf-kv-del" onClick={() => remove(i)} aria-label="Remove row" disabled={disabled}>×</button>
               </div>
             );
           })}
         </div>
       )}
 
-      <button type="button" className="pcf-add-row" onClick={() => append({ event: '', secret: '' })}>
+      <button type="button" className="pcf-add-row" onClick={() => append({ event: '', secret: '' })} disabled={disabled}>
         <PlusSVG /> Add Event Secret
       </button>
 
@@ -1028,6 +1108,13 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId: integrationIdP
 
   const authType = watch('auth_type');
   const enableWh = watch('enable_webhooks');
+  const webhookSecretsLocked =
+    !!integrationId &&
+    (
+      hasConfiguredWebhooks(integrationDetail) ||
+      hasConfiguredWebhooks(statusData) ||
+      !!webhookUrlData
+    );
 
   // ── Pre-fill from integration detail (covers the refresh/navigate-back case) ─
   // Priority: use detail data (which has base_url + auth_type from the DB) over
@@ -1035,22 +1122,34 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId: integrationIdP
   // Credential secrets are intentionally NOT pre-filled — the form stays locked.
   useEffect(() => {
     if (!integrationDetail) return;
+    const resolvedAuthType = extractAuthTypeFromSource(
+      integrationDetail,
+      crmConfig?.supported_auth_options,
+    );
+
     reset({
       ...makeCrmEntry(activeCrm, crmConfigs),
       base_url:  integrationDetail.base_url  ?? '',
-      auth_type: integrationDetail.auth_type ?? '',
+      auth_type: resolvedAuthType,
+      enable_webhooks: hasConfiguredWebhooks(integrationDetail),
     });
-  }, [integrationDetail]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [integrationDetail, crmConfig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Pre-fill from statusData as fallback (same-session flow) ─────────────
   useEffect(() => {
     if (!statusData || integrationDetail) return; // prefer detail data
+    const resolvedAuthType = extractAuthTypeFromSource(
+      statusData,
+      crmConfig?.supported_auth_options,
+    );
+
     reset({
       ...makeCrmEntry(activeCrm, crmConfigs),
       base_url:  statusData.base_url  ?? '',
-      auth_type: statusData.auth_type ?? '',
+      auth_type: resolvedAuthType,
+      enable_webhooks: hasConfiguredWebhooks(statusData),
     });
-  }, [statusData]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [statusData, integrationDetail, crmConfig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const helpInstructions    = crmConfig?.auth_instructions?.[authType] ?? null;
   const webhookInstructions = crmConfig?.webhook_instructions ?? null;
@@ -1108,7 +1207,10 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId: integrationIdP
     setValue('cred_refresh_token', '');
     setValue('cred_client_secret', '');
     // Restore enable_webhooks from detail data so the toggle shows the real state
-    const hasWebhooks = !!(integrationDetail?.webhook_uuid || webhookUrlData);
+    const hasWebhooks =
+      hasConfiguredWebhooks(integrationDetail) ||
+      hasConfiguredWebhooks(statusData) ||
+      !!webhookUrlData;
     setValue('enable_webhooks', hasWebhooks);
     // Reset gatekeeper so Test Connection is required before Save
     setTestStatus(null);
@@ -1125,10 +1227,16 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId: integrationIdP
    */
   const handleCancelEdit = () => {
     const source = integrationDetail ?? statusData;
+    const resolvedAuthType = extractAuthTypeFromSource(
+      source,
+      crmConfig?.supported_auth_options,
+    );
+
     reset({
       ...makeCrmEntry(activeCrm, crmConfigs),
       base_url:  source?.base_url  ?? '',
-      auth_type: source?.auth_type ?? '',
+      auth_type: resolvedAuthType,
+      enable_webhooks: hasConfiguredWebhooks(source),
     });
     setTestStatus(null);
     setTestError(null);
@@ -1396,7 +1504,7 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId: integrationIdP
                       <input
                         type="checkbox"
                         {...register('enable_webhooks')}
-                        disabled={isLocked && !isEditing}
+                        disabled={(isLocked && !isEditing) || webhookSecretsLocked}
                         onChange={(e) => {
                           handleFieldChange();
                           register('enable_webhooks').onChange(e);
@@ -1416,6 +1524,7 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId: integrationIdP
                       webhookUrl={webhookUrlData?.webhook_url ?? ''}
                       crmDisplayName={crmConfig.display_name}
                       webhookInstructions={webhookInstructions}
+                      disabled={webhookSecretsLocked}
                     />
                   </div>
                 )}
@@ -1428,6 +1537,7 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId: integrationIdP
                       webhookUrl={webhookUrlData?.webhook_url ?? ''}
                       crmDisplayName={crmConfig.display_name}
                       webhookInstructions={webhookInstructions}
+                      disabled={webhookSecretsLocked}
                     />
                   </div>
                 )}
