@@ -1,21 +1,12 @@
 /**
  * src/pages/superadmin/SuperAdminAdmins.jsx
- *
- * Fixes:
- * ✅ Refresh button REMOVED
- * ✅ Action buttons match Tenants page (Edit2/Trash2 icon-only, no border, hover color change)
- * ✅ Status badge matches Tenants (no border, same StatusBadge component)
- * ✅ Sort arrows added for Admin (name), Tenant, and Created columns
- * ✅ Status column: no sort arrows
- * ✅ Alignment: Actions column right-aligned to match Tenants page
- * ✅ DELETE FUNCTIONALITY: Trash2 button now opens ConfirmDeleteModal
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, Plus, ChevronDown, ChevronLeft, ChevronRight,
-  Loader2, Edit2, Trash2, X, Shield, Copy, CheckCircle,
+  Loader2, Edit2, Trash2, X, Shield, CheckCircle,
   ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { User, Mail } from 'lucide-react';
@@ -51,68 +42,29 @@ function SortIcon({ field, sortField, sortDir }) {
     : <ArrowDown size={12} style={{ marginLeft:4, color:'var(--primary)', verticalAlign:'middle' }} />;
 }
 
-// ─── Password Setup Link Modal ────────────────────────────────────────
-function PasswordSetupLinkModal({ setupLink, adminName, onClose }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(setupLink);
-    } catch {
-      const el = document.createElement('textarea');
-      el.value = setupLink;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
+// ─── Success Toast ────────────────────────────────────────────────────
+function SuccessToast({ message, onClose }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 4000);
+    return () => clearTimeout(t);
+  }, [onClose]);
 
   return (
-    <div style={ms.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ ...ms.modal, maxWidth:520 }} role="dialog" aria-modal="true">
-        <div style={ms.header}>
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <div style={{ ...ms.iconBox, background:'#059669' }}><CheckCircle size={18} color="white" /></div>
-            <div>
-              <h2 style={{ fontSize:17, fontWeight:700, margin:0 }}>Admin Created</h2>
-              <p style={{ fontSize:12.5, color:'var(--text-muted)', margin:0 }}>Share the password setup link with {adminName || 'the admin'}</p>
-            </div>
-          </div>
-          <button onClick={onClose} style={ms.closeBtn} aria-label="Close"><X size={18} /></button>
-        </div>
-        <div style={{ padding:'24px' }}>
-          <p style={{ fontSize:13, color:'var(--text-secondary)', marginBottom:16, lineHeight:1.6 }}>
-            The admin account has been created. Send the link below to the admin so they can set their password and activate their account.
-          </p>
-          <label style={ms.label}>Password Setup Link</label>
-          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-            <input
-              readOnly
-              value={setupLink}
-              style={{ ...ms.input, flex:1, background:'var(--surface-2)', color:'var(--text-secondary)', fontSize:12.5, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}
-              onFocus={e => e.target.select()}
-            />
-            <button
-              onClick={handleCopy}
-              title={copied ? 'Copied!' : 'Copy link'}
-              style={{ flexShrink:0, padding:'9px 14px', borderRadius:'var(--radius-sm)', border:'1px solid var(--border)', background: copied ? '#ECFDF5' : 'var(--surface)', color: copied ? '#059669' : 'var(--text-primary)', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontSize:13, fontWeight:600, fontFamily:'inherit', transition:'background 0.2s, color 0.2s' }}
-            >
-              {copied ? <CheckCircle size={14} /> : <Copy size={14} />}
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-          </div>
-          <p style={{ fontSize:11.5, color:'var(--text-muted)', marginTop:10, lineHeight:1.5 }}>
-            ⚠️ This link will expire. Share it with the admin as soon as possible. The admin will appear as <strong>Pending</strong> until they complete setup.
-          </p>
-        </div>
-        <div style={ms.footer}>
-          <button onClick={onClose} style={ms.submitBtn}>Done</button>
-        </div>
-      </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    <div style={{
+      position: 'fixed', bottom: 24, right: 24, zIndex: 2000,
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '12px 16px', borderRadius: 'var(--radius-sm)',
+      background: '#ECFDF5', border: '1px solid #6EE7B7',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+      fontSize: 13, fontWeight: 500, color: '#065F46',
+      animation: 'slideIn 0.2s ease',
+    }}>
+      <CheckCircle size={16} color="#059669" style={{ flexShrink: 0 }} />
+      {message}
+      <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'#059669', marginLeft:4, padding:2, display:'flex' }}>
+        <X size={14} />
+      </button>
+      <style>{`@keyframes slideIn { from { transform: translateY(8px); opacity:0; } to { transform: translateY(0); opacity:1; } }`}</style>
     </div>
   );
 }
@@ -142,10 +94,16 @@ function EditAdminModal({ admin, onClose, onSave }) {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
-    setSubmitting(true); setApiError('');
+
+    setSubmitting(true);
+    setApiError('');
     try {
-      onSave({ ...admin, name:`${form.first_name.trim()} ${form.last_name.trim()}`, email:form.admin_email.trim(), first_name:form.first_name.trim(), last_name:form.last_name.trim() });
-      onClose();
+      const fullName = `${form.first_name.trim()} ${form.last_name.trim()}`;
+      const updated = await onSave(admin.id, {
+        name:  fullName,
+        email: form.admin_email.trim(),
+      });
+      onClose(updated);
     } catch (err) {
       setApiError(err.message || 'Something went wrong. Please try again.');
     } finally {
@@ -171,9 +129,11 @@ function EditAdminModal({ admin, onClose, onSave }) {
           </div>
           <button onClick={onClose} style={ms.closeBtn} aria-label="Close"><X size={18} /></button>
         </div>
+
         <form onSubmit={handleSubmit} noValidate>
           <div style={{ padding:'24px 24px 0' }}>
             {apiError && <div style={ms.errorBanner} role="alert">{apiError}</div>}
+
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:18 }}>
               <div>
                 <label style={ms.label}>First Name <span style={{ color:'var(--danger)' }}>*</span></label>
@@ -192,7 +152,8 @@ function EditAdminModal({ admin, onClose, onSave }) {
                 {errors.last_name && <p role="alert" style={ms.fieldError}>{errors.last_name}</p>}
               </div>
             </div>
-            <div style={{ marginBottom:18 }}>
+
+            <div style={{ marginBottom:24 }}>
               <label style={ms.label}>Admin Email <span style={{ color:'var(--danger)' }}>*</span></label>
               <div style={{ position:'relative' }}>
                 <Mail size={15} style={ms.inputIcon} />
@@ -201,6 +162,7 @@ function EditAdminModal({ admin, onClose, onSave }) {
               {errors.admin_email && <p role="alert" style={ms.fieldError}>{errors.admin_email}</p>}
             </div>
           </div>
+
           <div style={ms.footer}>
             <button type="button" onClick={onClose} style={ms.cancelBtn} disabled={submitting}>Cancel</button>
             <button type="submit" style={ms.submitBtn} disabled={submitting}>
@@ -217,19 +179,19 @@ function EditAdminModal({ admin, onClose, onSave }) {
 // ─── Main Page ────────────────────────────────────────────────────────
 export default function SuperAdminAdmins() {
   const navigate = useNavigate();
-  const [admins, setAdmins]           = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState('');
-  const [search, setSearch]           = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [showModal, setShowModal]     = useState(false);
-  const [editingAdmin, setEditingAdmin] = useState(null);
+  const [admins, setAdmins]               = useState([]);
+  const [loading, setLoading]             = useState(true);
+  const [error, setError]                 = useState('');
+  const [search, setSearch]               = useState('');
+  const [statusFilter, setStatusFilter]   = useState('');
+  const [showModal, setShowModal]         = useState(false);
+  const [editingAdmin, setEditingAdmin]   = useState(null);
   const [deletingAdmin, setDeletingAdmin] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [setupLinkData, setSetupLinkData] = useState(null);
-  // Sort state
-  const [sortField, setSortField]     = useState('');
-  const [sortDir, setSortDir]         = useState('asc');
+  const [isDeleting, setIsDeleting]       = useState(false);
+  const [currentPage, setCurrentPage]     = useState(1);
+  const [successToast, setSuccessToast]   = useState('');  // ← replaces setupLinkData
+  const [sortField, setSortField]         = useState('');
+  const [sortDir, setSortDir]             = useState('asc');
   const recordsPerPage = 10;
 
   const fetchAdmins = useCallback(async (signal) => {
@@ -254,6 +216,7 @@ export default function SuperAdminAdmins() {
 
   useEffect(() => { setCurrentPage(1); }, [search, statusFilter]);
 
+  // ── Filtering & sorting ──────────────────────────────────────────────
   const filtered = admins.filter(a => {
     const status = a.is_pending ? 'Pending' : (a.is_active ? 'Active' : 'Inactive');
     if (statusFilter && status !== statusFilter) return false;
@@ -266,15 +229,14 @@ export default function SuperAdminAdmins() {
     return true;
   });
 
-  // Sort
   const sortedAdmins = (() => {
     if (!sortField) return filtered;
     return [...filtered].sort((a, b) => {
       let av, bv;
-      if (sortField === 'name')         { av = (a.name || a.email || '').toLowerCase();   bv = (b.name || b.email || '').toLowerCase(); }
-      else if (sortField === 'tenant') { av = (a.tenant_name || '').toLowerCase();        bv = (b.tenant_name || '').toLowerCase(); }
-      else if (sortField === 'created_at') { av = a.created_at || ''; bv = b.created_at || ''; }
-      else { av = String(a[sortField]||'').toLowerCase(); bv = String(b[sortField]||'').toLowerCase(); }
+      if      (sortField === 'name')       { av = (a.name || a.email || '').toLowerCase();  bv = (b.name || b.email || '').toLowerCase(); }
+      else if (sortField === 'tenant')     { av = (a.tenant_name || '').toLowerCase();       bv = (b.tenant_name || '').toLowerCase(); }
+      else if (sortField === 'created_at') { av = a.created_at || '';                        bv = b.created_at || ''; }
+      else                                 { av = String(a[sortField]||'').toLowerCase();    bv = String(b[sortField]||'').toLowerCase(); }
       if (av < bv) return sortDir === 'asc' ? -1 : 1;
       if (av > bv) return sortDir === 'asc' ?  1 : -1;
       return 0;
@@ -289,34 +251,49 @@ export default function SuperAdminAdmins() {
     else { setSortField(field); setSortDir('asc'); }
   };
 
+  // ── Add: prepend optimistic row + show "Invite sent" toast ───────────
   const handleAddAdmin = (result) => {
     setAdmins(prev => [{
-      id:           result.id || Date.now(),
-      email:        result.admin_email,
-      name:         result.admin_name || result.admin_email,
-      role:         'admin',
-      tenant_id:    result.tenant?.id ?? '',
+      id:          result.id || Date.now(),
+      email:       result.admin_email,
+      name:        result.admin_name || result.admin_email,
+      role:        'admin',
+      tenant_id:   result.tenant?.id ?? '',
       tenant_name: result.tenant?.name ?? '—',
-      is_active:    false,
-      is_pending:   true,
-      created_at:   new Date().toISOString(),
+      is_active:   false,
+      is_pending:  true,
+      created_at:  new Date().toISOString(),
     }, ...prev]);
-    const setupLink = result.setup_link || result.password_setup_link || result.invite_link;
-    if (setupLink) setSetupLinkData({ link:setupLink, adminName: result.admin_name || result.admin_email || 'the admin' });
+
+    // Show toast — no link shown, matching previous UX
+    const label = result.admin_name || result.admin_email || 'Admin';
+    setSuccessToast(`Invite sent successfully to ${label}.`);
   };
 
-  const handleSaveEdit = (updated) => {
-    setAdmins(prev => prev.map(a => a.id === updated.id ? { ...a, ...updated } : a));
+  // ── Edit: calls PATCH /super-admin/admins/:id ────────────────────────
+  const handleSaveEdit = async (adminId, patch) => {
+    const updated = await superAdminService.updateAdmin(adminId, patch);
+    setAdmins(prev =>
+      prev.map(a => a.id === adminId
+        ? { ...a, name: updated.name ?? a.name, email: updated.email ?? a.email }
+        : a
+      )
+    );
+    return updated;
   };
 
+  // ── Delete: calls DELETE /super-admin/admins/:id ─────────────────────
   const handleDeleteConfirm = async () => {
     if (!deletingAdmin) return;
+    setIsDeleting(true);
     try {
       await superAdminService.deleteAdmin(deletingAdmin.id);
-      setAdmins((prev) => prev.filter((a) => a.id !== deletingAdmin.id));
+      setAdmins(prev => prev.filter(a => a.id !== deletingAdmin.id));
       setDeletingAdmin(null);
     } catch (err) {
-      alert(`Error: ${err.message}`);
+      alert(`Delete failed: ${err.message}`);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -327,7 +304,6 @@ export default function SuperAdminAdmins() {
 
   const hasActive = search || statusFilter;
 
-  // Sortable TH helper
   const SortTh = ({ field, children, style }) => (
     <th style={{ cursor:'pointer', userSelect:'none', ...style }} onClick={() => handleSort(field)}>
       {children}<SortIcon field={field} sortField={sortField} sortDir={sortDir} />
@@ -338,40 +314,55 @@ export default function SuperAdminAdmins() {
     <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      {editingAdmin && <EditAdminModal admin={editingAdmin} onClose={() => setEditingAdmin(null)} onSave={handleSaveEdit} />}
+      {/* Edit Modal */}
+      {editingAdmin && (
+        <EditAdminModal
+          admin={editingAdmin}
+          onClose={() => setEditingAdmin(null)}
+          onSave={handleSaveEdit}
+        />
+      )}
 
-      {/* {setupLinkData && (
-        <PasswordSetupLinkModal setupLink={setupLinkData.link} adminName={setupLinkData.adminName} onClose={() => setSetupLinkData(null)} />
-      )} */}
-
+      {/* Delete Confirm Modal */}
       {deletingAdmin && (
         <ConfirmDeleteModal
           agent={deletingAdmin}
           isOpen={!!deletingAdmin}
-          onClose={() => setDeletingAdmin(null)}
+          onClose={() => !isDeleting && setDeletingAdmin(null)}
           onConfirm={handleDeleteConfirm}
-          isDeleting={false}
+          isDeleting={isDeleting}
         />
       )}
 
+      {/* Invite success toast — auto-dismisses after 4 s */}
+      {successToast && (
+        <SuccessToast message={successToast} onClose={() => setSuccessToast('')} />
+      )}
+
       {/* Page header */}
- {/* Page header */}
-<div className="page-header">
- <div className="page-header-left">
-  <div className="breadcrumb">
-    <span onClick={() => navigate('/superadmin/dashboard')} style={{ cursor:'pointer' }} onMouseEnter={e => e.currentTarget.style.textDecoration='underline'} onMouseLeave={e => e.currentTarget.style.textDecoration='none'}>Dashboard</span>
-    <span>›</span>
-    <span style={{ color:'var(--text-secondary)' }}>Admins</span>
-  </div>
-  <h1>Admins</h1>
-  <p>Manage admin users across all tenants</p>
-</div>
-  <div className="page-header-actions">
-    <button onClick={() => setShowModal(true)} className="btn btn-primary">
-      <Plus size={16} /> Add Admin
-    </button>
-  </div>
-</div>
+      <div className="page-header">
+        <div className="page-header-left">
+          <div className="breadcrumb">
+            <span
+              onClick={() => navigate('/superadmin/dashboard')}
+              style={{ cursor:'pointer' }}
+              onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+              onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+            >
+              Dashboard
+            </span>
+            <span>›</span>
+            <span style={{ color:'var(--text-secondary)' }}>Admins</span>
+          </div>
+          <h1>Admins</h1>
+          <p>Manage admin users across all tenants</p>
+        </div>
+        <div className="page-header-actions">
+          <button onClick={() => setShowModal(true)} className="btn btn-primary">
+            <Plus size={16} /> Add Admin
+          </button>
+        </div>
+      </div>
 
       {/* Filter toolbar */}
       <div className="filter-toolbar">
@@ -412,8 +403,7 @@ export default function SuperAdminAdmins() {
                 <th>ROLE</th>
                 <th>STATUS</th>
                 <SortTh field="created_at">CREATED</SortTh>
-                {/* Fixed: Right-aligned header to match Tenants page */}
-                <th style={{ textAlign: 'right', paddingRight: '24px' }}>ACTIONS</th>
+                <th style={{ textAlign:'right', paddingRight:24 }}>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -451,8 +441,7 @@ export default function SuperAdminAdmins() {
                     }
                   </td>
                   <td style={{ color:'var(--text-secondary)', fontSize:13.5 }}>{formatDate(a.created_at)}</td>
-                  {/* Fixed: Matched alignment and justifyContent with Tenants page */}
-                  <td style={{ textAlign: 'right', paddingRight: '16px' }} onClick={e => e.stopPropagation()}>
+                  <td style={{ textAlign:'right', paddingRight:16 }} onClick={e => e.stopPropagation()}>
                     <div style={{ display:'flex', gap:4, alignItems:'center', justifyContent:'flex-end' }}>
                       <button
                         type="button"
