@@ -1108,13 +1108,14 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId: integrationIdP
 
   const authType = watch('auth_type');
   const enableWh = watch('enable_webhooks');
-  const webhookSecretsLocked =
-    !!integrationId &&
-    (
-      hasConfiguredWebhooks(integrationDetail) ||
-      hasConfiguredWebhooks(statusData) ||
-      !!webhookUrlData
-    );
+const webhookSecretsLocked =
+  !isEditing &&          // ← added: never lock in edit mode
+  !!integrationId &&
+  (
+    hasConfiguredWebhooks(integrationDetail) ||
+    hasConfiguredWebhooks(statusData) ||
+    !!webhookUrlData
+  );
 
   // ── Pre-fill from integration detail (covers the refresh/navigate-back case) ─
   // Priority: use detail data (which has base_url + auth_type from the DB) over
@@ -1206,6 +1207,8 @@ function PageConfigureCrm({ activeCrm, crmConfigs, integrationId: integrationIdP
     setValue('cred_access_token', '');
     setValue('cred_refresh_token', '');
     setValue('cred_client_secret', '');
+    setValue('webhook_secret', '');
+setValue('per_event_secrets', []);
     // Restore enable_webhooks from detail data so the toggle shows the real state
     const hasWebhooks =
       hasConfiguredWebhooks(integrationDetail) ||
