@@ -1,13 +1,5 @@
 /**
  * src/pages/superadmin/SuperAdminTenants.jsx
- *
- * Fixes:
- *  ✅ EditTenantModal: "Originally selected" dot/legend REMOVED
- *  ✅ EditTenantModal: pre-selected CRMs seeded from tenant.source_systems,
- *     shown checked + blue-highlighted (identical to Add Tenant modal)
- *  ✅ Status column: sortable:false — no sort arrows
- *  ✅ Contact Email column: sortable:true + comparator reads email||contact_email (functional)
- *  ✅ DELETE FUNCTIONALITY: Trash2 button now opens ConfirmDeleteModal
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -46,33 +38,25 @@ export function TenantAvatar({ name, size = 36 }) {
 
 // ─── Modal shared styles ─────────────────────────────────────────────
 const ms = {
-  overlay: { position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.45)', backdropFilter:'blur(3px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 },
-  modal:   { background:'var(--surface)', borderRadius:'var(--radius)', boxShadow:'0 20px 60px rgba(0,0,0,0.25)', width:'100%', maxWidth:480, border:'1px solid var(--border)' },
-  header:  { display:'flex', alignItems:'center', justifyContent:'space-between', padding:'20px 24px', borderBottom:'1px solid var(--border)' },
-  iconBox: { width:38, height:38, borderRadius:'50%', background:'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center' },
-  input:   { width:'100%', padding:'9px 12px', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)', background:'var(--surface)', fontSize:13.5, outline:'none', fontFamily:'inherit', boxSizing:'border-box' },
-  label:   { display:'block', fontSize:13, fontWeight:600, marginBottom:6 },
-  fieldError: { fontSize:11.5, color:'var(--danger)', marginTop:4 },
-  footer:  { display:'flex', justifyContent:'flex-end', gap:10, padding:'16px 24px', borderTop:'1px solid var(--border)' },
-  submitBtn: { padding:'9px 20px', borderRadius:'var(--radius-sm)', background:'var(--primary)', color:'white', fontWeight:600, cursor:'pointer', border:'none', fontFamily:'inherit' },
-  closeBtn:  { background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)' },
+  overlay:     { position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.45)', backdropFilter:'blur(3px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 },
+  modal:       { background:'var(--surface)', borderRadius:'var(--radius)', boxShadow:'0 20px 60px rgba(0,0,0,0.25)', width:'100%', maxWidth:480, border:'1px solid var(--border)' },
+  header:      { display:'flex', alignItems:'center', justifyContent:'space-between', padding:'20px 24px', borderBottom:'1px solid var(--border)' },
+  iconBox:     { width:38, height:38, borderRadius:'50%', background:'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center' },
+  input:       { width:'100%', padding:'9px 12px', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)', background:'var(--surface)', fontSize:13.5, outline:'none', fontFamily:'inherit', boxSizing:'border-box' },
+  label:       { display:'block', fontSize:13, fontWeight:600, marginBottom:6 },
+  fieldError:  { fontSize:11.5, color:'var(--danger)', marginTop:4 },
+  footer:      { display:'flex', justifyContent:'flex-end', gap:10, padding:'16px 24px', borderTop:'1px solid var(--border)' },
+  submitBtn:   { padding:'9px 20px', borderRadius:'var(--radius-sm)', background:'var(--primary)', color:'white', fontWeight:600, cursor:'pointer', border:'none', fontFamily:'inherit' },
+  closeBtn:    { background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)' },
   errorBanner: { marginBottom:16, padding:'10px 14px', background:'#FEF2F2', border:'1px solid #FECACA', color:'#DC2626', borderRadius:'var(--radius-sm)', fontSize:13 },
 };
 
 // ─── Edit Tenant Modal ───────────────────────────────────────────────
-function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
+function EditTenantModal({ tenant, onClose, onSave }) {
   const [form, setForm] = useState({
-    name:  tenant?.name || '',
-    email: tenant?.email || tenant?.contact_email || '',
+    name:  tenant?.name  || '',
+    email: tenant?.contact_email || tenant?.email || '',
   });
-
-  // Seed the checkbox state from whatever was persisted on this tenant
-  const [selectedSystems, setSelectedSystems] = useState(() =>
-    (tenant?.source_systems || [])
-      .map((s) => (typeof s === 'string' ? s : s.system_name || ''))
-      .filter(Boolean)
-  );
-
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors]         = useState({});
   const [apiError, setApiError]     = useState('');
@@ -82,7 +66,6 @@ function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
     if (!form.name.trim())  e.name  = 'Tenant name is required.';
     if (!form.email.trim()) e.email = 'Contact email is required.';
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Enter a valid email.';
-    if (selectedSystems.length === 0) e.systems = 'Select at least one CRM system.';
     return e;
   };
 
@@ -90,32 +73,23 @@ function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
+
     setSubmitting(true);
     setApiError('');
     try {
-      await onSave({
-        ...tenant,
-        name:           form.name.trim(),
-        email:          form.email.trim(),
-        contact_email:  form.email.trim(),
-        source_systems: selectedSystems.map((s) => ({ system_name: s })),
+      // Call PATCH /super-admin/tenants/:id
+      // Backend accepts: { name, contact_email, is_active }
+      const updated = await onSave(tenant.id, {
+        name:          form.name.trim(),
+        contact_email: form.email.trim(),
       });
-      onClose();
+      onClose(updated);
     } catch (err) {
       setApiError(err.message || 'Something went wrong. Please try again.');
     } finally {
       setSubmitting(false);
     }
   };
-
-  const toggleSystem = (sys) => {
-    setSelectedSystems((prev) =>
-      prev.includes(sys) ? prev.filter((s) => s !== sys) : [...prev, sys]
-    );
-    if (errors.systems) setErrors((e) => ({ ...e, systems: '' }));
-  };
-
-  const systemOptions = allSystems.map((s) => s.system_name || s);
 
   return (
     <div style={ms.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -140,34 +114,36 @@ function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
             <div style={{ marginBottom:18 }}>
               <label style={ms.label}>Tenant Name <span style={{ color:'var(--danger)' }}>*</span></label>
               <input
-                style={ms.input}
+                style={{ ...ms.input, borderColor: errors.name ? 'var(--danger)' : undefined }}
                 placeholder="e.g. Global Industries Corp"
                 value={form.name}
-                onChange={(e) => { setForm((f) => ({ ...f, name:e.target.value })); if (errors.name) setErrors((er)=>({...er,name:''})); }}
+                onChange={(e) => { setForm(f => ({ ...f, name:e.target.value })); if (errors.name) setErrors(er => ({ ...er, name:'' })); }}
                 autoFocus
               />
               {errors.name && <p style={ms.fieldError}>{errors.name}</p>}
             </div>
 
             {/* Contact Email */}
-            <div style={{ marginBottom:18 }}>
+            <div style={{ marginBottom:24 }}>
               <label style={ms.label}>Contact Email <span style={{ color:'var(--danger)' }}>*</span></label>
               <input
                 type="email"
-                style={ms.input}
+                style={{ ...ms.input, borderColor: errors.email ? 'var(--danger)' : undefined }}
                 placeholder="admin@company.com"
                 value={form.email}
-                onChange={(e) => { setForm((f) => ({ ...f, email:e.target.value })); if (errors.email) setErrors((er)=>({...er,email:''})); }}
+                onChange={(e) => { setForm(f => ({ ...f, email:e.target.value })); if (errors.email) setErrors(er => ({ ...er, email:'' })); }}
               />
               {errors.email && <p style={ms.fieldError}>{errors.email}</p>}
             </div>
-
-
           </div>
 
           <div style={ms.footer}>
-            <button type="button" onClick={onClose} style={{ ...ms.submitBtn, background:'transparent', color:'var(--text-secondary)', border:'1px solid var(--border)' }} disabled={submitting}>Cancel</button>
-            <button type="submit" style={ms.submitBtn} disabled={submitting}>{submitting ? 'Saving…' : 'Save Changes'}</button>
+            <button type="button" onClick={onClose} style={{ ...ms.submitBtn, background:'transparent', color:'var(--text-secondary)', border:'1px solid var(--border)' }} disabled={submitting}>
+              Cancel
+            </button>
+            <button type="submit" style={ms.submitBtn} disabled={submitting}>
+              {submitting ? 'Saving…' : 'Save Changes'}
+            </button>
           </div>
         </form>
       </div>
@@ -178,21 +154,27 @@ function EditTenantModal({ tenant, onClose, onSave, allSystems = [] }) {
 // ─── Delete Confirm Modal ────────────────────────────────────────────
 function DeleteConfirmModal({ tenant, onClose, onConfirm, isLoading }) {
   return (
-    <div style={ms.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div style={ms.overlay} onClick={(e) => e.target === e.currentTarget && !isLoading && onClose()}>
       <div style={ms.modal} role="dialog" aria-modal="true">
         <div style={ms.header}>
           <div>
             <h2 style={{ fontSize:17, fontWeight:700, margin:0 }}>Delete {tenant?.name}?</h2>
             <p style={{ fontSize:12.5, color:'var(--text-muted)', margin:'4px 0 0' }}>This action cannot be undone.</p>
           </div>
-          <button onClick={onClose} style={ms.closeBtn}><X size={18} /></button>
+          <button onClick={onClose} style={ms.closeBtn} disabled={isLoading}><X size={18} /></button>
         </div>
         <div style={{ padding:'24px' }}>
-          <p style={{ fontSize:13, color:'var(--text-secondary)', marginBottom:0 }}>All data associated with this tenant will be permanently deleted.</p>
+          <p style={{ fontSize:13, color:'var(--text-secondary)', marginBottom:0 }}>
+            All data associated with <strong>{tenant?.name}</strong> will be permanently deleted, including all users, CRM integrations, and tickets.
+          </p>
         </div>
         <div style={ms.footer}>
-          <button type="button" onClick={onClose} style={{ ...ms.submitBtn, background:'transparent', color:'var(--text-secondary)', border:'1px solid var(--border)' }} disabled={isLoading}>Cancel</button>
-          <button type="button" onClick={onConfirm} style={{ ...ms.submitBtn, background:'var(--danger)' }} disabled={isLoading}>Delete</button>
+          <button type="button" onClick={onClose} style={{ ...ms.submitBtn, background:'transparent', color:'var(--text-secondary)', border:'1px solid var(--border)' }} disabled={isLoading}>
+            Cancel
+          </button>
+          <button type="button" onClick={onConfirm} style={{ ...ms.submitBtn, background:'#EF4444' }} disabled={isLoading}>
+            {isLoading ? 'Deleting…' : 'Delete'}
+          </button>
         </div>
       </div>
     </div>
@@ -202,24 +184,18 @@ function DeleteConfirmModal({ tenant, onClose, onConfirm, isLoading }) {
 // ─── Main Page ───────────────────────────────────────────────────────
 export default function SuperAdminTenants() {
   const navigate = useNavigate();
-  const [tenants, setTenants]             = useState([]);
-  const [allSystems, setAllSystems]       = useState([]);
-  const [loading, setLoading]             = useState(true);
-  const [error, setError]                 = useState('');
-  const [search, setSearch]               = useState('');
-  const [statusFilter, setStatusFilter]   = useState('');
-  const [sortField, setSortField]         = useState('');
-  const [sortDir, setSortDir]             = useState('asc');
-  const [page, setPage]                   = useState(1);
-  const [showAddModal, setShowAddModal]   = useState(false);
-  const [editingTenant, setEditingTenant] = useState(null);
+  const [tenants, setTenants]               = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [error, setError]                   = useState('');
+  const [search, setSearch]                 = useState('');
+  const [statusFilter, setStatusFilter]     = useState('');
+  const [sortField, setSortField]           = useState('');
+  const [sortDir, setSortDir]               = useState('asc');
+  const [page, setPage]                     = useState(1);
+  const [showAddModal, setShowAddModal]     = useState(false);
+  const [editingTenant, setEditingTenant]   = useState(null);
   const [deletingTenant, setDeletingTenant] = useState(null);
-
-  useEffect(() => {
-    superAdminService.getSourceSystems()
-      .then((data) => setAllSystems(Array.isArray(data) ? data : []))
-      .catch(() => setAllSystems([]));
-  }, []);
+  const [isDeleting, setIsDeleting]         = useState(false);
 
   const fetchTenants = useCallback(async (signal) => {
     setLoading(true); setError('');
@@ -240,6 +216,7 @@ export default function SuperAdminTenants() {
     return () => controller.abort();
   }, [fetchTenants]);
 
+  // ── Filtering & sorting ──────────────────────────────────────────────
   const filtered = useMemo(() => {
     return tenants.filter((t) => {
       if (search) {
@@ -257,7 +234,6 @@ export default function SuperAdminTenants() {
   const sorted = useMemo(() => {
     if (!sortField) return filtered;
     return [...filtered].sort((a, b) => {
-      // For email column, fall back to contact_email
       const av = sortField === 'email'
         ? String(a.email || a.contact_email || '').toLowerCase()
         : String(a[sortField] ?? '').toLowerCase();
@@ -271,37 +247,39 @@ export default function SuperAdminTenants() {
   }, [filtered, sortField, sortDir]);
 
   const handleSort = (field) => {
-    if (sortField === field) setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
+    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortField(field); setSortDir('asc'); }
   };
 
+  // ── Add ──────────────────────────────────────────────────────────────
   const handleAddTenant = () => {
     fetchTenants(new AbortController().signal);
     setShowAddModal(false);
   };
 
-  const handleSaveEdit = async (updated) => {
-    try {
-      await superAdminService.updateTenant(updated.id, {
-        name:           updated.name,
-        email:          updated.email,
-        source_systems: updated.source_systems,
-      });
-      setTenants((prev) => prev.map((t) => t.id === updated.id ? { ...t, ...updated } : t));
-      setEditingTenant(null);
-    } catch (err) {
-      alert(`Error: ${err.message}`);
-    }
+  // ── Edit: calls PATCH /super-admin/tenants/:id ───────────────────────
+  const handleSaveEdit = async (tenantId, patch) => {
+    // patch = { name, contact_email }  — maps directly to UpdateTenantRequest
+    const updated = await superAdminService.updateTenant(tenantId, patch);
+    // Merge the response back into local state so the row re-renders immediately
+    setTenants(prev =>
+      prev.map(t => t.id === tenantId ? { ...t, ...updated } : t)
+    );
+    return updated;
   };
 
+  // ── Delete: calls DELETE /super-admin/tenants/:id ────────────────────
   const handleDeleteConfirm = async () => {
     if (!deletingTenant) return;
+    setIsDeleting(true);
     try {
       await superAdminService.deleteTenant(deletingTenant.id);
-      setTenants((prev) => prev.filter((t) => t.id !== deletingTenant.id));
+      setTenants(prev => prev.filter(t => t.id !== deletingTenant.id));
       setDeletingTenant(null);
     } catch (err) {
-      alert(`Error: ${err.message}`);
+      alert(`Delete failed: ${err.message}`);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -310,7 +288,6 @@ export default function SuperAdminTenants() {
     return new Date(iso).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
   };
 
-  // Status: sortable:false  |  Contact Email: sortable:true (functional)
   const columns = [
     {
       key: 'name',
@@ -330,7 +307,7 @@ export default function SuperAdminTenants() {
     {
       key: 'email',
       label: 'Contact Email',
-      sortable: true,        // ← functional: comparator handles email||contact_email
+      sortable: true,
       width: '28%',
       render: (value, row) => (
         <div style={{ fontSize:13, color:'var(--text-secondary)' }}>{value || row.contact_email || '—'}</div>
@@ -339,7 +316,7 @@ export default function SuperAdminTenants() {
     {
       key: 'is_active',
       label: 'Status',
-      sortable: false,       // ← NO sort arrows on Status column
+      sortable: false,
       width: '15%',
       render: (value, row) => <StatusBadge status={(row.is_active ?? true) ? 'Active' : 'Inactive'} />,
     },
@@ -348,11 +325,11 @@ export default function SuperAdminTenants() {
       label: 'Created',
       sortable: true,
       width: '15%',
-      render: (value, row) => (
-        <span style={{ fontSize:13, color:'var(--text-muted)' }}>{formatDate(value || row.created_at)}</span>
+      render: (value) => (
+        <span style={{ fontSize:13, color:'var(--text-muted)' }}>{formatDate(value)}</span>
       ),
     },
-   {
+    {
       key: 'id',
       label: 'Actions',
       width: 80,
@@ -363,8 +340,8 @@ export default function SuperAdminTenants() {
             onClick={() => setEditingTenant(row)}
             title="Edit tenant"
             style={{ padding:6, border:'none', background:'none', cursor:'pointer', color:'var(--text-muted)', transition:'color 0.2s' }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--primary)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
           >
             <Edit2 size={14} />
           </button>
@@ -372,8 +349,8 @@ export default function SuperAdminTenants() {
             onClick={() => setDeletingTenant(row)}
             title="Delete tenant"
             style={{ padding:6, border:'none', background:'none', cursor:'pointer', color:'var(--text-muted)', transition:'color 0.2s' }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+            onMouseEnter={e => (e.currentTarget.style.color = '#EF4444')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
           >
             <Trash2 size={14} />
           </button>
@@ -401,7 +378,7 @@ export default function SuperAdminTenants() {
       <nav style={{ display:'flex', alignItems:'center', gap:6, fontSize:13, color:'var(--text-muted)', marginBottom:4 }}>
         <span
           onClick={() => navigate('/superadmin/dashboard')}
-          style={{ cursor:'pointer', color:'var(--text-muted)', fontWeight:500 }}
+          style={{ cursor:'pointer', fontWeight:500 }}
           onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
           onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
         >
@@ -446,25 +423,27 @@ export default function SuperAdminTenants() {
         emptyMessage={hasActiveFilters ? 'No tenants match your filters.' : 'No tenants found.'}
       />
 
+      {/* Add Modal */}
       {showAddModal && (
         <AddTenantModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onSubmit={handleAddTenant} />
       )}
 
+      {/* Edit Modal */}
       {editingTenant && (
         <EditTenantModal
           tenant={editingTenant}
           onClose={() => setEditingTenant(null)}
           onSave={handleSaveEdit}
-          allSystems={allSystems}
         />
       )}
 
+      {/* Delete Confirm Modal */}
       {deletingTenant && (
         <DeleteConfirmModal
           tenant={deletingTenant}
           onClose={() => setDeletingTenant(null)}
           onConfirm={handleDeleteConfirm}
-          isLoading={false}
+          isLoading={isDeleting}
         />
       )}
     </div>
